@@ -1,0 +1,28 @@
+# Enforces I7: TAPI is the only data path (spec section 8.3).
+# Presentation code must not reach past the API into storage or analytics.
+
+[importlinter]
+root_package = treble
+
+[importlinter:contract:1]
+name = Screens and renderers may not import storage or analytics
+type = forbidden
+source_modules =
+    treble.screens
+    treble.render
+forbidden_modules =
+    treble.store
+    treble.analytics
+    treble.ingest
+
+[importlinter:contract:2]
+name = Layered architecture
+type = layers
+layers =
+    treble.render
+    treble.screens
+    treble.tapi
+    treble.tql
+    treble.analytics
+    treble.store
+    treble.core
