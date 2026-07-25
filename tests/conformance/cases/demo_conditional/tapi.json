@@ -1,0 +1,8 @@
+{
+  "fields": {
+    "CHG_NET_1D": {"value": -0.42, "provenance_id": "cc33"},
+    "OAS_SPREAD_MID": {"value": 143.7, "provenance_id": "dd44", "stale": true, "model_derived": true},
+    "NO_SOURCE_FIELD": {"value": null, "provenance_id": "ee55"}
+  },
+  "series": {}
+}

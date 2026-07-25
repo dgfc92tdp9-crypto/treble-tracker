@@ -1,0 +1,7 @@
+{
+  "fields": {
+    "PX_LAST": {"value": 291.97, "provenance_id": "aa11", "stale": false},
+    "NAME": {"value": "INTL BUSINESS MACHINES", "provenance_id": "bb22"}
+  },
+  "series": {}
+}

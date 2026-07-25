@@ -1,0 +1,33 @@
+# Synthetic conformance case: static labels, bound fields, a drillable link.
+# DEMO mnemonics are test-only and never ship as screens.
+mnemonic: DEMO1
+title: Demo Basic
+rows: 6
+cols: 40
+namespaces: [Equity]
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SECURITY DESCRIPTION"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Last Px"
+      - kind: bound
+        at: {row: 2, col: 10}
+        field: PX_LAST
+        format: "{:.2f}"
+        width: 10
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "Name"
+      - kind: bound
+        at: {row: 3, col: 10}
+        field: NAME
+        width: 24
+      - kind: link
+        at: {row: 5, col: 0}
+        text: "1) Related Securities"
+        command: "{security} RELS"

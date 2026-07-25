@@ -1,0 +1,118 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "CHG TODAY"
+    },
+    {
+      "at": [
+        0,
+        12
+      ],
+      "attrs": [
+        "negative"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": "cc33",
+      "text": "-0.42"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "OAS (mid)"
+    },
+    {
+      "at": [
+        1,
+        12
+      ],
+      "attrs": [
+        "model_derived",
+        "stale"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": "dd44",
+      "text": "143.7"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Missing"
+    },
+    {
+      "at": [
+        2,
+        12
+      ],
+      "attrs": [
+        "stale"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": "ee55",
+      "text": "—"
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Settle"
+    },
+    {
+      "at": [
+        4,
+        12
+      ],
+      "attrs": [
+        "editable"
+      ],
+      "input": "settle_dt",
+      "link": null,
+      "provenance": null,
+      "text": "07/29/26  "
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    6,
+    44
+  ],
+  "mnemonic": "DEMO2",
+  "panes": [],
+  "stale": true,
+  "tab": "main"
+}
