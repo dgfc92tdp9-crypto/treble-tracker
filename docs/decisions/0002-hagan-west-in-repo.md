@@ -13,12 +13,23 @@ guarantee).
 
 ## Decision
 
-Implement Hagan–West monotone convex ourselves in `treble/analytics/curves/`, following the
-published paper (Hagan & West, "Interpolation Methods for Curve Construction", *Applied
-Mathematical Finance*, 2006), and validate against the paper's worked example table as a
-golden test. All other supported interpolations (linear zeros, log-linear discount factors,
-natural cubic zeros, monotonic cubic) use QuantLib's implementations. The bootstrap asserts
-the 1e-10 repricing property on every curve regardless of method.
+Implement Hagan–West monotone convex ourselves in `treble/analytics/curves/hagan_west.py`,
+following the published paper (Hagan & West, "Interpolation Methods for Curve Construction",
+*Applied Mathematical Finance*, 2006).
+
+**Amendment (same date):** the bootstrap solver is generic over an in-repo `Interpolator`
+protocol, because QuantLib's bootstrap cannot take a custom Python interpolation trait — so
+the other methods (linear zeros, log-linear discount, natural/monotonic cubic zeros) are also
+provided as thin in-repo interpolators (NumPy/SciPy, both in the fixed stack), with a single
+global solve (`scipy.optimize.root`) driving node zeros to reprice every input to 1e-10.
+QuantLib remains the analytics core for schedules, calendars, day counts and all bond/OAS
+math; QuantLib curve construction is used as an independent *cross-check* in golden tests
+rather than as the bootstrap implementation.
+
+Validation: closed-form g-integrals cross-checked against quadrature under Hypothesis;
+structural properties (node repricing, forward positivity, forward continuity, forward-integral
+consistency) asserted; repricing property asserted for every interpolation method on every
+build — the constructor refuses to return a curve that misses 1e-10.
 
 ## Consequences
 

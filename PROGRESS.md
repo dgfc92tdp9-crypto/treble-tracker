@@ -72,6 +72,10 @@ Non-blocking, proceeding on stated defaults (flag if wrong):
 
 *One line each, linking to the full record in `docs/decisions/`. Do not duplicate the record's content here.*
 
+- **Release definition (Jack, 2026-07-25):** "launch" = the complete spec through Phase 5
+  (real-time, PORT/TFM3, messaging, execution, AI) — no public/phased launch before that.
+  Build order and phase gates unchanged; deadline explicitly subordinate to completeness.
+
 - [0001](docs/decisions/0001-bitemporal-immutable-rows.md) — Bitemporal rows immutable; `knowledge_to` derived at query time (I2)
 - [0002](docs/decisions/0002-hagan-west-in-repo.md) — Hagan–West monotone convex implemented in-repo; QuantLib lacks it
 - [0003](docs/decisions/0003-phase1-oas-user-vol.md) — Phase 1 OAS: HW lattice with explicit user-supplied vol; VCUB is a Phase 2 drop-in
@@ -92,11 +96,43 @@ Non-blocking, proceeding on stated defaults (flag if wrong):
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
 
-### 2026-07-25 — Phase 0 complete, Phase 1 started
+### 2026-07-25 — Phase 0 complete; WP0–WP4 built
 Read spec, CLAUDE.md, PROGRESS.md in full. Produced the Phase 0 plan (invariant mechanisms +
 kill-tests, screen contract, WP0–WP15 breakdown, open questions); Jack answered the three
 blocking questions (CI = GitHub Actions; universe = all EDGAR filers; OAS = lattice with user
-vol) and approved. Wrote ADR-0001..0005. Next: WP0 toolchain + CI, then WP1 core.
+vol) and approved. Wrote ADR-0001..0005 (0002 amended: in-repo interpolator protocol behind
+the generic bootstrap; QuantLib as cross-check).
+
+Built and tested:
+- **WP0** — uv env on Apple Silicon (QuantLib 1.43 arm64), pre-commit, GitHub Actions
+  workflow, private remote `dgfc92tdp9-crypto/treble-tracker`, first pushes green locally.
+- **WP1** `core/` — FIGI (check digit) / LEI (mod-97) / TUID, yellow keys, security-reference
+  parsing for every §5.1 form; `Provenance` content-addressed DAG + generic `trace` (SPTR);
+  bitemporal immutable `Fact` (no stored `knowledge_to`, ADR-0001).
+- **WP2** `store/` — content-addressed `PayloadStore` (put/get/exists, corruption detection),
+  append-only DuckDB `IngestLog`, `Store`/`HistoryStore` protocols with **no mutation members**
+  and required keyword `as_of`; `DuckStore` with latest-knowledge-wins reads; I1 dangling-
+  provenance rejection; I2 Hypothesis property (no `knowledge_from > as_of` ever); I5
+  deterministic-replay test at the storage layer.
+- **WP3** `render/contract/` — screen schema (semantic attrs, closed predicate set, panes,
+  tabs), generic resolver `resolve(def, ctx, as_of, tapi) -> CellBuffer`, canonical layout-tree
+  + text-snapshot projections, conformance harness with 3 synthetic cases and goldens;
+  renderer registry seeded with the reference renderer (TUI/web plug into the same suite).
+- **WP4 (part)** `analytics/` — `_ql.py` (locked evaluation-date context manager; cached
+  calendars/day counters; the only Settings-touching module), `@model` registry + envelope
+  (I3; auto-captures `content_hash`-bearing inputs), `CurveConfig` content-addressed (I4,
+  pinned golden hash), Hagan–West monotone convex in-repo (quadrature-validated closed-form
+  integrals), interpolator set (linear zero, log-linear DF, natural/monotonic cubic, monotone
+  convex), global-solve bootstrap enforcing 1e-10 repricing at construction, across all
+  methods, on real QuantLib calendars/day counts.
+
+**Environment note:** the Claude Code sandbox slows uv/mypy/pytest I/O badly (mypy ~9 min
+wall for 2s CPU); mypy cache is pointed at the session scratchpad as a workaround. CI on
+GitHub runners is unaffected.
+
+Still open in WP4 before WP5: QuantLib cross-check golden for the log-linear bootstrap;
+Hagan–West paper worked-example golden (needs the paper table — do not fabricate values).
+Next: finish WP4 validation goldens, commit per criterion, then WP5 bonds/YAS.
 
 ### (not yet started)
 Repository scaffolded with layout, tooling, invariant enforcement config, and the four orientation

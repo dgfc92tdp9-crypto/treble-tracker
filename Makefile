@@ -24,6 +24,9 @@ conformance:          ## renderer conformance suite (I6)
 imports:              ## enforce I7
 	uv run lint-imports
 
+audit:                ## dependency vulnerability scan (network; CI + local, not a test)
+	uv run pip-audit --skip-editable
+
 check: lint types imports test   ## everything CI runs
 
 tui:

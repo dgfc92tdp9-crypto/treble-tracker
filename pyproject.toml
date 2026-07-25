@@ -8,6 +8,7 @@ requires-python = ">=3.12"
 dependencies = [
   # core
   "duckdb>=1.1",
+  "pytz>=2024.1",  # duckdb needs it to return TIMESTAMPTZ values to Python
   "polars>=1.0",
   "pyarrow>=17",
   "pydantic>=2.8",
@@ -27,6 +28,7 @@ dependencies = [
   "highspy>=1.7",
   # grammar / parsing
   "lark>=1.2",
+  "pyyaml>=6.0",
   # ingest
   "httpx>=0.27",
   "tenacity>=9.0",
@@ -51,8 +53,10 @@ dev = [
   "pytest-asyncio>=0.24",
   "hypothesis>=6.112",
   "import-linter>=2.1",
+  "pip-audit>=2.7",
   "pre-commit>=3.8",
   "syrupy>=4.7",
+  "types-PyYAML>=6.0",
 ]
 
 [project.scripts]
@@ -70,8 +74,16 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "DTZ", "T20", "SIM", "PTH", "RUF"]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "DTZ", "T20", "SIM", "PTH", "RUF", "S"]
 # DTZ is deliberate: naive datetimes are a correctness hazard for I2 bitemporality.
+# S (bandit) is deliberate: security lint fails the build, not a review (spec §22.4).
+# N813: `import QuantLib as ql` is the universal QuantLib convention.
+ignore = ["N813"]
+
+[tool.ruff.lint.per-file-ignores]
+# S101: pytest asserts are the point of test files.
+"tests/**/*.py" = ["S101"]
+"conftest.py" = ["S101"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -81,7 +93,7 @@ disallow_any_explicit = false
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["QuantLib.*", "xlwings.*", "lightgbm.*"]
+module = ["QuantLib.*", "xlwings.*", "lightgbm.*", "scipy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
