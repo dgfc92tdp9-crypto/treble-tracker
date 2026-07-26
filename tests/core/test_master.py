@@ -14,8 +14,8 @@ import pytest
 from treble.core.identifiers import TUID
 from treble.core.master import (
     REDISTRIBUTION_RESTRICTED_KINDS,
-    figi_hierarchy,
     conflicts,
+    figi_hierarchy,
     links_from_facts,
     resolve_instrument,
 )
@@ -37,9 +37,7 @@ def openfigi_facts(tmp_path: Path) -> list:
     results = json.loads((FIXTURES / "openfigi" / "mapping_ibm.json").read_bytes())
     envelope = json.dumps({"jobs": list(JOBS), "results": results}, sort_keys=True).encode()
     raw = RawPayload(data=envelope, source_uri="openfigi", fetched_at=FETCHED)
-    adapter = OpenFigiAdapter(
-        PayloadStore(tmp_path / "p"), IngestLog(tmp_path / "l.db"), jobs=JOBS
-    )
+    adapter = OpenFigiAdapter(PayloadStore(tmp_path / "p"), IngestLog(tmp_path / "l.db"), jobs=JOBS)
     return list(adapter.parse(raw, payload_hash(raw.data)).facts)
 
 
@@ -108,7 +106,7 @@ class TestEvidence:
     def test_restricted_kinds_flagged(self, tmp_path: Path) -> None:
         # Spec §9.3: CUSIP/ISIN resolve and display but never bulk-export.
         links = links_from_facts(nport_facts(tmp_path))
-        assert REDISTRIBUTION_RESTRICTED_KINDS == {"cusip", "isin"}
+        assert {"cusip", "isin"} == REDISTRIBUTION_RESTRICTED_KINDS
         assert any(link.restricted for link in links)
 
 
