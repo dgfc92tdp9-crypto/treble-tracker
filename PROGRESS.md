@@ -98,16 +98,20 @@ Non-blocking, proceeding on stated defaults (flag if wrong):
 enough — these six must exist and stay in place. **Never remove or weaken them; when adding
 an external source, add its fixture-drift check at the same time.**
 
-- [ ] **Scheduled deep CI run** — nightly, high Hypothesis `max_examples`, so property tests
-      keep exploring new inputs after code is "done" (this is how the Hagan–West quadrature
-      blind spot was found)
-- [ ] **Persistent Hypothesis example database** — counterexamples replay forever; a fixed
-      bug cannot silently regress
-- [ ] **Fixture-drift detection** — scheduled live re-fetch, schema diffed against each
-      recorded fixture. Largest long-term risk: seven external feeds changing shape silently
-- [ ] **Coverage floor in CI** — untested new code cannot land (would have caught the two
-      renamed-but-unexercised `TraceCredentialsMissing` call sites)
-- [ ] **Mutation testing** — `make mutate`, on demand; proves the suite detects damage
+- [x] **Scheduled deep CI run** — `.github/workflows/deep.yml`, nightly 03:17 UTC, Hypothesis
+      `deep` profile at 2000 examples/property (`make deep` locally). This is how the
+      Hagan–West quadrature blind spot was found
+- [x] **Persistent Hypothesis example database** — `.hypothesis/examples` cached across deep
+      runs; any counterexample ever found replays forever, so a fixed bug cannot regress
+- [x] **Fixture-drift detection** — `tests/ingest/test_fixture_drift.py`, marker `drift`,
+      gated on `TREBLE_CHECK_DRIFT=1` so the offline contract holds for the normal suite.
+      Compares live *schema* (not values) against every recorded fixture across all seven
+      feeds. **When adding a source, add its drift check in the same commit.**
+- [x] **Coverage floor in CI** — `--cov-fail-under=80` in pytest addopts; untested new code
+      cannot land (would have caught the renamed-but-unexercised `TraceCredentialsMissing`
+      call sites)
+- [x] **Mutation testing** — `make mutate` (mutmut over `analytics/` and `core/`), on demand
+      because it is slow; proves the suite detects damage rather than merely passing
 - [x] **`pip-audit` in CI** — dependency vulnerabilities disclosed after shipping
 
 ## Data access findings (settled 2026-07-26 — do not re-derive)

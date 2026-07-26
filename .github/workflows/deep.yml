@@ -1,0 +1,66 @@
+# Continuous verification (PROGRESS.md "Continuous verification").
+#
+# The per-commit suite proves today's code against today's inputs. This job
+# keeps hunting after the code is finished:
+#
+#   - property tests run with a much larger example budget, so Hypothesis
+#     explores input space nobody has thought of (this is how the
+#     Hagan-West quadrature blind spot surfaced);
+#   - the example database persists across runs, so any counterexample ever
+#     found is replayed forever and a fixed bug cannot silently return;
+#   - fixture-drift checks re-fetch each source live and compare its schema
+#     against the recorded fixture, so a feed changing shape is reported
+#     the week it happens rather than discovered through wrong numbers.
+#
+# Runs nightly on the free ubuntu runner (~5 min/night of the 2000 free
+# monthly minutes) and on demand.
+name: deep
+
+on:
+  schedule:
+    - cron: "17 3 * * *"  # 03:17 UTC daily; off-the-hour to avoid the rush
+  workflow_dispatch:
+
+jobs:
+  deep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install
+        run: |
+          uv python install 3.12
+          uv venv --python 3.12
+          uv pip install -e ".[dev]"
+
+      # Persist Hypothesis's example database between runs: found
+      # counterexamples are replayed on every subsequent run, forever.
+      - name: Restore Hypothesis example database
+        uses: actions/cache/restore@v4
+        with:
+          path: .hypothesis/examples
+          key: hypothesis-examples-${{ github.run_id }}
+          restore-keys: hypothesis-examples-
+
+      - name: Deep property run
+        env:
+          HYPOTHESIS_PROFILE: deep
+        run: uv run pytest -q -p no:randomly
+
+      - name: Save Hypothesis example database
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .hypothesis/examples
+          key: hypothesis-examples-${{ github.run_id }}
+
+      # Network is allowed here (unlike the per-commit suite, which is
+      # offline by contract). Failures mean a source changed shape.
+      - name: Fixture drift
+        env:
+          TREBLE_CHECK_DRIFT: "1"
+          TREBLE_EDGAR_CONTACT: ${{ secrets.TREBLE_EDGAR_CONTACT }}
+        run: uv run pytest -q -m drift
+
+      - name: Dependency audit
+        run: uv run pip-audit --skip-editable

@@ -27,6 +27,15 @@ imports:              ## enforce I7
 audit:                ## dependency vulnerability scan (network; CI + local, not a test)
 	uv run pip-audit --skip-editable
 
+deep:                 ## nightly-equivalent property run (2000 examples/property)
+	HYPOTHESIS_PROFILE=deep uv run pytest -q
+
+drift:                ## live source schema check — fails when a feed changes shape
+	TREBLE_CHECK_DRIFT=1 uv run pytest -q -m drift
+
+mutate:               ## mutation testing: proves the suite detects damage. Slow.
+	uv run mutmut run --paths-to-mutate treble/analytics/,treble/core/
+
 check: lint types imports test   ## everything CI runs
 
 tui:

@@ -54,6 +54,7 @@ dev = [
   "pytest-asyncio>=0.24",
   "hypothesis>=6.112",
   "import-linter>=2.1",
+  "mutmut>=3.0",
   "pip-audit>=2.7",
   "pre-commit>=3.8",
   "syrupy>=4.7",
@@ -100,10 +101,11 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-markers"
+addopts = "-q --strict-markers --cov=treble --cov-report=term-missing:skip-covered --cov-fail-under=80 -m 'not drift'"
 markers = [
   "golden: validates an analytic against published reference values",
   "conformance: renderer conformance case",
   "property: Hypothesis property test of a stated invariant",
   "replay: deterministic replay test (I5)",
+  "drift: live source schema check; needs network and TREBLE_CHECK_DRIFT=1",
 ]
