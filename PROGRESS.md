@@ -45,6 +45,9 @@ Criteria are copied from `CLAUDE.md` §8. Tick only when passing in CI on a clea
 - [ ] TAPI with Python client; `TDP`/`TDH`/`TDS` spreadsheet functions via xlwings
 - [ ] TQL parses and executes the spec §4.2 example
 - [ ] Local-only mode: one command from clean checkout to working workstation
+- [ ] Pane form selection enforced at load time; CI validates every `.screen.yaml` against
+      the screen-definition contract (spec §6.1 — requested by Jack citing §6.4; §6.4 is
+      currently the charting engine, reconcile if the spec is revised)
 - [ ] `PROGRESS.md` current
 
 ---

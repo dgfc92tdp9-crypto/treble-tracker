@@ -77,6 +77,19 @@ class TestStructuralProperties:
             assert all(a >= b for a, b in pairwise(discounts))
 
 
+def _region_breakpoints(g0: float, g1: float) -> list[float]:
+    """Candidate eta values where the shape function changes formula. Passing
+    them to quad stops it stepping over spikes narrower than its sampling
+    (Hypothesis found g1 ~ 6e-8 packing the transition into width ~2e-6)."""
+    candidates: list[float] = []
+    if g1 != g0:
+        candidates.append((g1 + 2.0 * g0) / (g1 - g0))
+        candidates.append(3.0 * g1 / (g1 - g0))
+    if g1 + g0 != 0.0:
+        candidates.append(g1 / (g1 + g0))
+    return [eta for eta in candidates if 0.0 < eta < 1.0]
+
+
 @given(
     g0=st.floats(min_value=-0.05, max_value=0.05, allow_nan=False),
     g1=st.floats(min_value=-0.05, max_value=0.05, allow_nan=False),
@@ -84,7 +97,10 @@ class TestStructuralProperties:
 )
 def test_g_integral_matches_quadrature(g0: float, g1: float, x: float) -> None:
     """The closed-form integrals must agree with numeric integration of g."""
-    numeric, _err = quad(lambda u: _g(u, g0, g1), 0.0, x, limit=200)
+    interior = [eta for eta in _region_breakpoints(g0, g1) if eta < x]
+    numeric, _err = quad(
+        lambda u: _g(u, g0, g1), 0.0, x, limit=400, points=interior or None
+    )
     assert _g_integral(x, g0, g1) == pytest.approx(numeric, abs=1e-9)
 
 

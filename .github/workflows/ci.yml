@@ -8,19 +8,15 @@ on:
 
 jobs:
   check:
-    strategy:
-      fail-fast: false
-      matrix:
-        # macos-14 is Apple Silicon, matching the development machine (CLAUDE.md §2).
-        os: [macos-14, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    # Ubuntu only: private-repo macOS runners bill at 10x minutes (cost
+    # directive, 2026-07-26). The dev Mac covers the macOS leg via make check.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.12"
       - name: Install
         run: |
+          uv python install 3.12
           uv venv --python 3.12
           uv pip install -e ".[dev]"
       - name: Check
