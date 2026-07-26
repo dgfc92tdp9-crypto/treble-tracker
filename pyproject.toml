@@ -46,9 +46,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "ruff>=0.6",
-  "mypy>=1.11",
-  "pytest>=8.3",
+  "ruff==0.16.0",  # pinned: formatter verdicts must be reproducible across machines
+  "mypy==2.3.0",
+  "pytest==9.1.1",
   "pytest-cov>=5.0",
   "pytest-asyncio>=0.24",
   "hypothesis>=6.112",
