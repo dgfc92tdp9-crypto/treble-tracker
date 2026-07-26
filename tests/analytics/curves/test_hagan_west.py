@@ -98,9 +98,7 @@ def _region_breakpoints(g0: float, g1: float) -> list[float]:
 def test_g_integral_matches_quadrature(g0: float, g1: float, x: float) -> None:
     """The closed-form integrals must agree with numeric integration of g."""
     interior = [eta for eta in _region_breakpoints(g0, g1) if eta < x]
-    numeric, _err = quad(
-        lambda u: _g(u, g0, g1), 0.0, x, limit=400, points=interior or None
-    )
+    numeric, _err = quad(lambda u: _g(u, g0, g1), 0.0, x, limit=400, points=interior or None)
     assert _g_integral(x, g0, g1) == pytest.approx(numeric, abs=1e-9)
 
 
