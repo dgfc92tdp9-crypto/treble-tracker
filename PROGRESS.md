@@ -9,12 +9,17 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 ## Current position
 
 **Phase:** 1 — research workstation
-**Status:** Phase 0 complete; plan approved by Jack 2026-07-25. Work packages WP0–WP15 defined
-(see approved plan, mirrored by the decision records). Starting WP0 (toolchain + CI).
-**Next action:** WP0 — verify `make setup` on Apple Silicon, add GitHub Actions workflow,
-create private remote, first commit. Then WP1 (core) → WP2 (store) → WP3 (screen contract)
-→ WP4/5 (analytics) → WP6/7 (ingest, master) → WP8–10 (TAPI, TQL, cmd) → WP11/12
-(screens, renderers) → WP13–15 (spreadsheet, local-only, gate audit).
+**Status:** WP0–WP5 complete; WP6 ~90% (EDGAR/FRED/Treasury/OpenFIGI/GLEIF done with real
+recorded fixtures; TRACE-file pending endpoint investigation). Full local gate green at
+`239c48d`: 167 tests, mypy --strict, import contracts, ruff incl. security (S) rules.
+Completion vs the fixed model (see memory/working prefs): ~13.13%.
+**Next action:** confirm ubuntu CI green on `239c48d`; TRACE-file adapter (investigate the
+real public download path first — no guessed endpoints); then WP7 security master; then the
+vertical slice (WP8 TAPI → WP10 cmd → WP11 DES/YAS → WP12 TUI → WP14 local-only) is
+prioritised ahead of full breadth so a launchable TUI exists at the earliest date.
+**Standing directives (Jack):** accuracy above all; stress tests + real data always; API
+choices delegated (pick accuracy-maximising, report after); launch = full spec through
+Phase 5; zero external cost (ubuntu-only CI, no cloud routines; pause on token exhaustion).
 
 ---
 
@@ -98,6 +103,24 @@ Non-blocking, proceeding on stated defaults (flag if wrong):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-07-26 — suite green; WP5/WP6 landed; six harness catches
+Continuation of the 2026-07-25 session. Full gate went green (167 tests) after the harness
+caught six real defects, none reaching a commit: (1) QuantLib 1.43 removed the float-price
+`Bond::yield` overload → `ql.BondPrice`; (2) payment dates silently rolled by QL's default
+Following convention on UNADJUSTED bonds → spec convention passed through; (3) content-
+addressed ids were timezone-representation-sensitive → all stored datetimes canonicalised
+to UTC (regression-pinned); (4) DuckDB TIMESTAMPTZ needs `pytz` → dependency added; (5)
+ingest log lacked source URI → replay wasn't byte-identical → column added; (6) scipy quad
+stepped over a 2e-6-wide spike in the Hagan–West shape function (Hypothesis-found) → the
+*checker* was wrong, closed form exact; breakpoints now passed to quad. WP6 adapters
+(EDGAR companyfacts+submissions, OpenFIGI envelope-payload, GLEIF) all fixture-tested with
+live-recorded payloads; FIGIs/LEIs cross-validated against our own checksum implementations.
+CI: setup-python ordering fixed; trimmed to ubuntu-only (cost directive). Environment note:
+this sandbox does not process .pth files — root conftest.py pins sys.path (keep it).
+Decisions added: release = full spec at launch; completion-percentage model in memory prefs.
+Jack added a Phase 1 criterion (pane-form validation in CI) citing spec §6.4; recorded
+against §6.1 pending his spec revision — his edit had not reached disk (verified via git).
 
 ### 2026-07-25 — Phase 0 complete; WP0–WP4 built
 Read spec, CLAUDE.md, PROGRESS.md in full. Produced the Phase 0 plan (invariant mechanisms +
