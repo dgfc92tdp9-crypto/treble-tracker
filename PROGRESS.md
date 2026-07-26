@@ -92,6 +92,43 @@ Non-blocking, proceeding on stated defaults (flag if wrong):
 
 ---
 
+## Continuous verification (standing requirement, Jack 2026-07-26)
+
+"Make sure holes are always found, even after their creation." Write-time checks are not
+enough — these six must exist and stay in place. **Never remove or weaken them; when adding
+an external source, add its fixture-drift check at the same time.**
+
+- [ ] **Scheduled deep CI run** — nightly, high Hypothesis `max_examples`, so property tests
+      keep exploring new inputs after code is "done" (this is how the Hagan–West quadrature
+      blind spot was found)
+- [ ] **Persistent Hypothesis example database** — counterexamples replay forever; a fixed
+      bug cannot silently regress
+- [ ] **Fixture-drift detection** — scheduled live re-fetch, schema diffed against each
+      recorded fixture. Largest long-term risk: seven external feeds changing shape silently
+- [ ] **Coverage floor in CI** — untested new code cannot land (would have caught the two
+      renamed-but-unexercised `TraceCredentialsMissing` call sites)
+- [ ] **Mutation testing** — `make mutate`, on demand; proves the suite detects damage
+- [x] **`pip-audit` in CI** — dependency vulnerabilities disclosed after shipping
+
+## Data access findings (settled 2026-07-26 — do not re-derive)
+
+Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
+
+- **FINRA `fixedIncomeMarket/treasuryDailyAggregates`** — works with credentials. Parsed and
+  fixture-tested. Aggregates only: ATS/dealer counts, volumes, VWAP by product and maturity.
+- **FINRA `fixedIncomeMarket/trace`** (individual corporate transactions) — **404 with a valid
+  token** on GET and POST. Entitlement-gated; FINRA sells it (TRACE Data Feeds / End-Of-Day
+  Transaction File / Enhanced Historical). Not available free.
+- **FINRA Gateway free bond lookup** — its Fixed Income Data User Agreement **prohibits**
+  "any robot, spider, other automatic or manual process to monitor or copy the Data", bans
+  bulk download beyond personal non-commercial use, and forbids redistribution (plus
+  Refinitiv/ICE/Moody's restrictions). **Do not automate it.**
+- **Conclusion:** no free, licence-clean source of intraday per-trade corporate bond prints
+  exists. Per-bond *valuations* come from **SEC N-PORT** (adapter built): quarterly, public
+  domain, CUSIP/ISIN/LEI + par balance + USD fair value + maturity/coupon + ASC 820
+  `fairValLevel`. Implied price = valUSD/balance*100, computed in analytics (I3), not ingest.
+  Municipal per-trade prints remain available free from MSRB EMMA (not yet built).
+
 ## Known deviations from the spec
 
 *Anything built differently from what the spec says, with the reason and the authorising decision record. Empty is the goal.*

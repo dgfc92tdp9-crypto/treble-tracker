@@ -1,0 +1,26 @@
+tradeDate,productCategory,yearsToMaturity,benchmark,atsInterdealerCount,atsInterdealerVolume,dealerCustomerCount,dealerCustomerVolume,volumeWeightedAveragePrice
+2023-12-14,Bills,,,36873,66.10,48268,121.70,
+2023-12-14,FRNs,,,88,0.40,139,1.00,
+2023-12-14,Nominal Coupons,<= 2 years,On-the-run,31155,60.20,4827,32.00,100.949
+2023-12-14,Nominal Coupons,<= 2 years,Off-the-run,16034,18.00,21683,28.40,
+2023-12-14,Nominal Coupons,> 2 years and <= 3 years,On-the-run,29539,47.30,3419,28.30,100.851
+2023-12-14,Nominal Coupons,> 2 years and <= 3 years,Off-the-run,3586,7.00,5650,13.10,
+2023-12-14,Nominal Coupons,> 3 years and <= 5 years,On-the-run,90537,157.00,11617,83.20,102.138
+2023-12-14,Nominal Coupons,> 3 years and <= 5 years,Off-the-run,2980,13.70,4466,25.80,
+2023-12-14,Nominal Coupons,> 5 years and <= 7 years,On-the-run,19808,28.70,3250,12.10,102.617
+2023-12-14,Nominal Coupons,> 5 years and <= 7 years,Off-the-run,1533,6.20,2865,10.70,
+2023-12-14,Nominal Coupons,> 7 years and <= 10 years,On-the-run,69193,107.30,13164,60.20,104.555
+2023-12-14,Nominal Coupons,> 7 years and <= 10 years,Off-the-run,2282,10.20,3350,12.00,
+2023-12-14,Nominal Coupons,> 10 years and <= 20 years,On-the-run,8600,11.60,2666,8.60,106.970
+2023-12-14,Nominal Coupons,> 10 years and <= 20 years,Off-the-run,2064,4.00,2591,6.90,
+2023-12-14,Nominal Coupons,> 20 years,On-the-run,23372,31.60,5133,17.80,111.545
+2023-12-14,Nominal Coupons,> 20 years,Off-the-run,4997,12.30,4864,21.80,
+2023-12-14,TIPS,<= 5 years,On-the-run,223,2.40,125,3.70,
+2023-12-14,TIPS,<= 5 years,Off-the-run,2804,1.60,941,4.30,
+2023-12-14,TIPS,> 5 years and <= 10 years,On-the-run,328,3.10,182,4.80,
+2023-12-14,TIPS,> 5 years and <= 10 years,Off-the-run,1204,0.80,446,2.50,
+2023-12-14,TIPS,> 10 years,On-the-run,139,0.40,119,1.30,
+2023-12-14,TIPS,> 10 years,Off-the-run,819,0.10,391,0.90,
+2023-12-15,Bills,,,32294,60.40,46668,91.40,
+2023-12-15,FRNs,,,96,0.50,124,0.60,
+2023-12-15,Nominal Coupons,<= 2 years,On-the-run,24905,48.30,2943,30.10,100.824
