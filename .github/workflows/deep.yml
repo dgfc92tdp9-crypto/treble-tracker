@@ -64,3 +64,15 @@ jobs:
 
       - name: Dependency audit
         run: uv run pip-audit --skip-editable
+
+      # Mutation testing does not currently work here (five structural
+      # collisions — see PROGRESS.md "Continuous verification"). It is
+      # attempted nightly anyway, non-blocking, so that a mutmut release, a
+      # Hypothesis change, or a config insight shows up as a green step
+      # instead of being rediscovered by hand months later. If this ever
+      # passes, promote it to a required step and record the kill rate.
+      - name: Mutation testing (known-failing; attempted to detect a fix)
+        continue-on-error: true
+        run: |
+          PYTEST_ADDOPTS="--no-cov -m 'not drift'" timeout 1800 uv run mutmut run
+          uv run mutmut results

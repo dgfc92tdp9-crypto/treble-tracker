@@ -152,6 +152,10 @@ an external source, add its fixture-drift check at the same time.**
       survivor there means a wrong *number*), no reflection involved — and consider
       `cosmic-ray` instead. `[tool.mutmut]` is already narrowed to that scope.
       `mutants/` is gitignored (committed by mistake once, removed in a2bd7f7).
+      **Retried automatically:** the nightly `deep` workflow attempts it every night as a
+      `continue-on-error` step (Jack's instruction, 2026-07-27 — this is a genuine issue, not
+      one to drop). A green step there means the blocker has lifted; promote it to required
+      and record the kill rate at that point.
 - [x] **`pip-audit` in CI** — dependency vulnerabilities disclosed after shipping
 
 **Full battery run 2026-07-27 from the new location, all green except mutation:** 211 tests,

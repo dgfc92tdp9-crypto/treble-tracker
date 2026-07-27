@@ -1,0 +1,59 @@
+# Universe definition (spec §9.4; decision 0005).
+#
+# What the security master is populated *for*. Subsets are a configuration,
+# never a code change — pointing this at a different universe is an edit
+# here and a re-run of `treble populate`.
+#
+# Decision 0005 sets the Phase 1 default to every EDGAR XBRL filer. That is
+# ~8k companies and hours of wall clock, so the file defines several named
+# universes and the runner takes one by name: `dev` for iteration, `full`
+# for the real thing. Both use the identical code path, so a green `dev`
+# run is genuine evidence the `full` run will work.
+
+universes:
+  # Small, fast, and real — for development and for `treble init` seeding.
+  # These CIKs are stable, high-profile filers with rich XBRL histories.
+  dev:
+    description: Ten large US filers; minutes to populate, exercises every adapter
+    edgar_ciks:
+      - 51143      # International Business Machines
+      - 320193     # Apple
+      - 789019     # Microsoft
+      - 1018724    # Amazon
+      - 200406     # Johnson & Johnson
+      - 19617      # JPMorgan Chase
+      - 34088      # Exxon Mobil
+      - 104169     # Walmart
+      - 80424      # Procter & Gamble
+      - 93410      # Chevron
+    fred_series: [SOFR, DGS10, DGS2, T10Y2Y, BAMLC0A0CM]
+    treasury_auctions_since: "2026-01-01"
+    # N-PORT filings supply per-bond valuations (see ingest/nport.py). Left
+    # empty here: filings are discovered by EDGAR full-text search at run
+    # time rather than hardcoded, so this list stays honest as funds file.
+    nport_filings: []
+
+  # Decision 0005's target. Populated by discovering every filer from
+  # EDGAR's bulk company index rather than an enumerated list — an
+  # enumerated 8k-line list would go stale the day it was written.
+  full:
+    description: Every EDGAR XBRL filer (decision 0005); hours, tens of GB
+    edgar_ciks: discover   # sentinel: resolve from EDGAR's company index
+    fred_series: [SOFR, DGS10, DGS2, DGS30, T10Y2Y, BAMLC0A0CM, BAMLH0A0HYM2, CPIAUCSL]
+    treasury_auctions_since: "2020-01-01"
+    nport_filings: []
+
+# Per-source pacing. These are the published limits (CLAUDE.md §6), not
+# guesses; the adapters enforce them with token buckets.
+rate_limits:
+  edgar_per_second: 10        # SEC published limit
+  openfigi_per_minute: 25     # unauthenticated; 250 with a free API key
+  gleif_per_second: 1
+  treasury_per_second: 2
+
+# OpenFIGI is the binding constraint at full scale: 25 mapping requests per
+# minute unauthenticated, 100 jobs per request, so ~2,500 instruments/minute.
+# Set OPENFIGI_API_KEY in .env to raise this tenfold. The runner batches to
+# the maximum job size regardless.
+openfigi:
+  jobs_per_request: 100
