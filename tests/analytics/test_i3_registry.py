@@ -45,6 +45,13 @@ def _walk_public_callables() -> list[tuple[str, str, object]]:
                 continue
             if inspect.isclass(obj) or getattr(obj, "__module__", None) != info.name:
                 continue
+            # Mutation testing rewrites each function into many module-level
+            # copies (`x__build_bond__mutmut_1`, ...). They are tooling
+            # artefacts, not analytics, and would otherwise make this
+            # invariant unsatisfiable under `make mutate`. Real code is
+            # unaffected: no genuine analytic can carry this marker.
+            if "__mutmut_" in name:
+                continue
             found.append((info.name, name, obj))
     return found
 

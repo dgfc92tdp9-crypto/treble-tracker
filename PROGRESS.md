@@ -133,13 +133,25 @@ an external source, add its fixture-drift check at the same time.**
 - [x] **Coverage floor in CI** — `--cov-fail-under=84` in pytest addopts (measured 89.42%);
       untested new code cannot land (would have caught the renamed-but-unexercised
       `TraceCredentialsMissing` call sites)
-- [ ] **Mutation testing** — `make mutate`, config in `[tool.mutmut]`. **Configured but never
-      completed a run.** mutmut 3.x copies only `paths_to_mutate` into its sandbox, so a
-      scoped config breaks on cross-package test imports; now set to the whole of `treble/`
-      with `tests/`, which is correct but a long job. Next session: run it to completion,
-      record the kill rate, and investigate any surviving mutants — a survivor means a test
-      that passes whether or not the code is right. `mutants/` is gitignored (it was
-      committed by mistake once and removed in a2bd7f7).
+- [ ] **Mutation testing — NOT ACHIEVED with mutmut 3.x. Do not sink more time into it
+      without changing tool.** Five attempts on 2026-07-27, each hitting a distinct collision
+      with this project's *own* verification machinery:
+      1. the I3 registry walk — mutmut's synthesised `x__fn__mutmut_N` functions look like
+         unregistered public analytics;
+      2. `test_log_has_no_mutation_api` — synthesised methods look like mutation API;
+      3. the store-protocol reflection test — same cause;
+      4. the coverage floor — mutant-expanded source is ~74k statements, reads 13.6%;
+      5. Hypothesis `HealthCheck.differing_executors` — mutmut runs tests from a different
+         executor than Hypothesis expects.
+      Root cause: this codebase enforces invariants by **runtime reflection** plus a coverage
+      gate, and mutmut works by **synthesising code at runtime**. They are structurally at
+      odds. Fixes 1–3 were applied and kept (invariant tests now ignore `__mutmut_` names —
+      narrow, and no real member can carry that marker), but 4–5 need tool-level changes.
+      **Recommended next attempt:** score mutation coverage only on the pure numerical
+      modules (`hagan_west.py`, `bonds/pricing.py`, `bonds/callable.py`) — highest value (a
+      survivor there means a wrong *number*), no reflection involved — and consider
+      `cosmic-ray` instead. `[tool.mutmut]` is already narrowed to that scope.
+      `mutants/` is gitignored (committed by mistake once, removed in a2bd7f7).
 - [x] **`pip-audit` in CI** — dependency vulnerabilities disclosed after shipping
 
 **Full battery run 2026-07-27 from the new location, all green except mutation:** 211 tests,

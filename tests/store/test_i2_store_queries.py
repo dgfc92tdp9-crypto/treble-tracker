@@ -35,7 +35,14 @@ class TestProtocolShape:
         "proto", [protocols.Store, protocols.HistoryStore, protocols.IngestLogP]
     )
     def test_no_update_or_delete_members(self, proto: type) -> None:
-        members = [name for name, _ in inspect.getmembers(proto) if not name.startswith("_")]
+        # Ignore mutation-testing artefacts (`...__mutmut_N`): they are
+        # synthesised by `make mutate`, not API surface. Real members
+        # cannot carry this marker, so the invariant is unweakened.
+        members = [
+            name
+            for name, _ in inspect.getmembers(proto)
+            if not name.startswith("_") and "__mutmut_" not in name
+        ]
         mutating = ("update", "delete", "remove", "drop")
         forbidden = [m for m in members if any(w in m.lower() for w in mutating)]
         assert forbidden == []

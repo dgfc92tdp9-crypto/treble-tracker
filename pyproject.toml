@@ -111,12 +111,11 @@ markers = [
 ]
 
 [tool.mutmut]
-# Mutation testing proves the suite detects damage rather than merely
-# passing. Scoped to the correctness-critical layers; run on demand
-# (`make mutate`) because it is slow by nature.
-# The whole package must be in the sandbox: mutmut copies only
-# paths_to_mutate, and the tests import across packages (tests/core pulls
-# treble.ingest, tests/conformance pulls treble.render). Mutating all of
-# treble/ is correct but slow — this is an on-demand target, not per-commit.
-paths_to_mutate = ["treble/"]
-tests_dir = ["tests/"]
+# NOT WORKING as of 2026-07-27 — see PROGRESS.md "Continuous verification".
+# mutmut 3.x collides with five of this project's own mechanisms (reflection
+# -based invariant tests x3, the coverage floor, and Hypothesis's executor
+# health check). Scope is narrowed to the pure numerical modules, where a
+# surviving mutant would mean a wrong *number* and where no reflection is
+# involved — that is the version worth retrying with a different tool.
+paths_to_mutate = ["treble/analytics/curves/hagan_west.py"]
+tests_dir = ["tests/analytics/curves/"]

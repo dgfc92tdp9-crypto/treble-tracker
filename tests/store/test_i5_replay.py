@@ -77,7 +77,10 @@ class TestIngestLog:
 
     def test_log_has_no_mutation_api(self, tmp_path: Path) -> None:
         log = IngestLog(tmp_path / "log.db")
-        public = [m for m in dir(log) if not m.startswith("_")]
+        # Ignore mutation-testing artefacts (`...__mutmut_N`): they are
+        # synthesised by `make mutate`, not API surface. Real members
+        # cannot carry this marker, so the invariant is unweakened.
+        public = [m for m in dir(log) if not m.startswith("_") and "__mutmut_" not in m]
         assert sorted(public) == ["append", "read"]
 
 
