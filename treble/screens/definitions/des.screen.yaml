@@ -1,0 +1,159 @@
+# DES — Description (spec §7.1: "the canonical security page ... the
+# most-used function in the system").
+#
+# Phase 1 scope is what EDGAR XBRL actually supports: key figures, capital
+# structure and the reporting entity. Business description, management and
+# ownership need sources not yet ingested (§7.1 lists them; DOCS/OWN cover
+# them later) and are deliberately absent rather than shown blank.
+#
+# Bindings are as-reported XBRL tags, not coined mnemonics: the filer's own
+# vocabulary, so SPTR traces every cell straight back to its filing.
+mnemonic: DES
+title: Security Description
+rows: 22
+cols: 80
+namespaces: [Equity]
+
+tabs:
+  - name: main
+    cells:
+      # --- header -------------------------------------------------------
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SECURITY DESCRIPTION"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+
+      # --- reporting entity ---------------------------------------------
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Shares out"
+      - kind: bound
+        at: {row: 2, col: 14}
+        field: "dei:EntityCommonStockSharesOutstanding:shares"
+        format: "{:,.0f}"
+        width: 20
+        conditional:
+          - when: is_stale
+            attrs: [stale]
+          - when: is_null
+            attrs: [stale]
+
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "Public float"
+      - kind: bound
+        at: {row: 3, col: 14}
+        field: "dei:EntityPublicFloat:USD"
+        format: "{:,.0f}"
+        width: 20
+        conditional:
+          - when: is_stale
+            attrs: [stale]
+          - when: is_null
+            attrs: [stale]
+
+      # --- balance sheet ------------------------------------------------
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "BALANCE SHEET (as reported, USD)"
+        attrs: [label, emphasis]
+
+      - kind: static
+        at: {row: 6, col: 0}
+        text: "Assets"
+      - kind: bound
+        at: {row: 6, col: 14}
+        field: "us-gaap:Assets:USD"
+        format: "{:,.0f}"
+        width: 20
+        conditional:
+          - when: is_stale
+            attrs: [stale]
+
+      - kind: static
+        at: {row: 7, col: 0}
+        text: "Liabilities"
+      - kind: bound
+        at: {row: 7, col: 14}
+        field: "us-gaap:Liabilities:USD"
+        format: "{:,.0f}"
+        width: 20
+        conditional:
+          - when: is_stale
+            attrs: [stale]
+
+      - kind: static
+        at: {row: 8, col: 0}
+        text: "Equity"
+      - kind: bound
+        at: {row: 8, col: 14}
+        field: "us-gaap:StockholdersEquity:USD"
+        format: "{:,.0f}"
+        width: 20
+        conditional:
+          - when: negative
+            attrs: [negative]
+          - when: is_stale
+            attrs: [stale]
+
+      # --- income -------------------------------------------------------
+      - kind: static
+        at: {row: 10, col: 0}
+        text: "INCOME (as reported, USD)"
+        attrs: [label, emphasis]
+
+      - kind: static
+        at: {row: 11, col: 0}
+        text: "Revenue"
+      - kind: bound
+        at: {row: 11, col: 14}
+        field: "us-gaap:Revenues:USD"
+        format: "{:,.0f}"
+        width: 20
+        conditional:
+          - when: is_stale
+            attrs: [stale]
+
+      - kind: static
+        at: {row: 12, col: 0}
+        text: "Net income"
+      - kind: bound
+        at: {row: 12, col: 14}
+        field: "us-gaap:NetIncomeLoss:USD"
+        format: "{:,.0f}"
+        width: 20
+        conditional:
+          - when: negative
+            attrs: [negative]
+          - when: positive
+            attrs: [positive]
+          - when: is_stale
+            attrs: [stale]
+
+      # --- drillable links (§5.4: cyan, <GO> executes) -------------------
+      - kind: static
+        at: {row: 15, col: 0}
+        text: "RELATED FUNCTIONS"
+        attrs: [label, emphasis]
+      - kind: link
+        at: {row: 16, col: 0}
+        text: "1) FA   Financial Analysis"
+        command: "{security} FA"
+      - kind: link
+        at: {row: 17, col: 0}
+        text: "2) GP   Price Graph"
+        command: "{security} GP"
+      - kind: link
+        at: {row: 18, col: 0}
+        text: "3) SPTR Source Trace"
+        command: "{security} SPTR"
+
+      # --- provenance footer --------------------------------------------
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "All figures as-reported XBRL; SPTR on any value for its filing."
+        attrs: [label]
