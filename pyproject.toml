@@ -83,6 +83,11 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "DTZ", "T20", "SIM", "P
 # N813: `import QuantLib as ql` is the universal QuantLib convention.
 ignore = ["N813"]
 
+[tool.ruff.lint.flake8-bugbear]
+# typer.Option/Argument in defaults is the library's required idiom and the
+# calls are immutable; B008 exists for mutable defaults, which these are not.
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
+
 [tool.ruff.lint.per-file-ignores]
 # S101: pytest asserts are the point of test files.
 "tests/**/*.py" = ["S101"]
