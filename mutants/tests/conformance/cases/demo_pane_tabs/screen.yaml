@@ -1,0 +1,27 @@
+# Synthetic case: graphical pane region + multiple tabs. The conformance
+# suite asserts the pane's region, type, and data binding — not its pixels.
+mnemonic: DEMO3
+title: Demo Pane
+rows: 10
+cols: 50
+namespaces: [Equity]
+tabs:
+  - name: chart
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "PRICE GRAPH"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 1, col: 0, height: 8, width: 50}
+        pane_type: timeseries
+        binding: "PX_LAST[-30D:0D]"
+  - name: stats
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SUMMARY"
+      - kind: bound
+        at: {row: 1, col: 0}
+        field: PX_HIGH_30D
+        format: "{:.2f}"

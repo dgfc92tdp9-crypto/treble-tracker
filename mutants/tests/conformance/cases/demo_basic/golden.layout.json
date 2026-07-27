@@ -1,0 +1,88 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SECURITY DESCRIPTION"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Last Px"
+    },
+    {
+      "at": [
+        2,
+        10
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "aa11",
+      "text": "291.97"
+    },
+    {
+      "at": [
+        3,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Name"
+    },
+    {
+      "at": [
+        3,
+        10
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "bb22",
+      "text": "INTL BUSINESS MACHINES"
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "IBM US Equity RELS",
+      "provenance": null,
+      "text": "1) Related Securities"
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    6,
+    40
+  ],
+  "mnemonic": "DEMO1",
+  "panes": [],
+  "stale": false,
+  "tab": "main"
+}

@@ -1,0 +1,30 @@
+{
+    "exit_code_by_key": {
+        "treble.core.provenance.x_trace__mutmut_1": null,
+        "treble.core.provenance.x_trace__mutmut_2": null,
+        "treble.core.provenance.x_trace__mutmut_3": null,
+        "treble.core.provenance.x_trace__mutmut_4": null,
+        "treble.core.provenance.x_trace__mutmut_5": null,
+        "treble.core.provenance.x_trace__mutmut_6": null,
+        "treble.core.provenance.x_trace__mutmut_7": null,
+        "treble.core.provenance.x_trace__mutmut_8": null,
+        "treble.core.provenance.x_trace__mutmut_9": null,
+        "treble.core.provenance.x_trace__mutmut_10": null,
+        "treble.core.provenance.x_trace__mutmut_11": null,
+        "treble.core.provenance.x_trace__mutmut_12": null,
+        "treble.core.provenance.x_trace__mutmut_13": null,
+        "treble.core.provenance.x_trace__mutmut_14": null,
+        "treble.core.provenance.x_trace__mutmut_15": null,
+        "treble.core.provenance.x_trace__mutmut_16": null,
+        "treble.core.provenance.x_trace__mutmut_17": null,
+        "treble.core.provenance.x_trace__mutmut_18": null,
+        "treble.core.provenance.x_trace__mutmut_19": null,
+        "treble.core.provenance.x_trace__mutmut_20": null,
+        "treble.core.provenance.x_trace__mutmut_21": null,
+        "treble.core.provenance.x_trace__mutmut_22": null,
+        "treble.core.provenance.x_trace__mutmut_23": null
+    },
+    "type_check_error_by_key": {},
+    "durations_by_key": {},
+    "estimated_durations_by_key": {}
+}

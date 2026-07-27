@@ -34,7 +34,7 @@ drift:                ## live source schema check — fails when a feed changes 
 	TREBLE_CHECK_DRIFT=1 uv run pytest -q -m drift
 
 mutate:               ## mutation testing: proves the suite detects damage. Slow.
-	uv run mutmut run --paths-to-mutate treble/analytics/,treble/core/
+	uv run mutmut run   # scope configured in pyproject [tool.mutmut]
 
 check: lint types imports test   ## everything CI runs
 
