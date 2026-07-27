@@ -8,6 +8,12 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 
 ## Current position
 
+> **Repo location: `~/dev/treble-tracker`.** Moved out of `~/Documents` on 2026-07-27 because
+> that folder is iCloud-synced: every temp file, DuckDB database and fixture read went through
+> the sync layer, making the suite effectively unrunnable (ten-minute cycles, `git index.lock`
+> write timeouts). After the move the full suite runs in 10s. **Do not move it back under
+> `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
+
 **Phase:** 1 — research workstation
 **Status:** WP0–WP6 complete (EDGAR/FRED/Treasury/OpenFIGI/GLEIF/N-PORT/TRACE-aggregates, all
 with real recorded fixtures — TRACE per-trade is a settled non-goal, see Data access findings).
@@ -124,12 +130,27 @@ an external source, add its fixture-drift check at the same time.**
       gated on `TREBLE_CHECK_DRIFT=1` so the offline contract holds for the normal suite.
       Compares live *schema* (not values) against every recorded fixture across all seven
       feeds. **When adding a source, add its drift check in the same commit.**
-- [x] **Coverage floor in CI** — `--cov-fail-under=80` in pytest addopts; untested new code
-      cannot land (would have caught the renamed-but-unexercised `TraceCredentialsMissing`
-      call sites)
-- [x] **Mutation testing** — `make mutate` (mutmut over `analytics/` and `core/`), on demand
-      because it is slow; proves the suite detects damage rather than merely passing
+- [x] **Coverage floor in CI** — `--cov-fail-under=84` in pytest addopts (measured 89.42%);
+      untested new code cannot land (would have caught the renamed-but-unexercised
+      `TraceCredentialsMissing` call sites)
+- [ ] **Mutation testing** — `make mutate`, config in `[tool.mutmut]`. **Configured but never
+      completed a run.** mutmut 3.x copies only `paths_to_mutate` into its sandbox, so a
+      scoped config breaks on cross-package test imports; now set to the whole of `treble/`
+      with `tests/`, which is correct but a long job. Next session: run it to completion,
+      record the kill rate, and investigate any surviving mutants — a survivor means a test
+      that passes whether or not the code is right. `mutants/` is gitignored (it was
+      committed by mistake once and removed in a2bd7f7).
 - [x] **`pip-audit` in CI** — dependency vulnerabilities disclosed after shipping
+
+**Full battery run 2026-07-27 from the new location, all green except mutation:** 211 tests,
+coverage 89.42%, mypy --strict over 52 files, both import contracts kept, ruff+bandit clean,
+no dependency vulnerabilities, deep stress at 2000 examples/property with no counterexamples,
+live schema drift checked against all seven feeds with no drift. Suite runtime 10s (51s with
+coverage). Three real defects found by this battery: eight late-binding closures in the ingest
+adapters (silent cross-instrument corruption on any future refactor), three property tests
+whose hardcoded `max_examples` silently overrode the deep profile (so the nightly run was
+never stressing price↔yield, the duration identity, or the I2 guarantee), and a `make mutate`
+target that had never worked.
 
 ## Data access findings (settled 2026-07-26 — do not re-derive)
 

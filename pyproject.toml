@@ -114,7 +114,9 @@ markers = [
 # Mutation testing proves the suite detects damage rather than merely
 # passing. Scoped to the correctness-critical layers; run on demand
 # (`make mutate`) because it is slow by nature.
-# tests_dir must match the mutation scope: mutmut copies only the mutated
-# packages into its sandbox, so tests importing treble.render cannot run there.
-paths_to_mutate = ["treble/core/"]
-tests_dir = ["tests/core/"]
+# The whole package must be in the sandbox: mutmut copies only
+# paths_to_mutate, and the tests import across packages (tests/core pulls
+# treble.ingest, tests/conformance pulls treble.render). Mutating all of
+# treble/ is correct but slow — this is an on-demand target, not per-commit.
+paths_to_mutate = ["treble/"]
+tests_dir = ["tests/"]
