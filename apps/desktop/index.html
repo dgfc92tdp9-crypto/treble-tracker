@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Treble Tracker</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main id="screen" aria-live="polite"></main>
+    <footer>
+      <div id="status" role="status"></div>
+      <div id="prompt">
+        <label for="command-line">&gt;</label>
+        <input id="command-line" autocomplete="off" autofocus spellcheck="false"
+               aria-label="Command line" />
+      </div>
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

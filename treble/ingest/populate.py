@@ -16,8 +16,10 @@ that the payload store already holds.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, Iterator
 from datetime import date
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
@@ -235,6 +237,38 @@ def fetch_company_index(contact_email: str) -> bytes:
     )
     response.raise_for_status()
     return response.content
+
+
+def cached_company_index(data_dir: Path, contact_email: str, *, max_age_hours: int = 24) -> bytes:
+    """EDGAR's company index, from disk when possible.
+
+    The workstation needs this to resolve a ticker, so an uncached fetch
+    made opening the application depend on EDGAR being reachable — a
+    desktop app that cannot open on a train is broken. The cached copy is
+    used when fresh, refreshed when stale, and fallen back to when the
+    refresh fails, so the only unopenable state is "never once online".
+    """
+    cache = data_dir / "company_index.json"
+    if cache.is_file():
+        age = time.time() - cache.stat().st_mtime
+        if age < max_age_hours * 3600:
+            return cache.read_bytes()
+
+    try:
+        payload = fetch_company_index(contact_email)
+    except Exception:
+        if cache.is_file():
+            # Stale beats absent: tickers change far more slowly than a day.
+            return cache.read_bytes()
+        raise
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    # Written via a temporary file so an interrupted write cannot leave a
+    # truncated cache that would then be served as though it were valid.
+    tmp = cache.with_suffix(".json.tmp")
+    tmp.write_bytes(payload)
+    tmp.replace(cache)
+    return payload
 
 
 def iter_discovered_ciks(company_tickers_payload: bytes) -> Iterator[int]:

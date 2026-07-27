@@ -15,24 +15,42 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Status:** WP0–WP6 complete. **WP7 complete**: universe configuration
-(`config/universe.yaml`), pure planning with resumability derived from the ingest log
-(`core/universe.py`), the population runner (`ingest/populate.py`), the `treble` CLI
-(populate/status/universes), EDGAR filer discovery (8,017 unique filers resolved live from
-10,432 index entries — decision 0005's "~8k" estimate confirmed), instrument identity via the
-FIGI hierarchy (`core/master.py`) and the GLEIF Level 2 entity graph (`core/entity_graph.py`).
-**The dev universe is really populated**: ~345k facts from live EDGAR/FRED/Treasury, each
-carrying provenance (I1) and bitemporal stamps (I2); `treble status` reports 0 outstanding.
-Resumability proven on real data, not only in tests.
-Still open in §9.5: EDGAR Exhibit 21 and OpenCorporates as additional entity-graph sources.
-The full 8k-filer run has not been executed (hours, tens of GB) — the machinery is proven at
-dev scale and the command is `treble populate --universe full`.
-**Next action:** the vertical slice to a launchable TUI — WP8 (minimal TAPI over the
-populated store) → WP10 (command grammar) → WP11 (`DES` and `YAS` definitions + resolvers)
-→ WP12 (Textual renderer against the existing conformance suite) → WP14 (`treble init`).
-There is now real data behind it, so `IBM US Equity DES <GO>` can render genuine EDGAR
-fundamentals rather than seed fixtures. Deferred deliberately, not forgotten: EDGAR
-Exhibit 21 / OpenCorporates (§9.5 breadth), and executing the full 8k-filer run.
+**Completion: 23.02%** overall (Phase 1 at 69.06% — 11.05 of 16 work packages).
+
+> **The completion model, recorded here because it was folklore before.** Phase 1 is taken as
+> one third of the whole project; the figure is (Phase 1 WPs complete / 16) x 33.33%. Partials
+> are counted by deliverable, not by feeling: WP8 is 0.9 (in-process and HTTP transports plus
+> the field dictionary; gRPC and Arrow Flight are Phase 2 by the spec), WP11 is 0.15 (one of
+> eleven screens exists). **This supersedes the 28.13% reported on 2026-07-27, which was too
+> high**: it counted WP11 and WP12 as nearly done when only `DES` had been built and only the
+> TUI renderer existed. The number went down because the accounting got honest, not because
+> work was lost.
+
+**Status:** WP0-WP7 and WP10 complete. **WP12 complete**: both renderers now pass one
+conformance suite. The Textual TUI and the TypeScript renderer shared by the desktop shell
+are compared against the same goldens (`RENDERERS = {reference, tui, web}`), the web renderer
+driven from Python through `treble/render/web/conformance.mjs` so it is a renderer *under
+test* rather than a parallel suite that could drift.
+
+**The desktop application exists and opens from the Dock.** `Treble Tracker.app` is a Tauri
+v2 bundle (4.0 MB, `org.trebletracker.desktop`) built by `make desktop-install`. It is a real
+macOS application in its own window, not a browser: the Rust shell owns the window and starts
+`treble serve` as a sidecar, skipping the spawn when a server is already listening so a
+hand-run server is never fought over, and killing only a child it started. Launched from
+Launchpad with no terminal involved, `IBM US Equity DES` renders 942,134,390 shares and
+$152,099,000,000 of assets from the live 345,326-fact store, every figure provenance-backed.
+The TUI launcher bundle is renamed `Treble Tracker Terminal.app` so the two cannot overwrite
+each other.
+
+Screens are served resolved, never as raw data: `treble/render/server.py` hands the client the
+same CellBuffer the TUI renders, so the desktop is never given the opportunity to resolve
+anything itself (I6 across a process boundary, I7 intact).
+
+**Next action:** WP11 is the long pole - ten screens remain (`FA`, `GP`, `HP`, `YAS`, `ICVS`,
+`SRCH`, `EQS`, `FLDS`, `SPTR`, `MDL`), each a definition plus resolver plus conformance case,
+and every one now renders on both surfaces for free. Then WP9 (TQL), WP13 (spreadsheet
+add-in), WP14 (`treble init`), WP15 (gate audit). Deferred deliberately, not forgotten: EDGAR
+Exhibit 21 / OpenCorporates (9.5 breadth), and executing the full 8k-filer run.
 **Standing directives (Jack):** accuracy above all; stress tests + real data always; API
 choices delegated (pick accuracy-maximising, report after); launch = full spec through
 Phase 5; zero external cost (ubuntu-only CI, no cloud routines; pause on token exhaustion).
@@ -216,6 +234,56 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-07-27 — WP12: the desktop application, and four holes it exposed
+
+`Treble Tracker.app` now opens from the Dock as a real macOS application. Building it required
+the HTTP transport and a second renderer, and putting those in front of a real window found
+four defects that every unit test had passed over. Each is now pinned by a test.
+
+1. **The desktop client could not read a single response.** Its WebView runs on its own origin
+   (`tauri://localhost`), so every call to loopback is cross-origin, and the server sent no
+   CORS headers. The requests *succeeded* — the access log showed a wall of `GET /health` at
+   200 OK — while the client threw away every reply and retried until it timed out. Invisible
+   from the server side, which is why the regression test asserts the header rather than the
+   status code. The allowlist is explicit, never `*`: loopback is reachable from any page the
+   user has open, and a wildcard would let a website read this store.
+
+2. **The store that opened depended on the working directory.** `DEFAULT_DATA_DIR` was a
+   relative `Path("data")`. Launched from the Dock, or from a terminal anywhere but the repo
+   root, the workstation silently created a *fresh empty store* and rendered a screen of
+   dashes — indistinguishable from a company that reports nothing. It caught me during this
+   session: a verification server built a second store at `~/.treble` and served a screenful
+   of nothing at 200 OK while I read it as a passing check. Now anchored absolutely, with
+   `TREBLE_DATA_DIR` to override, and `DuckStore.fact_count()` makes an empty store announce
+   itself at startup instead of rendering plausible emptiness.
+
+3. **Opening the application required EDGAR to be reachable.** Ticker resolution fetched
+   `company_tickers.json` on every launch. A desktop app that cannot open on a train is
+   broken. Now cached, refreshed when stale, and fallen back to when a refresh fails — the
+   only unopenable state is "never once online", and it says so.
+
+4. **The HTTP server sat in the wrong layer.** Written as `treble/tapi/server.py`, it imported
+   `treble.render` and broke the layered contract. It resolves screens, which is a render-layer
+   act, so it moved to `treble/render/server.py`. The contract caught a name that had been
+   quietly asserting TAPI serves screens; it does not — it serves data, and this serves
+   buffers resolved from it.
+
+The layout-tree comparison is now structural rather than byte-wise (the text snapshot stays
+character-exact). Node spells `1.0` as `1`, and a renderer in another language must not fail
+for its runtime's number formatting when every position, string, attribute, pane region and
+binding still matches exactly. `canonical_json()` is now the single serialisation point,
+because the first cut of the web renderer drifted by reproducing `json.dumps` parameters by
+hand and getting `ensure_ascii` wrong.
+
+**Process note.** The first `tauri build` reported exit 0 and had failed: the command ended in
+`... > log 2>&1; echo "EXIT=$?"; tail`, so the status came from `tail`. This is the seventh
+instance of that exact mistake, and the first where the safeguard held — `scripts/gate.sh`
+was not the thing that ran, so nothing caught it but reading the log. Builds are now run with
+the exit code captured to a file before anything else touches the pipeline.
+
+Gate green: 90.42% coverage, both import contracts kept, mypy --strict clean, three renderers
+conformant on every case.
 
 ### 2026-07-27 — WP7: GLEIF relationship-record entity graph
 Continuation of the 2026-07-26 session (this entry also backfills that session's last four

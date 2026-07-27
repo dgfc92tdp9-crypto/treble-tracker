@@ -23,6 +23,7 @@ stage "lint + security"   "$VENV/ruff" check .
 stage "format"            "$VENV/ruff" format --check .
 stage "types (strict)"    "$VENV/mypy" treble
 stage "architecture (I7)" "$VENV/lint-imports"
+stage "web renderer"      ./scripts/build_web.sh
 stage "tests + coverage"  "$VENV/pytest" -q
 
 printf '\nGATE GREEN — safe to commit\n'

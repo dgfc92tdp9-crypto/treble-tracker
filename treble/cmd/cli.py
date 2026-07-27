@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 from rich.console import Console
@@ -22,9 +23,13 @@ from rich.table import Table
 from treble.cmd.env import load_env
 from treble.core.universe import load_universe_config
 from treble.ingest.populate import Populator
+from treble.render.server import DEFAULT_HOST, DEFAULT_PORT
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadStore
+
+if TYPE_CHECKING:
+    from treble.tapi.local import LocalTapi
 
 app = typer.Typer(
     add_completion=False,
@@ -37,8 +42,31 @@ app = typer.Typer(
 load_env()
 console = Console()
 
-DEFAULT_DATA_DIR = Path("data")
-DEFAULT_CONFIG = Path("config/universe.yaml")
+
+def _default_data_dir() -> Path:
+    """Where the workstation looks for its store, independent of cwd.
+
+    This was a relative ``Path("data")``, so which store opened depended on
+    the directory the command ran from. Launched from the Dock, or from a
+    terminal anywhere but the repo root, it silently created a fresh empty
+    store and rendered a screen of honest-looking dashes with no error —
+    the exact shape of a wrong display that never announces itself.
+
+    ``TREBLE_DATA_DIR`` overrides. Otherwise the repo's own ``data/`` is
+    used when this is a source checkout, falling back to ``~/.treble`` for
+    an installed copy that has no repo to anchor to.
+    """
+    override = os.environ.get("TREBLE_DATA_DIR")
+    if override:
+        return Path(override).expanduser().resolve()
+    repo_root = Path(__file__).resolve().parents[2]
+    if (repo_root / "pyproject.toml").is_file():
+        return repo_root / "data"
+    return Path.home() / ".treble"
+
+
+DEFAULT_DATA_DIR = _default_data_dir()
+DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "config" / "universe.yaml"
 
 
 class ContactMissingError(Exception):
@@ -184,17 +212,63 @@ def tui(
     Needs a populated store — run `treble populate` first, or screens will
     render honest em dashes rather than figures.
     """
-    from treble.ingest.populate import fetch_company_index
     from treble.render.tui.app import run as run_tui
     from treble.render.tui.theme import get_theme
+
+    run_tui(_local_tapi(data_dir, contact), theme=get_theme(theme))
+
+
+def _local_tapi(data_dir: Path, contact: str | None) -> LocalTapi:
+    """The data path both clients open on.
+
+    Shared deliberately: the desktop shell and the TUI must resolve the same
+    ticker to the same security from the same store, and the only way to
+    guarantee that is for there to be one place it is decided.
+    """
+    from treble.ingest.populate import cached_company_index
     from treble.tapi.local import LocalTapi, TickerIndex
 
     _, _, store = _open_stores(data_dir)
-    email = _contact_email(contact)
     # Ticker resolution comes from EDGAR's own index — the same payload the
     # population runner uses for discovery, so the two cannot disagree.
-    tickers = TickerIndex.from_company_index(fetch_company_index(email))
-    run_tui(LocalTapi(store, tickers=tickers), theme=get_theme(theme))
+    if store.fact_count() == 0:
+        # Silence here would be indistinguishable from a company that
+        # reports nothing: every bound cell renders as a dash either way.
+        console.print(
+            f"[bold yellow]warning[/]: no facts in {data_dir} — screens will render dashes. "
+            "Run `treble populate` first."
+        )
+    index = cached_company_index(data_dir, _contact_email(contact))
+    return LocalTapi(store, tickers=TickerIndex.from_company_index(index))
+
+
+@app.command()
+def serve(
+    data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where payloads and the store live."),
+    contact: str | None = typer.Option(None, help="Contact email for the EDGAR User-Agent."),
+    host: str = typer.Option(DEFAULT_HOST, help="Bind address. Loopback by default."),
+    port: int = typer.Option(DEFAULT_PORT, help="Port for the local TAPI transport."),
+) -> None:
+    """Serve TAPI over HTTP for the desktop client.
+
+    The desktop shell is a separate process, so it reaches the same data
+    path over loopback rather than in-process. It receives resolved
+    CellBuffers, never raw data — which is what keeps every renderer in
+    agreement (I6).
+    """
+    from treble.render.server import run as run_server
+
+    if host != DEFAULT_HOST:
+        # §22.1's entitlement model does not exist yet, so anything beyond
+        # loopback would be an unauthenticated view of the whole store.
+        console.print(
+            f"[bold red]refusing to bind {host}[/]: local-only mode has no authentication; "
+            "only 127.0.0.1 is served until the entitlement model lands (spec §22.1)."
+        )
+        raise typer.Exit(code=2)
+
+    console.print(f"TAPI on http://{host}:{port}  ·  docs at /api")
+    run_server(_local_tapi(data_dir, contact), host=host, port=port)
 
 
 @app.command()

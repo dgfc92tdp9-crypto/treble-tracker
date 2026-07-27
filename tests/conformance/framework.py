@@ -16,13 +16,20 @@ fails; it does not get a special case. Set ``TREBLE_REGEN_GOLDEN=1`` to
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
 from treble.core.identifiers import SecurityQuery
 from treble.core.provenance import ProvenanceId
-from treble.render.contract.buffer import CellBuffer, layout_tree, text_snapshot
+from treble.render.contract.buffer import (
+    CellBuffer,
+    canonical_json,
+    layout_tree,
+    text_snapshot,
+)
 from treble.render.contract.resolver import FieldResult, ScreenContext, resolve
 from treble.render.contract.schema import ScreenDef, load_screen
 
@@ -125,8 +132,43 @@ def tui_renderer(case: Case) -> tuple[str, str]:
     return conformance_artifacts(case.reference_buffer())
 
 
+WEB_DIR = Path(__file__).parents[2] / "treble" / "render" / "web"
+
+
+def web_renderer(case: Case) -> tuple[str, str]:
+    """The TypeScript renderer the desktop shell and browser client share.
+
+    Driven exactly as the desktop client is: given the layout-tree JSON that
+    ``POST /command`` returns, and asked to render. Nothing about the screen
+    definition reaches it -- which is the point of I6.
+
+    A missing toolchain is a hard failure, not a skip. A renderer that is
+    silently untested is worse than one that is absent, and this is the only
+    check standing between the desktop client and a screen it draws wrongly.
+    """
+    node = shutil.which("node")
+    if node is None:
+        raise RuntimeError("node is required to run the web renderer's conformance")
+    if not (WEB_DIR / "dist" / "renderer.js").exists():
+        raise RuntimeError(f"web renderer is not built; run `make web` ({WEB_DIR}/dist missing)")
+
+    buffer = case.reference_buffer()
+    proc = subprocess.run(  # noqa: S603
+        [node, str(WEB_DIR / "conformance.mjs")],
+        input=layout_tree(buffer),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"web renderer failed: {proc.stderr.strip()}")
+    result = json.loads(proc.stdout)
+    return canonical_json(result["tree"]), result["text"]
+
+
 RENDERERS: dict[str, RendererUnderTest] = {
     "reference": reference_renderer,
     "tui": tui_renderer,
-    # "web": added by the TS renderer work package (same goldens)
+    "web": web_renderer,
 }

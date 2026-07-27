@@ -1,0 +1,67 @@
+/* §6.2: a dense monospaced grid. The desktop gets real type rendering
+   where the TUI gets terminal cells, but the geometry is identical
+   because both consume the same resolved buffer. */
+:root {
+  --bg: #0a0a0a;
+  --fg: #c6c6c6;
+  --status-bg: #1c1c1c;
+  --accent: #d78700;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: Menlo, "SF Mono", monospace;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+main {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 12px;
+}
+
+.grid { display: grid; white-space: pre; }
+.cell { white-space: pre; }
+.cell[data-command] { cursor: pointer; }
+
+.pane {
+  border: 1px solid #3a3a3a;
+  position: relative;
+  margin: 2px;
+}
+.pane-label { color: #767676; font-size: 11px; padding: 2px 4px; display: block; }
+.pane-chart { width: 100%; height: calc(100% - 18px); display: block; }
+
+footer { border-top: 1px solid #3a3a3a; background: var(--status-bg); }
+
+#status {
+  padding: 4px 12px;
+  color: #949494;
+  min-height: 1.4em;
+  font-size: 13px;
+}
+#status.error { color: #d70000; }
+
+#prompt { display: flex; align-items: center; padding: 4px 12px 8px; gap: 8px; }
+#prompt label { color: var(--accent); font-weight: 700; }
+
+#command-line {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font: inherit;
+  text-transform: uppercase;
+}
+
+@keyframes treble-blink { 50% { opacity: 0; } }

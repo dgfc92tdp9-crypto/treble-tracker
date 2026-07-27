@@ -181,6 +181,17 @@ class DuckStore:
 
     # -- reads (as_of is required; I2) ---------------------------------------
 
+    def fact_count(self) -> int:
+        """How many facts the store holds.
+
+        Cheap enough to call at startup, which is the point: an empty store
+        renders every bound cell as a dash, and a dash is indistinguishable
+        from "not reported". The clients check this so an unpopulated store
+        announces itself instead of looking like a company with no figures.
+        """
+        row = self._conn.execute("select count(*) from facts").fetchone()
+        return int(row[0]) if row else 0
+
     def read(self, subject: TUID, field: str, *, as_of: datetime) -> list[Fact]:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")

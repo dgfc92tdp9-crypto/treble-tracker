@@ -1,13 +1,16 @@
-"""Build `Treble Tracker.app` — a double-clickable launcher for the TUI.
+"""Build `Treble Tracker Terminal.app` — a double-clickable TUI launcher.
 
-This is a *launcher*, not the native desktop client. The spec's desktop
-surface (§4) is a Tauri shell with WebGL panes rendering the same screen
-definitions; that is Phase 1's "both clients" criterion and remains to be
-built. What this gives you today is the workstation opening from
-Applications or the Dock without touching a terminal.
+Not the desktop client. The spec's desktop surface (4) is the Tauri shell
+in `apps/desktop`, which is built and installed by `make desktop-install`
+and is the application to open normally.
 
-The bundle is generated rather than committed as binary: `make app` rebuilds
-it, so it can never drift from the code it launches.
+This bundle exists because the TUI is a genuinely different surface, not
+a fallback: it runs over SSH, in tmux, and on a machine with no WebView.
+Its name and bundle identifier are deliberately distinct so the two never
+overwrite each other in ~/Applications.
+
+The bundle is generated rather than committed as binary: `make app`
+rebuilds it, so it can never drift from the code it launches.
 """
 
 from __future__ import annotations
@@ -18,7 +21,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-APP_NAME = "Treble Tracker"
+APP_NAME = "Treble Tracker Terminal"
 BUNDLE_ID = "org.trebletracker.workstation"
 
 LAUNCHER = """#!/bin/bash

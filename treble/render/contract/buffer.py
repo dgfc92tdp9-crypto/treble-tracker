@@ -86,6 +86,16 @@ def layout_tree(buffer: CellBuffer) -> str:
         ],
         "footnotes": list(buffer.footnotes),
     }
+    return canonical_json(payload)
+
+
+def canonical_json(payload: object) -> str:
+    """The one serialisation used for layout goldens.
+
+    Exists so no caller can reproduce these parameters by hand and drift
+    from them — which is precisely what happened when the web renderer was
+    wired in and re-dumped with ``ensure_ascii`` left at its default.
+    """
     return json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False)
 
 

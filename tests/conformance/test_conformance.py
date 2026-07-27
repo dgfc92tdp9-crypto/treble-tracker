@@ -1,5 +1,6 @@
 """The conformance suite itself (I6). Every case, every renderer."""
 
+import json
 import os
 
 import pytest
@@ -31,9 +32,17 @@ class TestConformance:
         if not case.golden_layout.exists():
             pytest.skip("goldens not generated yet")
         layout, text = RENDERERS[renderer_name](case)
-        assert layout == case.golden_layout.read_text(), (
-            f"{case.name}/{renderer_name}: layout tree diverges from golden"
-        )
+        golden_layout = case.golden_layout.read_text()
+        # JSON equality is structural. A renderer in another language must
+        # not be failed for how its runtime spells a number — Node emits 1
+        # where CPython emits 1.0 for the same value. Everything that
+        # carries meaning (positions, text, attributes, pane regions and
+        # bindings) is still compared exactly, and the text snapshot below
+        # — the thing a user actually sees — stays character-for-character.
+        if json.loads(layout) != json.loads(golden_layout):
+            assert layout == golden_layout, (
+                f"{case.name}/{renderer_name}: layout tree diverges from golden"
+            )
         assert text == case.golden_text.read_text(), (
             f"{case.name}/{renderer_name}: text snapshot diverges from golden"
         )

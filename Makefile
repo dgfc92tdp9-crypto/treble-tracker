@@ -1,4 +1,4 @@
-.PHONY: setup lint types test golden conformance check tui desktop clean
+.PHONY: setup lint types test golden conformance check tui web desktop app clean
 
 setup:                ## create the venv and install everything
 	uv venv --python 3.12
@@ -39,13 +39,19 @@ mutate:               ## mutation testing: proves the suite detects damage. Slow
 gate:                 ## the single pre-commit gate; fails loudly, never silently
 	./scripts/gate.sh
 
-check: lint types imports test   ## everything CI runs
+web:                   ## compile the shared TS renderer (a renderer under conformance)
+	./scripts/build_web.sh
+
+check: lint types imports web test   ## everything CI runs
 
 tui:
 	uv run treble tui
 
-desktop:
+desktop:              ## run the desktop client against a dev server
 	cd apps/desktop && npm run tauri dev
+
+desktop-install:      ## build the desktop client and install it into ~/Applications
+	./scripts/install_desktop.sh
 
 app:                  ## build 'Treble Tracker.app' into ~/Applications
 	uv run python scripts/make_app.py
