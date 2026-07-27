@@ -44,5 +44,8 @@ tui:
 desktop:
 	cd apps/desktop && npm run tauri dev
 
+app:                  ## build 'Treble Tracker.app' into ~/Applications
+	uv run python scripts/make_app.py
+
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache htmlcov .coverage
