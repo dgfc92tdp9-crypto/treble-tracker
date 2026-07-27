@@ -108,6 +108,31 @@ Non-blocking, proceeding on stated defaults (flag if wrong):
 
 ---
 
+## Verification practice (standing, learned the hard way 2026-07-27)
+
+**Run `make gate` before every commit. Do not commit with `--no-verify`.**
+
+Three times on 2026-07-27 a check was piped into `tail`, its exit code was
+masked by the pipe, the output was read as if it were a pass, and a failing
+state was committed. Twice more, `--no-verify` was used to skip the
+pre-commit hook — originally justified when iCloud made the suite
+unrunnable, and left in place after that reason disappeared.
+
+The compensation is mechanical, not aspirational:
+
+- `scripts/gate.sh` (`make gate`) runs every check under `set -euo
+  pipefail`, so a failing stage stops the script whether or not anything is
+  piped. It prints `GATE GREEN` only when everything passed.
+- The pre-commit hook now runs the test suite as well as lint and types, so
+  the local gate matches CI. With the repo out of iCloud the whole thing
+  takes ~15s; there is no longer any excuse to bypass it.
+
+**Jack's standing instruction (2026-07-27):** "Always try to learn and
+compensate for every mistake found/made. Time doesn't matter, only that it
+is the highest level project produced." Every defect found — in the code or
+in the process — gets a mechanism that prevents its recurrence, not a note
+to be more careful.
+
 ## Continuous verification (standing requirement, Jack 2026-07-26)
 
 "Make sure holes are always found, even after their creation." Write-time checks are not

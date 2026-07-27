@@ -18,6 +18,12 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+      - id: tests
+        name: test suite + coverage floor
+        entry: .venv/bin/pytest -q
+        language: system
+        pass_filenames: false
+        types: [python]
       - id: import-linter
         name: import-linter (I7)
         entry: uv run lint-imports

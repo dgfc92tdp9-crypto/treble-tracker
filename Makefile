@@ -36,6 +36,9 @@ drift:                ## live source schema check — fails when a feed changes 
 mutate:               ## mutation testing: proves the suite detects damage. Slow.
 	uv run mutmut run   # scope configured in pyproject [tool.mutmut]
 
+gate:                 ## the single pre-commit gate; fails loudly, never silently
+	./scripts/gate.sh
+
 check: lint types imports test   ## everything CI runs
 
 tui:
