@@ -14,6 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+      # The shared TypeScript renderer is a renderer under conformance, so
+      # the suite compiles and runs it. Without node, `make check` fails
+      # loudly rather than skipping a renderer — which is the point.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Install
         run: |
           uv python install 3.12
