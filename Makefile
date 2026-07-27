@@ -39,6 +39,9 @@ mutate:               ## mutation testing: proves the suite detects damage. Slow
 gate:                 ## the single pre-commit gate; fails loudly, never silently
 	./scripts/gate.sh
 
+completion:            ## print the completion figure (computed, never hand-written)
+	uv run python scripts/completion.py --verbose
+
 web:                   ## compile the shared TS renderer (a renderer under conformance)
 	./scripts/build_web.sh
 

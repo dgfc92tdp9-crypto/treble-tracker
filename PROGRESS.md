@@ -15,21 +15,25 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Completion: 20.72%** overall (Phase 1 at 69.06% — 11.05 of 16 work packages).
+**Completion: 20.42%** — computed by `python scripts/completion.py`, never written by hand.
 
-> **The completion model, written down here so it stops being folklore.** Fixed phase weights:
-> P1 30%, P2 25%, P3 15%, P4 20%, P5 10%. Within the active phase the fraction is completed
-> work packages over the phase total (P1 has WP0-WP15 = 16). So 11.05/16 x 30% = 20.72%. The
-> decimals are arithmetic from this model, not a confidence estimate.
+> **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
+> weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
+> computes; `tests/test_completion.py` fails the gate if this file disagrees with it, if the
+> weights do not sum to 100, if Phase 1 does not have 16 packages, or if any partial lacks a
+> `basis` saying what was counted.
 >
-> Partials are counted by deliverable, not by feeling: WP8 is 0.9 (in-process and HTTP
-> transports plus the field dictionary; gRPC and Arrow Flight are Phase 2 by the spec), WP11
-> is 0.15 (one of eleven screens exists), WP12 is 1.0 (both renderers, one suite).
+> **Why it exists.** The number was written by hand and one update got it wrong twice over: the
+> phase weight was reverse-engineered from an earlier reported figure (33.33%) instead of read
+> from the model (30%), and WP11/WP12 were credited by impression when one screen of eleven
+> existed and one renderer of two. Neither was an arithmetic error — both were preferring a
+> recalled value to the recorded one. The first run of the new test caught this section still
+> claiming 20.72% against a computed 20.42%, which is the mechanism doing its job on its
+> author.
 >
-> **This supersedes the 28.13% reported earlier on 2026-07-27, which was wrong twice over**: it
-> counted WP11 and WP12 as nearly done when only `DES` existed and only the TUI rendered, and
-> a working figure of 33.33% was used for the P1 weight instead of the recorded 30%. The
-> number went down because the accounting got honest, not because work was lost.
+> Reported figures over time: 28.13% (wrong — bad weight, over-credited partials), 23.02%
+> (wrong weight only), 20.72% (correct weight, partials still by impression), **20.42%**
+> (computed; WP8 0.8 and WP11 0.09 now carry a stated basis).
 
 **Status:** WP0-WP7 and WP10 complete. **WP12 complete**: both renderers now pass one
 conformance suite. The Textual TUI and the TypeScript renderer shared by the desktop shell
@@ -155,6 +159,84 @@ compensate for every mistake found/made. Time doesn't matter, only that it
 is the highest level project produced." Every defect found — in the code or
 in the process — gets a mechanism that prevents its recurrence, not a note
 to be more careful.
+
+## Failure modes and what catches them (standing, Jack 2026-07-27)
+
+> "I want you to update Progress and your method of approach so that simple mistakes like
+> these don't come up as often if not at all. Also adjust for code errors that keep coming up
+> and the general way they come up so that you learn from your mistakes."
+
+Every mistake made on this project so far falls into four classes. They are recorded by
+*class* rather than as a list of incidents, because the same shape keeps recurring in new
+material — a note about one incident would not have prevented the next one. Each class names
+the mechanism that now catches it, and says honestly whether that mechanism is enforced by
+the gate or is a rule that depends on discipline.
+
+### A. Success read from output that could not report failure — 7 occurrences
+
+`ruff check . | tail`, `pytest | tail`, and most recently `npx tauri build > log 2>&1; echo
+"EXIT=$?"; tail -25 log`. In every case the exit status came from the last command in the
+chain, the output looked fine, and a failing state was accepted. The Tauri build reported
+exit 0 while the compile had failed on a missing icon.
+
+- **Enforced:** `scripts/gate.sh` runs every check under `set -euo pipefail`; the pre-commit
+  hook runs the same suite so a bypass requires `--no-verify`, which is forbidden.
+- **Enforced:** multi-step builds live in `scripts/*.sh` with `set -euo pipefail` and an
+  explicit post-condition — `install_desktop.sh` fails if a "successful" build produced no
+  bundle, because a stale bundle copied after a failed build is indistinguishable from success.
+- **Rule:** never end a command with a pager or `tail` and read its status. Redirect to a
+  file, capture `$?` into a variable or file *before* anything else runs, then read the log.
+
+### B. A recalled value preferred over the recorded one — 4 occurrences
+
+The completion percentage (phase weight reverse-engineered from an earlier figure instead of
+read from the model). The web renderer's JSON (`json.dumps` parameters reproduced by hand,
+`ensure_ascii` wrong, goldens diverged). The `.env` loader (the variable had been exported by
+hand in the shell, which masked for days that the CLI never read `.env` at all). The iCloud
+diagnosis (a theory about the sandbox preferred over measuring, until Jack's report that
+Terminal was also slow disproved it).
+
+- **Enforced:** `config/completion.yaml` + `scripts/completion.py` + `tests/test_completion.py`
+  — the number is computed, and the gate fails if PROGRESS.md disagrees.
+- **Enforced:** `canonical_json()` is the single serialisation point for layout goldens; there
+  are no parameters left to reproduce by hand.
+- **Rule:** when two places must agree, make one derive from the other. Where that is
+  impossible, add a test that compares them. Never reconstruct a constant by dividing two
+  numbers you already suspect.
+
+### C. A check that could not have failed — 2 occurrences
+
+A verification server was pointed at `~/.treble` while the real store is `data/`; it created
+an empty database, served a screen of honest-looking dashes at 200 OK, and that was read as a
+passing check. A test asserted "contains a digit" as a proxy for "is a figure" and was
+satisfied by the static menu label `1) FA Financial Analysis`.
+
+- **Enforced:** `DuckStore.fact_count()`, checked at client startup, so an empty store
+  announces itself instead of rendering plausible emptiness.
+- **Enforced:** `DEFAULT_DATA_DIR` is absolute, so which store opens no longer depends on the
+  working directory.
+- **Rule:** a check that has never been observed to fail is not evidence. Before trusting a new
+  test or a manual verification, confirm it fails against the broken state. Assert the precise
+  property (no cell carries provenance), never a proxy for it (no text contains a digit).
+
+### D. An environment assumption never stated — 4 occurrences
+
+A relative `Path("data")` for the store. A network fetch on every launch, making the desktop
+app unopenable offline. An icon set with the `.icns` but no `.png`. An HTTP server placed in
+`treble/tapi/` when it imports `treble.render`.
+
+- **Enforced:** `lint-imports` caught the layering, as designed (I7).
+- **Enforced:** `tests/cmd/test_data_dir.py` pins cwd-independence;
+  `tests/ingest/test_company_index_cache.py` pins the offline path.
+- **Rule:** paths anchored absolutely, never relative to the caller's cwd; assume no network at
+  startup; a build that has only ever run on this machine has not been shown to be portable.
+
+### The distinction that matters
+
+Classes A and C are the dangerous ones, because their failure mode is *looking correct*. B and
+D announce themselves eventually. So the ordering rule is: **prove the check can fail before
+believing what it says.** That is the only one of these that generalises to mistakes not yet
+made.
 
 ## Continuous verification (standing requirement, Jack 2026-07-26)
 

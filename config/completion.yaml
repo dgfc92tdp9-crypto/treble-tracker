@@ -1,0 +1,49 @@
+# The completion ledger — the single source of truth for the reported figure.
+#
+# The percentage was stated by hand and got it wrong twice in one update: the
+# phase weight was reverse-engineered from an earlier (also wrong) figure
+# instead of read, and partial work packages were credited by impression
+# rather than by deliverable. Both are the same mistake — trusting a recalled
+# number over the recorded one.
+#
+# So the number is no longer written by anyone. `scripts/completion.py`
+# computes it from this file, and `tests/test_completion.py` fails the gate if
+# PROGRESS.md disagrees with the computation. To change the reported figure you
+# must change a `done:` value here and give it a `basis:` — a countable
+# statement, not a feeling.
+
+# Fixed phase weights (Jack, 2026-07-26). These are the model; do not re-derive
+# them from any previously reported percentage.
+weights:
+  phase_1: 30
+  phase_2: 25
+  phase_3: 15
+  phase_4: 20
+  phase_5: 10
+
+active_phase: phase_1
+
+# Phase 1 has 16 work packages, WP0–WP15. `done` is a fraction in [0, 1].
+# Every value other than 0 or 1 needs a `basis` stating what was counted.
+phase_1:
+  WP0:  {done: 1.0, name: "Toolchain + CI"}
+  WP1:  {done: 1.0, name: "core — identifiers, provenance, bitemporal facts"}
+  WP2:  {done: 1.0, name: "store — payloads, ingest log, DuckDB"}
+  WP3:  {done: 1.0, name: "screen definition contract + conformance harness"}
+  WP4:  {done: 1.0, name: "analytics foundations — QuantLib, registry, curves"}
+  WP5:  {done: 1.0, name: "bonds analytics — yield, spreads, risk, OAS"}
+  WP6:  {done: 1.0, name: "ingest adapters"}
+  WP7:  {done: 1.0, name: "security master + entity graph"}
+  WP8:  {done: 0.8, name: "TAPI",
+         basis: "field dictionary, in-process transport, HTTP transport and
+                 Python client all ship; the tql service is blocked on WP9 and
+                 gRPC/Arrow Flight are Phase 2 by spec 8.3"}
+  WP9:  {done: 0.0, name: "TQL — grammar, planner, executor"}
+  WP10: {done: 1.0, name: "command grammar + dispatcher"}
+  WP11: {done: 0.09, name: "screens",
+         basis: "1 of 11 screens built (DES). FA, GP, HP, YAS, ICVS, SRCH,
+                 EQS, FLDS, SPTR, MDL outstanding"}
+  WP12: {done: 1.0, name: "renderers — TUI and desktop against one suite"}
+  WP13: {done: 0.0, name: "spreadsheet add-in"}
+  WP14: {done: 0.0, name: "local-only mode — treble init"}
+  WP15: {done: 0.0, name: "Phase 1 gate audit"}
