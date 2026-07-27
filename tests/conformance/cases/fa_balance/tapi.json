@@ -1,0 +1,30 @@
+{
+  "fields": {
+    "us-gaap:Assets:USD": {
+      "value": 152099000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:CashAndCashEquivalentsAtCarryingValue:USD": {
+      "value": 7172000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:Liabilities:USD": {
+      "value": 117558000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:StockholdersEquity:USD": {
+      "value": 34452000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest:USD": {
+      "value": 34541000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    }
+  },
+  "series": {}
+}

@@ -1,0 +1,19 @@
+{
+  "fields": {},
+  "series": {
+    "sys:provenance": [
+      [
+        "edgar",
+        "api",
+        "2026-07-27",
+        "https://data.sec.gov/submissions/CIK0000051143.json"
+      ],
+      [
+        "edgar",
+        "xbrl",
+        "2026-07-27",
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000051143.json"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "FINANCIAL ANALYSIS · CASH FLOW"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "as reported (USD)"
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Net cash from operating activities"
+    },
+    {
+      "at": [
+        4,
+        34
+      ],
+      "attrs": [
+        "positive"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "       5,169,000,000"
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Net cash from investing activities"
+    },
+    {
+      "at": [
+        5,
+        34
+      ],
+      "attrs": [
+        "negative"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "     -10,489,000,000"
+    },
+    {
+      "at": [
+        6,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Net cash from financing activities"
+    },
+    {
+      "at": [
+        6,
+        34
+      ],
+      "attrs": [
+        "positive"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "       2,719,000,000"
+    },
+    {
+      "at": [
+        8,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Cash and equivalents, carrying value"
+    },
+    {
+      "at": [
+        8,
+        34
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "       7,172,000,000"
+    },
+    {
+      "at": [
+        16,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TABS"
+    },
+    {
+      "at": [
+        17,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "IBM US Equity FA",
+      "provenance": null,
+      "text": "1) Income   2) Balance sheet   3) Cash flow"
+    },
+    {
+      "at": [
+        18,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "IBM US Equity DES",
+      "provenance": null,
+      "text": "DES  Description"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "The three activity totals are as filed; they are not forced to reconcile."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "FA",
+  "panes": [],
+  "stale": false,
+  "tab": "cashflow"
+}

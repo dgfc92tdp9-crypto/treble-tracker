@@ -1,0 +1,314 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "FINANCIAL ANALYSIS · INCOME STATEMENT"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "as reported (USD)"
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Revenues"
+    },
+    {
+      "at": [
+        4,
+        34
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "      17,162,000,000"
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Income tax expense / (benefit)"
+    },
+    {
+      "at": [
+        5,
+        34
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "         313,000,000"
+    },
+    {
+      "at": [
+        6,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Net income / (loss)"
+    },
+    {
+      "at": [
+        6,
+        34
+      ],
+      "attrs": [
+        "positive"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "       2,165,000,000"
+    },
+    {
+      "at": [
+        7,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Comprehensive income, net of tax"
+    },
+    {
+      "at": [
+        7,
+        34
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "       2,429,000,000"
+    },
+    {
+      "at": [
+        9,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "PER SHARE"
+    },
+    {
+      "at": [
+        10,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "EPS, basic"
+    },
+    {
+      "at": [
+        10,
+        34
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "                2.30"
+    },
+    {
+      "at": [
+        11,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "EPS, diluted"
+    },
+    {
+      "at": [
+        11,
+        34
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "                2.27"
+    },
+    {
+      "at": [
+        12,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Weighted average shares, basic"
+    },
+    {
+      "at": [
+        12,
+        34
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "         941,192,024"
+    },
+    {
+      "at": [
+        13,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Weighted average shares, diluted"
+    },
+    {
+      "at": [
+        13,
+        34
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "text": "         953,263,534"
+    },
+    {
+      "at": [
+        16,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TABS"
+    },
+    {
+      "at": [
+        17,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "IBM US Equity FA",
+      "provenance": null,
+      "text": "1) Income   2) Balance sheet   3) Cash flow"
+    },
+    {
+      "at": [
+        18,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "IBM US Equity DES",
+      "provenance": null,
+      "text": "DES  Description"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "As-reported XBRL under the filer's own tags; standardisation is Phase 2."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "FA",
+  "panes": [],
+  "stale": false,
+  "tab": "income"
+}

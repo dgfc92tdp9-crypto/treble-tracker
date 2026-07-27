@@ -1,0 +1,21 @@
+SOURCE TRACE
+────────────────────────────────────────────────────────────────────────────
+Every document behind the values shown for this security.
+
+SOURCE      METHOD     RETRIEVED     DOCUMENT
++------------------------------------------------------------------------------+
+|[table_scroll:sys:provenance]                                                 |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+DES  Description
+No figure is displayed without a row here to account for it (I1).

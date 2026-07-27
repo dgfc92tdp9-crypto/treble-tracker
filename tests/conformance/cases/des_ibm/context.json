@@ -1,0 +1,9 @@
+{
+  "as_of": "2026-07-27T12:00:00+00:00",
+  "screen": "DES",
+  "security": {
+    "ticker": "IBM",
+    "key": "Equity",
+    "venue": "US"
+  }
+}

@@ -1,0 +1,21 @@
+MODEL REGISTRY
+────────────────────────────────────────────────────────────────────────────
+Every analytic output is stamped with the id and version below (I3).
+
+MODEL ID                  VER   SPEC     SUMMARY
++------------------------------------------------------------------------------+
+|[table_scroll:sys:models]                                                     |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Discovered by import, never hand-listed; a stale list would under-report.

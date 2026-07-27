@@ -1,0 +1,118 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SOURCE TRACE"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Every document behind the values shown for this security."
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SOURCE      METHOD     RETRIEVED     DOCUMENT"
+    },
+    {
+      "at": [
+        19,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "IBM US Equity DES",
+      "provenance": null,
+      "text": "DES  Description"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "No figure is displayed without a row here to account for it (I1)."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "SPTR",
+  "panes": [
+    {
+      "binding": "sys:provenance",
+      "data": [
+        [
+          "edgar",
+          "api",
+          "2026-07-27",
+          "https://data.sec.gov/submissions/CIK0000051143.json"
+        ],
+        [
+          "edgar",
+          "xbrl",
+          "2026-07-27",
+          "https://data.sec.gov/api/xbrl/companyfacts/CIK0000051143.json"
+        ]
+      ],
+      "region": [
+        5,
+        0,
+        13,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

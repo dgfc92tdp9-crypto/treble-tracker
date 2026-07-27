@@ -1,0 +1,97 @@
+{
+  "fields": {},
+  "series": {
+    "sys:models": [
+      [
+        "bonds.accrued_interest",
+        "1.0",
+        "\u00a710.1",
+        "Accrued to settlement on the bond's exact day count"
+      ],
+      [
+        "bonds.cash_flows",
+        "1.0",
+        "\u00a710.1",
+        "Remaining cash flow schedule (CSHF)"
+      ],
+      [
+        "bonds.convexity",
+        "1.0",
+        "\u00a710.1",
+        "Convexity at the quoted yield"
+      ],
+      [
+        "bonds.dv01",
+        "1.0",
+        "\u00a710.1",
+        "Price value of a basis point (per 100 face)"
+      ],
+      [
+        "bonds.effective_duration",
+        "1.0",
+        "\u00a710.1",
+        "Effective duration: whole-curve bump, full lattice revaluation"
+      ],
+      [
+        "bonds.g_spread",
+        "1.0",
+        "\u00a710.1",
+        "Yield minus interpolated government curve at maturity"
+      ],
+      [
+        "bonds.lattice_price",
+        "1.0",
+        "\u00a710.2",
+        "Callable bond clean price from the Hull-White lattice at a given OAS"
+      ],
+      [
+        "bonds.macaulay_duration",
+        "1.0",
+        "\u00a710.1",
+        "Macaulay duration at the quoted yield"
+      ],
+      [
+        "bonds.modified_duration",
+        "1.0",
+        "\u00a710.1",
+        "Modified duration at the quoted yield"
+      ],
+      [
+        "bonds.oas_hull_white_lattice",
+        "1.0",
+        "\u00a710.2",
+        "OAS on a Hull-White trinomial lattice; vol/mean-reversion are explicit user parameters (ADR-0003), not market-calibrated"
+      ],
+      [
+        "bonds.price_from_yield",
+        "1.0",
+        "\u00a710.1",
+        "Clean price from street-convention yield"
+      ],
+      [
+        "bonds.yield_from_price",
+        "1.0",
+        "\u00a710.1",
+        "Street-convention yield solved from clean price"
+      ],
+      [
+        "bonds.yield_to_call",
+        "1.0",
+        "\u00a710.1",
+        "Yield to a specific call date/price"
+      ],
+      [
+        "bonds.yield_to_worst",
+        "1.0",
+        "\u00a710.1",
+        "Minimum yield across maturity and every call date"
+      ],
+      [
+        "bonds.z_spread",
+        "1.0",
+        "\u00a710.1",
+        "Constant shift to the zero curve equating PV to price"
+      ]
+    ]
+  }
+}

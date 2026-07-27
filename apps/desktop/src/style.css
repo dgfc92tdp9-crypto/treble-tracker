@@ -65,3 +65,15 @@ footer { border-top: 1px solid #3a3a3a; background: var(--status-bg); }
 }
 
 @keyframes treble-blink { 50% { opacity: 0; } }
+
+/* Table panes (MDL, FLDS, SPTR). Scrolls inside its own region rather
+   than growing the page — the pane's region is part of the contract. */
+.pane-table { overflow: auto; border: none; }
+.pane-table table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.pane-table td {
+  padding: 1px 10px 1px 0;
+  white-space: nowrap;
+  vertical-align: top;
+}
+.pane-table tr:nth-child(even) { background: #131313; }
+.pane-table td:first-child { color: #00afd7; }

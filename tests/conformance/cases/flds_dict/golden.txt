@@ -1,0 +1,21 @@
+FIELD DICTIONARY
+────────────────────────────────────────────────────────────────────────────
+Documented mnemonics. As-reported XBRL tags resolve dynamically.
+
+MNEMONIC          DESCRIPTION                      TYPE      SOURCE
++------------------------------------------------------------------------------+
+|[table_scroll:sys:fields]                                                     |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+A mnemonic absent here is an error, never a blank cell (§9.6).

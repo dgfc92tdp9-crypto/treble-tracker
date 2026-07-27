@@ -1,0 +1,129 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "FIELD DICTIONARY"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Documented mnemonics. As-reported XBRL tags resolve dynamically."
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "MNEMONIC          DESCRIPTION                      TYPE      SOURCE"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "A mnemonic absent here is an error, never a blank cell (§9.6)."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "FLDS",
+  "panes": [
+    {
+      "binding": "sys:fields",
+      "data": [
+        [
+          "BEST_EPS",
+          "Consensus earnings per share estimate",
+          "ratio",
+          "contributed, model"
+        ],
+        [
+          "CUR_MKT_CAP",
+          "Current market capitalisation",
+          "money",
+          "edgar"
+        ],
+        [
+          "DUR_ADJ_OAS",
+          "Option-adjusted (effective) duration",
+          "duration",
+          "model"
+        ],
+        [
+          "IDX_MWEIGHT",
+          "Index member weight",
+          "ratio",
+          "edgar"
+        ],
+        [
+          "OAS_SPREAD_MID",
+          "Option-adjusted spread, mid",
+          "spread",
+          "model"
+        ],
+        [
+          "PX_LAST",
+          "Last price",
+          "price",
+          "fred, trace-api"
+        ]
+      ],
+      "region": [
+        5,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

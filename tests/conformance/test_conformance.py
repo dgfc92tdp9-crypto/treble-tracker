@@ -51,3 +51,18 @@ class TestConformance:
 @pytest.mark.conformance
 def test_at_least_one_case_exists() -> None:
     assert CASES, "conformance suite must not be empty"
+
+
+@pytest.mark.conformance
+def test_every_shipped_screen_has_a_case() -> None:
+    """I6's kill-test at the suite level.
+
+    A screen with no conformance case is a screen no renderer is checked
+    against — it can render differently on the TUI and the desktop, or
+    render nothing at all, and nothing would fail.
+    """
+    from treble.render.contract.registry import available
+
+    covered = {c.definition.mnemonic for c in CASES}
+    missing = sorted(set(available()) - covered)
+    assert not missing, f"screens with no conformance case: {', '.join(missing)}"

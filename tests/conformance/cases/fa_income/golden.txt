@@ -1,0 +1,21 @@
+FINANCIAL ANALYSIS · INCOME STATEMENT
+────────────────────────────────────────────────────────────────────────────
+as reported (USD)
+
+Revenues                                17,162,000,000
+Income tax expense / (benefit)             313,000,000
+Net income / (loss)                      2,165,000,000
+Comprehensive income, net of tax         2,429,000,000
+
+PER SHARE
+EPS, basic                                        2.30
+EPS, diluted                                      2.27
+Weighted average shares, basic             941,192,024
+Weighted average shares, diluted           953,263,534
+
+
+TABS
+1) Income   2) Balance sheet   3) Cash flow
+DES  Description
+
+As-reported XBRL under the filer's own tags; standardisation is Phase 2.

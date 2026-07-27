@@ -1,0 +1,46 @@
+# FLDS — Field dictionary (spec §9.6).
+#
+# What a mnemonic means, what type it is, and where it comes from. Screens
+# bind to mnemonics rather than storage details, so this is the vocabulary
+# the whole system is written in.
+#
+# It lists the *documented* mnemonics. As-reported XBRL tags resolve
+# dynamically (there are tens of thousands, one per filer tag) and are
+# deliberately not enumerated here — DES and FA show them in place, where
+# they carry the filer's own meaning.
+mnemonic: FLDS
+title: Field Dictionary
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "FIELD DICTIONARY"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Documented mnemonics. As-reported XBRL tags resolve dynamically."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "MNEMONIC          DESCRIPTION                      TYPE      SOURCE"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 5, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:fields"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "A mnemonic absent here is an error, never a blank cell (§9.6)."
+        attrs: [label]

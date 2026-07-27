@@ -1,0 +1,342 @@
+# FA — Financial Analysis (spec §7.2, §14.1).
+#
+# Phase 1 is the **as-reported** view: the filer's own XBRL tags, carried
+# through unchanged. The standardised global chart of accounts (§14.1) is
+# Phase 2 scale and is recorded as an open question in PROGRESS — so rather
+# than half-map accounts and present the result as comparable, this screen
+# is explicit that it shows what the company filed, under the company's own
+# labels.
+#
+# Three tabs, one per statement, because a statement is the unit an analyst
+# reads. Every figure traces to its filing through SPTR (I1).
+mnemonic: FA
+title: Financial Analysis
+rows: 22
+cols: 80
+namespaces: [Equity]
+
+tabs:
+  # ------------------------------------------------------------------ #
+  - name: income
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "FINANCIAL ANALYSIS · INCOME STATEMENT"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "as reported (USD)"
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "Revenues"
+      - kind: bound
+        at: {row: 4, col: 34}
+        field: "us-gaap:Revenues:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "Income tax expense / (benefit)"
+      - kind: bound
+        at: {row: 5, col: 34}
+        field: "us-gaap:IncomeTaxExpenseBenefit:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [positive]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 6, col: 0}
+        text: "Net income / (loss)"
+      - kind: bound
+        at: {row: 6, col: 34}
+        field: "us-gaap:NetIncomeLoss:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [negative]}
+          - {when: positive, attrs: [positive]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 7, col: 0}
+        text: "Comprehensive income, net of tax"
+      - kind: bound
+        at: {row: 7, col: 34}
+        field: "us-gaap:ComprehensiveIncomeNetOfTax:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [negative]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 9, col: 0}
+        text: "PER SHARE"
+        attrs: [label, emphasis]
+
+      - kind: static
+        at: {row: 10, col: 0}
+        text: "EPS, basic"
+      - kind: bound
+        at: {row: 10, col: 34}
+        field: "us-gaap:EarningsPerShareBasic:USD/shares"
+        format: "{:>20,.2f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [negative]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 11, col: 0}
+        text: "EPS, diluted"
+      - kind: bound
+        at: {row: 11, col: 34}
+        field: "us-gaap:EarningsPerShareDiluted:USD/shares"
+        format: "{:>20,.2f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [negative]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 12, col: 0}
+        text: "Weighted average shares, basic"
+      - kind: bound
+        at: {row: 12, col: 34}
+        field: "us-gaap:WeightedAverageNumberOfSharesOutstandingBasic:shares"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 13, col: 0}
+        text: "Weighted average shares, diluted"
+      - kind: bound
+        at: {row: 13, col: 34}
+        field: "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding:shares"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 16, col: 0}
+        text: "TABS"
+        attrs: [label, emphasis]
+      - kind: link
+        at: {row: 17, col: 0}
+        text: "1) Income   2) Balance sheet   3) Cash flow"
+        command: "{security} FA"
+      - kind: link
+        at: {row: 18, col: 0}
+        text: "DES  Description"
+        command: "{security} DES"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "As-reported XBRL under the filer's own tags; standardisation is Phase 2."
+        attrs: [label]
+
+  # ------------------------------------------------------------------ #
+  - name: balance
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "FINANCIAL ANALYSIS · BALANCE SHEET"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "as reported (USD)"
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "Assets"
+      - kind: bound
+        at: {row: 4, col: 34}
+        field: "us-gaap:Assets:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "  of which cash and equivalents"
+      - kind: bound
+        at: {row: 5, col: 34}
+        field: "us-gaap:CashAndCashEquivalentsAtCarryingValue:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 6, col: 0}
+        text: "Liabilities"
+      - kind: bound
+        at: {row: 6, col: 34}
+        field: "us-gaap:Liabilities:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 8, col: 0}
+        text: "Stockholders' equity"
+      - kind: bound
+        at: {row: 8, col: 34}
+        field: "us-gaap:StockholdersEquity:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [negative]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 9, col: 0}
+        text: "  incl. non-controlling interests"
+      - kind: bound
+        at: {row: 9, col: 34}
+        field: "us-gaap:StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [negative]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 16, col: 0}
+        text: "TABS"
+        attrs: [label, emphasis]
+      - kind: link
+        at: {row: 17, col: 0}
+        text: "1) Income   2) Balance sheet   3) Cash flow"
+        command: "{security} FA"
+      - kind: link
+        at: {row: 18, col: 0}
+        text: "DES  Description"
+        command: "{security} DES"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "Assets and liabilities are separately reported tags, not a derived identity."
+        attrs: [label]
+
+  # ------------------------------------------------------------------ #
+  - name: cashflow
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "FINANCIAL ANALYSIS · CASH FLOW"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "as reported (USD)"
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "Net cash from operating activities"
+      - kind: bound
+        at: {row: 4, col: 34}
+        field: "us-gaap:NetCashProvidedByUsedInOperatingActivities:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [negative]}
+          - {when: positive, attrs: [positive]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "Net cash from investing activities"
+      - kind: bound
+        at: {row: 5, col: 34}
+        field: "us-gaap:NetCashProvidedByUsedInInvestingActivities:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [negative]}
+          - {when: positive, attrs: [positive]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 6, col: 0}
+        text: "Net cash from financing activities"
+      - kind: bound
+        at: {row: 6, col: 34}
+        field: "us-gaap:NetCashProvidedByUsedInFinancingActivities:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: negative, attrs: [negative]}
+          - {when: positive, attrs: [positive]}
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 8, col: 0}
+        text: "Cash and equivalents, carrying value"
+      - kind: bound
+        at: {row: 8, col: 34}
+        field: "us-gaap:CashAndCashEquivalentsAtCarryingValue:USD"
+        format: "{:>20,.0f}"
+        width: 20
+        conditional:
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 16, col: 0}
+        text: "TABS"
+        attrs: [label, emphasis]
+      - kind: link
+        at: {row: 17, col: 0}
+        text: "1) Income   2) Balance sheet   3) Cash flow"
+        command: "{security} FA"
+      - kind: link
+        at: {row: 18, col: 0}
+        text: "DES  Description"
+        command: "{security} DES"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "The three activity totals are as filed; they are not forced to reconcile."
+        attrs: [label]

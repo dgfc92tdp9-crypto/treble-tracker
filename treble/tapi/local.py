@@ -152,10 +152,19 @@ class LocalTapi:
             model_derived=False,
         )
 
+    #: Bindings that introspect the system rather than a security. Prefixed
+    #: so they cannot be mistaken for field mnemonics: CLAUDE.md forbids
+    #: coining mnemonics, and these are not fields — no security has a
+    #: "sys:models". They back SPTR, MDL and FLDS, the three screens whose
+    #: subject is the workstation itself.
+    SYSTEM_BINDINGS = ("sys:provenance", "sys:models", "sys:fields")
+
     def series(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime
     ) -> tuple[tuple[str | float | int | None, ...], ...]:
-        """A time series for a graphical pane: (effective date, value) rows."""
+        """Tabular data for a pane: a time series, or a system table."""
+        if binding in self.SYSTEM_BINDINGS:
+            return self._system_series(security, binding, as_of=as_of)
         if security is None:
             return ()
         definition = self._fields.get(binding)
@@ -172,6 +181,69 @@ class LocalTapi:
     def search_fields(self, query: str, *, limit: int = 50):  # type: ignore[no-untyped-def]
         """Backs `FLDS`."""
         return self._fields.search(query, limit=limit)
+
+    # -- system introspection (SPTR, MDL, FLDS) -------------------------
+
+    def _system_series(
+        self, security: SecurityQuery | None, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """The workstation describing itself.
+
+        These read registries and dictionaries rather than the fact store,
+        but they still come through TAPI: a screen reaching into
+        `treble.analytics` directly would break I7, and the import contract
+        would reject it.
+        """
+        if binding == "sys:fields":
+            return tuple(
+                (f.mnemonic, f.description, f.field_type.value, ", ".join(f.sources) or "—")
+                for f in self._fields.documented()
+            )
+        if binding == "sys:models":
+            # Importing the package is what populates the registry: models
+            # register at import time, so a registry read that skipped this
+            # would report an empty MDL screen and look like "no models".
+            from treble.analytics.registry import load_all_models
+
+            return tuple(
+                (
+                    registered.meta.model_id,
+                    registered.meta.version,
+                    registered.meta.spec_section,
+                    registered.meta.summary or registered.qualname,
+                )
+                for registered in sorted(load_all_models().values(), key=lambda r: r.meta.model_id)
+            )
+        # sys:provenance — the I1 DAG behind this security's current values.
+        if security is None:
+            return ()
+        return self._provenance_rows(security, as_of=as_of)
+
+    def _provenance_rows(
+        self, security: SecurityQuery, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """One row per distinct source document behind the security.
+
+        SPTR's promise (spec §5.4, I1) is that any figure on screen can be
+        followed back to the document it came from. The store is asked what
+        provenance it actually holds for the subject; the first cut of this
+        walked the field dictionary instead and returned nothing at all,
+        because real values live under as-reported XBRL tags that resolve
+        dynamically and cannot be enumerated.
+        """
+        subject = self.resolve(security)
+        rows: list[tuple[str | float | int | None, ...]] = []
+        for provenance_id in self._store.subject_provenance(subject, as_of=as_of):
+            record = self._store.provenance(provenance_id)
+            rows.append(
+                (
+                    record.source_system,
+                    record.method.value,
+                    record.retrieved_at.date().isoformat(),
+                    record.source_uri,
+                )
+            )
+        return tuple(sorted(rows))
 
 
 def utc_now() -> datetime:

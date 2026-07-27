@@ -30,6 +30,7 @@ from treble.render.contract.buffer import (
     layout_tree,
     text_snapshot,
 )
+from treble.render.contract.registry import get_screen
 from treble.render.contract.resolver import FieldResult, ScreenContext, resolve
 from treble.render.contract.schema import ScreenDef, load_screen
 
@@ -81,11 +82,22 @@ class FrozenTapi:
 
 
 class Case:
+    definition: ScreenDef
+
     def __init__(self, path: Path) -> None:
         self.path = path
         self.name = path.name
-        self.definition: ScreenDef = load_screen((path / "screen.yaml").read_text())
         raw_context = json.loads((path / "context.json").read_text())
+        # A case either carries its own definition (synthetic cases, which
+        # exercise the contract itself) or names a shipped screen. Real
+        # screens are referenced, never copied: a copied definition would
+        # let the case keep passing against a screen that had changed
+        # underneath it, which is the one thing conformance must not do.
+        shipped = raw_context.pop("screen", None)
+        if shipped is not None:
+            self.definition = get_screen(shipped)
+        else:
+            self.definition = load_screen((path / "screen.yaml").read_text())
         self.as_of: datetime = datetime.fromisoformat(raw_context.pop("as_of"))
         if self.as_of.tzinfo is None:
             raise ValueError(f"{self.name}: as_of must be timezone-aware")

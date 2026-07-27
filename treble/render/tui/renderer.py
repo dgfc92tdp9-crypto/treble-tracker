@@ -54,6 +54,47 @@ def sparkline(values: list[float], width: int) -> str:
     )
 
 
+def table_lines(pane: ResolvedPane, *, height: int, width: int) -> list[str]:
+    """A table pane drawn as aligned columns.
+
+    Needed because MDL, FLDS and SPTR are tables, and a pane type with no
+    drawing renders as an empty box: the data resolves, conformance passes
+    (it asserts region and binding, never pixels) and the user sees
+    nothing. Truncation is always announced for the same reason — a table
+    silently cut off is a wrong display, not a tidy one.
+    """
+    rows = [["" if cell is None else str(cell) for cell in row] for row in pane.data]
+    if not rows:
+        return [f"[{pane.binding}] no rows"[:width]]
+
+    columns = max(len(row) for row in rows)
+    widths = [max((len(row[i]) for row in rows if i < len(row)), default=0) for i in range(columns)]
+
+    gap = 2
+    # Shrink the widest column repeatedly rather than scaling everything:
+    # it keeps short identifier columns intact and truncates prose.
+    while sum(widths) + gap * (columns - 1) > width and max(widths) > 4:
+        widths[widths.index(max(widths))] -= 1
+
+    visible = rows
+    footer = ""
+    if len(rows) > height:
+        visible = rows[: height - 1]
+        footer = f"... {len(rows) - len(visible)} more rows"
+
+    lines = [
+        (" " * gap)
+        .join(
+            (row[i] if i < len(row) else "")[: widths[i]].ljust(widths[i]) for i in range(columns)
+        )
+        .rstrip()[:width]
+        for row in visible
+    ]
+    if footer:
+        lines.append(footer[:width])
+    return lines
+
+
 def render_pane(pane: ResolvedPane) -> list[str]:
     """A pane as text lines. Region and binding are honoured exactly; the
     *drawing* is the TUI's own (§6.1)."""
@@ -65,6 +106,8 @@ def render_pane(pane: ResolvedPane) -> list[str]:
         lines.append(f"[{pane.pane_type.value}:{pane.binding}]"[:width])
         if spark:
             lines.append(spark)
+    elif pane.pane_type is PaneType.TABLE_SCROLL:
+        lines.extend(table_lines(pane, height=height, width=width))
     else:
         lines.append(f"[{pane.pane_type.value}:{pane.binding}]"[:width])
     while len(lines) < height:

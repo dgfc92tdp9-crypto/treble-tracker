@@ -62,11 +62,28 @@ export function styleFor(attrs: Attr[]): string {
   return ordered.map((a) => STYLES[a] ?? "").filter(Boolean).join(";");
 }
 
+/** A table pane as real HTML.
+ *
+ *  MDL, FLDS and SPTR are tables, and a pane type with no drawing renders
+ *  as an empty box: the data arrives, conformance passes (it asserts
+ *  region and binding, never pixels) and the user sees nothing. */
+function renderTable(pane: LayoutPane, height: number, width: number): string {
+  const rows = pane.data.map((row) => row.map((cell) => (cell === null ? "" : String(cell))));
+  const body = rows
+    .map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
+    .join("");
+  return (
+    `<div class="pane pane-table" style="grid-row:span ${height};grid-column:span ${width}">`
+    + `<table>${body}</table></div>`
+  );
+}
+
 /** Render a pane. The desktop draws a real chart where the TUI draws a
  *  sparkline — §6.1 permits exactly this difference, which is why
  *  conformance asserts region/type/binding and never pixels. */
 export function renderPane(pane: LayoutPane): string {
   const [, , height, width] = pane.region;
+  if (pane.type === "table_scroll") return renderTable(pane, height, width);
   const points = pane.data
     .map((row) => row[row.length - 1])
     .filter((v): v is number => typeof v === "number");

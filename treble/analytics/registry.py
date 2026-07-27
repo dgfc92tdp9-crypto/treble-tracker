@@ -57,6 +57,29 @@ class RegisteredModel(BaseModel):
 MODEL_REGISTRY: dict[str, RegisteredModel] = {}
 
 
+def load_all_models() -> dict[str, RegisteredModel]:
+    """Import every analytics submodule, then return the registry.
+
+    Models register as a side effect of `@model` at import time, so reading
+    `MODEL_REGISTRY` without importing anything returns ``{}`` — and `MDL`
+    would render an empty table that reads as "this system has no models"
+    rather than "nothing has been imported yet". That is the silent-wrong-
+    display failure this project exists to avoid, so discovery is explicit
+    and exhaustive rather than relying on some other module having happened
+    to import the right things first.
+    """
+    import importlib
+    import pkgutil
+
+    import treble.analytics
+
+    for info in pkgutil.walk_packages(
+        treble.analytics.__path__, prefix=f"{treble.analytics.__name__}."
+    ):
+        importlib.import_module(info.name)
+    return MODEL_REGISTRY
+
+
 def _stringify(value: object) -> str:
     if isinstance(value, float | int | bool | str) or value is None:
         return repr(value)

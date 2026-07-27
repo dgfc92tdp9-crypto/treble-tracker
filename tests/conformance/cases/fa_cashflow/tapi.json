@@ -1,0 +1,25 @@
+{
+  "fields": {
+    "us-gaap:NetCashProvidedByUsedInOperatingActivities:USD": {
+      "value": 5169000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:NetCashProvidedByUsedInInvestingActivities:USD": {
+      "value": -10489000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:NetCashProvidedByUsedInFinancingActivities:USD": {
+      "value": 2719000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:CashAndCashEquivalentsAtCarryingValue:USD": {
+      "value": 7172000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    }
+  },
+  "series": {}
+}

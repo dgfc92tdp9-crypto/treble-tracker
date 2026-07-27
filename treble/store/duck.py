@@ -181,6 +181,35 @@ class DuckStore:
 
     # -- reads (as_of is required; I2) ---------------------------------------
 
+    def subject_provenance(self, subject: TUID, *, as_of: datetime) -> list[ProvenanceId]:
+        """Distinct provenance ids behind a subject's visible values (I1, I2).
+
+        Backs SPTR. It asks the store what is actually there rather than
+        iterating the field dictionary: almost every real value is under an
+        as-reported XBRL tag, which the dictionary resolves dynamically and
+        therefore cannot enumerate. Walking the dictionary found nothing at
+        all for a company with 345k facts — an empty trace that read as "no
+        sources" rather than "wrong question".
+
+        Point-in-time like every other read: latest knowledge wins, nothing
+        known after ``as_of`` is visible.
+        """
+        rows = self._conn.execute(
+            """
+            SELECT DISTINCT provenance_id FROM (
+                SELECT provenance_id, row_number() OVER (
+                    PARTITION BY subject, field, effective_from,
+                                 coalesce(effective_to, DATE '9999-12-31')
+                    ORDER BY knowledge_from DESC
+                ) AS rn
+                FROM facts
+                WHERE subject = ? AND knowledge_from <= ?
+            ) WHERE rn = 1
+            """,
+            [subject, as_of],
+        ).fetchall()
+        return [ProvenanceId(row[0]) for row in rows if row[0] is not None]
+
     def fact_count(self) -> int:
         """How many facts the store holds.
 

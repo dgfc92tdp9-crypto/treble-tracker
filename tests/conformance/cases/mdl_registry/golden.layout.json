@@ -1,0 +1,183 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "MODEL REGISTRY"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Every analytic output is stamped with the id and version below (I3)."
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "MODEL ID                  VER   SPEC     SUMMARY"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Discovered by import, never hand-listed; a stale list would under-report."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "MDL",
+  "panes": [
+    {
+      "binding": "sys:models",
+      "data": [
+        [
+          "bonds.accrued_interest",
+          "1.0",
+          "§10.1",
+          "Accrued to settlement on the bond's exact day count"
+        ],
+        [
+          "bonds.cash_flows",
+          "1.0",
+          "§10.1",
+          "Remaining cash flow schedule (CSHF)"
+        ],
+        [
+          "bonds.convexity",
+          "1.0",
+          "§10.1",
+          "Convexity at the quoted yield"
+        ],
+        [
+          "bonds.dv01",
+          "1.0",
+          "§10.1",
+          "Price value of a basis point (per 100 face)"
+        ],
+        [
+          "bonds.effective_duration",
+          "1.0",
+          "§10.1",
+          "Effective duration: whole-curve bump, full lattice revaluation"
+        ],
+        [
+          "bonds.g_spread",
+          "1.0",
+          "§10.1",
+          "Yield minus interpolated government curve at maturity"
+        ],
+        [
+          "bonds.lattice_price",
+          "1.0",
+          "§10.2",
+          "Callable bond clean price from the Hull-White lattice at a given OAS"
+        ],
+        [
+          "bonds.macaulay_duration",
+          "1.0",
+          "§10.1",
+          "Macaulay duration at the quoted yield"
+        ],
+        [
+          "bonds.modified_duration",
+          "1.0",
+          "§10.1",
+          "Modified duration at the quoted yield"
+        ],
+        [
+          "bonds.oas_hull_white_lattice",
+          "1.0",
+          "§10.2",
+          "OAS on a Hull-White trinomial lattice; vol/mean-reversion are explicit user parameters (ADR-0003), not market-calibrated"
+        ],
+        [
+          "bonds.price_from_yield",
+          "1.0",
+          "§10.1",
+          "Clean price from street-convention yield"
+        ],
+        [
+          "bonds.yield_from_price",
+          "1.0",
+          "§10.1",
+          "Street-convention yield solved from clean price"
+        ],
+        [
+          "bonds.yield_to_call",
+          "1.0",
+          "§10.1",
+          "Yield to a specific call date/price"
+        ],
+        [
+          "bonds.yield_to_worst",
+          "1.0",
+          "§10.1",
+          "Minimum yield across maturity and every call date"
+        ],
+        [
+          "bonds.z_spread",
+          "1.0",
+          "§10.1",
+          "Constant shift to the zero curve equating PV to price"
+        ]
+      ],
+      "region": [
+        5,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

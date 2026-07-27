@@ -1,0 +1,49 @@
+# SPTR — Source Trace (spec §5.4; invariant I1).
+#
+# The screen that makes provenance checkable rather than merely promised:
+# every source document behind this security's current values, with how it
+# was extracted and when it was retrieved.
+#
+# The traversal is generic — one walk over the provenance DAG, no per-screen
+# code. Provenance that had to be wired up screen by screen would be
+# provenance you could forget to wire up.
+mnemonic: SPTR
+title: Source Trace
+rows: 22
+cols: 80
+namespaces: [Equity]
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SOURCE TRACE"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Every document behind the values shown for this security."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "SOURCE      METHOD     RETRIEVED     DOCUMENT"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 5, col: 0, height: 13, width: 80}
+        pane_type: table_scroll
+        binding: "sys:provenance"
+
+      - kind: link
+        at: {row: 19, col: 0}
+        text: "DES  Description"
+        command: "{security} DES"
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "No figure is displayed without a row here to account for it (I1)."
+        attrs: [label]

@@ -1,0 +1,40 @@
+{
+  "fields": {
+    "dei:EntityCommonStockSharesOutstanding:shares": {
+      "value": 942134390.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "dei:EntityPublicFloat:USD": {
+      "value": 274500000000.0,
+      "stale": true,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:Assets:USD": {
+      "value": 152099000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:Liabilities:USD": {
+      "value": 117558000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:StockholdersEquity:USD": {
+      "value": 34452000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:Revenues:USD": {
+      "value": 17162000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:NetIncomeLoss:USD": {
+      "value": 2165000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    }
+  },
+  "series": {}
+}

@@ -1,0 +1,45 @@
+{
+  "fields": {
+    "us-gaap:Revenues:USD": {
+      "value": 17162000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:IncomeTaxExpenseBenefit:USD": {
+      "value": 313000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:NetIncomeLoss:USD": {
+      "value": 2165000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:ComprehensiveIncomeNetOfTax:USD": {
+      "value": 2429000000.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:EarningsPerShareBasic:USD/shares": {
+      "value": 2.3,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:EarningsPerShareDiluted:USD/shares": {
+      "value": 2.27,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:WeightedAverageNumberOfSharesOutstandingBasic:shares": {
+      "value": 941192024.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    },
+    "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding:shares": {
+      "value": 953263534.0,
+      "stale": false,
+      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+    }
+  },
+  "series": {}
+}

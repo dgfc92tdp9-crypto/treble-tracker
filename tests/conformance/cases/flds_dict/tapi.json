@@ -1,0 +1,43 @@
+{
+  "fields": {},
+  "series": {
+    "sys:fields": [
+      [
+        "BEST_EPS",
+        "Consensus earnings per share estimate",
+        "ratio",
+        "contributed, model"
+      ],
+      [
+        "CUR_MKT_CAP",
+        "Current market capitalisation",
+        "money",
+        "edgar"
+      ],
+      [
+        "DUR_ADJ_OAS",
+        "Option-adjusted (effective) duration",
+        "duration",
+        "model"
+      ],
+      [
+        "IDX_MWEIGHT",
+        "Index member weight",
+        "ratio",
+        "edgar"
+      ],
+      [
+        "OAS_SPREAD_MID",
+        "Option-adjusted spread, mid",
+        "spread",
+        "model"
+      ],
+      [
+        "PX_LAST",
+        "Last price",
+        "price",
+        "fred, trace-api"
+      ]
+    ]
+  }
+}

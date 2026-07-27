@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Completion: 20.42%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 21.09%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -32,8 +32,9 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > author.
 >
 > Reported figures over time: 28.13% (wrong — bad weight, over-credited partials), 23.02%
-> (wrong weight only), 20.72% (correct weight, partials still by impression), **20.42%**
-> (computed; WP8 0.8 and WP11 0.09 now carry a stated basis).
+> (wrong weight only), 20.72% (correct weight, partials still by impression), 20.42%
+> (computed; WP8 0.8 and WP11 0.09 with a stated basis), **21.09%** (WP11 0.45 — five of
+> eleven screens).
 
 **Status:** WP0-WP7 and WP10 complete. **WP12 complete**: both renderers now pass one
 conformance suite. The Textual TUI and the TypeScript renderer shared by the desktop shell
@@ -321,6 +322,43 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-07-27 — WP11 batch 1: FA, SPTR, MDL, FLDS
+
+Five of eleven screens now exist. `FA` is three tabs of as-reported XBRL (income, balance
+sheet, cash flow); `SPTR`, `MDL` and `FLDS` are the screens whose subject is the workstation
+itself — the provenance DAG, the model registry and the field dictionary.
+
+**Accuracy check that came free.** IBM's balance sheet closes exactly on the rendered figures:
+liabilities 117,558,000,000 + equity including non-controlling interests 34,541,000,000 =
+assets 152,099,000,000. EPS ties too: 2,165,000,000 / 941,192,024 = 2.30 basic, and
+/ 953,263,534 = 2.27 diluted, both matching the filed per-share tags. Nothing forces these to
+agree — the tags are stored independently — so agreement is evidence the ingest is faithful.
+
+Three defects found by looking at output rather than trusting green tests:
+
+1. **`MDL` would have rendered an empty registry.** Models register as a side effect of
+   `@model` at import time, and nothing imported the analytics submodules, so
+   `MODEL_REGISTRY` read `{}`. An empty table reads as "this system has no models" rather
+   than "nothing has been imported". `load_all_models()` now walks the package explicitly;
+   all 15 models appear.
+
+2. **`SPTR` returned zero rows for a company with 345,326 facts.** The traversal iterated the
+   field *dictionary*, which documents six mnemonics; every real IBM value lives under an
+   as-reported XBRL tag that the dictionary resolves dynamically and cannot enumerate. Now
+   `DuckStore.subject_provenance()` asks the store what provenance it actually holds, point-in-
+   time like every other read. It returns the two EDGAR documents behind IBM.
+
+3. **Table panes were not drawn at all.** `table_scroll` had no rendering, so all three new
+   screens resolved correct data, passed conformance — which asserts a pane's region and
+   binding and never its pixels — and displayed an empty box. Correct data, green suite, blank
+   screen. Both renderers now draw tables, truncation is always announced, and
+   `tests/render/test_table_panes.py` pins it.
+
+Conformance cases for shipped screens now **reference** the real definition rather than
+carrying a copy, so a case cannot keep passing against a screen that changed underneath it.
+A new meta-test fails if any shipped screen has no case at all — a screen nothing is checked
+against can render differently on the two surfaces and nothing would notice.
 
 ### 2026-07-27 — WP12: the desktop application, and four holes it exposed
 

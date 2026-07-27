@@ -1,0 +1,21 @@
+FINANCIAL ANALYSIS · BALANCE SHEET
+────────────────────────────────────────────────────────────────────────────
+as reported (USD)
+
+Assets                                 152,099,000,000
+  of which cash and equivalents          7,172,000,000
+Liabilities                            117,558,000,000
+
+Stockholders' equity                    34,452,000,000
+  incl. non-controlling interests       34,541,000,000
+
+
+
+
+
+
+TABS
+1) Income   2) Balance sheet   3) Cash flow
+DES  Description
+
+Assets and liabilities are separately reported tags, not a derived identity.

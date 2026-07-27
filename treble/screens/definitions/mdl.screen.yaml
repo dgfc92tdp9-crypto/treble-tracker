@@ -1,0 +1,46 @@
+# MDL — Model registry (spec §11.4; invariant I3).
+#
+# Every analytic in this system carries a model id and version, and this
+# screen is the list. It exists so the answer to "what computed this, and
+# which version" is a screen rather than a code search.
+#
+# The table is populated by discovery, not by a maintained list: models
+# register at import time and TAPI walks the analytics package. A screen
+# backed by a hand-kept list would drift silently, and a short MDL is
+# indistinguishable from a system with few models.
+mnemonic: MDL
+title: Model Registry
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "MODEL REGISTRY"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Every analytic output is stamped with the id and version below (I3)."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "MODEL ID                  VER   SPEC     SUMMARY"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 5, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:models"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "Discovered by import, never hand-listed; a stale list would under-report."
+        attrs: [label]
