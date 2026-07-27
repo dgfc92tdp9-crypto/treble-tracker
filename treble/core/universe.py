@@ -22,8 +22,6 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-from treble.store.ingest_log import IngestLog
-
 #: Sentinel meaning "resolve the filer list from EDGAR at run time" rather
 #: than from an enumerated list that would go stale immediately.
 DISCOVER: Literal["discover"] = "discover"
@@ -132,27 +130,24 @@ def plan_steps(
     return steps
 
 
-def completed_steps(log: IngestLog) -> set[str]:
-    """Steps already recorded in the ingest log.
+def completion_key(source_id: str, source_uri: str) -> str:
+    """Identity of one completed unit of work.
 
-    The log entry's ``source_uri`` carries the identifying key (a CIK in an
-    EDGAR URL, a series id in a FRED URL), so completion is derived from
-    what was actually fetched — not from a separate ledger that could
-    disagree with the payload store.
+    Deliberately (source, uri) rather than uri alone: the same CIK is
+    fetched by two different EDGAR adapters, and completing one must not
+    mark the other done.
     """
-    done: set[str] = set()
-    for entry in log.read():
-        done.add(f"{entry.source}|{entry.source_uri}")
-    return done
+    return f"{source_id}|{source_uri}"
 
 
 def remaining_steps(
-    steps: list[PopulationStep], log: IngestLog, uri_for: dict[str, str]
+    steps: list[PopulationStep], done: set[str], uri_for: dict[str, str]
 ) -> list[PopulationStep]:
-    """Steps not yet present in the log.
+    """Steps whose completion key is not already in ``done``.
 
-    ``uri_for`` maps ``str(step)`` to the URI that adapter would fetch, so
-    the comparison is against the same identity the log records.
+    Pure: ``done`` is supplied by the caller (which reads the ingest log —
+    core may not import store, I7). Completion is therefore derived from
+    what was actually fetched, never from a side-car ledger that could
+    drift out of sync with the payload store.
     """
-    done = completed_steps(log)
-    return [s for s in steps if f"{s.source_id}|{uri_for[str(s)]}" not in done]
+    return [s for s in steps if completion_key(s.source_id, uri_for[str(s)]) not in done]

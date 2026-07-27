@@ -4,7 +4,6 @@ Tests the real `config/universe.yaml` rather than a synthetic fixture: a
 config that parses in a test but not in production is worthless.
 """
 
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -12,15 +11,13 @@ import pytest
 from treble.core.universe import (
     PopulationStep,
     UniverseSpec,
+    completion_key,
     load_universe_config,
     plan_steps,
     remaining_steps,
 )
-from treble.store.ingest_log import IngestLog
-from treble.store.payloads import payload_hash
 
 CONFIG = Path(__file__).parent.parent.parent / "config" / "universe.yaml"
-NOW = datetime(2026, 7, 27, 12, 0, tzinfo=UTC)
 
 
 class TestConfig:
@@ -76,10 +73,10 @@ class TestPlanning:
 
 
 class TestResumability:
-    def test_completed_work_is_skipped_on_rerun(self, tmp_path: Path) -> None:
-        """The core resumability guarantee: interrupt and re-run fetches
-        only what is missing, derived from the ingest log itself."""
-        log = IngestLog(tmp_path / "log.db")
+    """Planning is pure: `done` is supplied by the caller (which reads the
+    ingest log — core may not import store, I7)."""
+
+    def test_completed_work_is_skipped_on_rerun(self) -> None:
         steps = [
             PopulationStep(source_id="fred", key="SOFR"),
             PopulationStep(source_id="fred", key="DGS10"),
@@ -88,36 +85,20 @@ class TestResumability:
             "fred:SOFR": "https://fred.example/SOFR",
             "fred:DGS10": "https://fred.example/DGS10",
         }
-        assert len(remaining_steps(steps, log, uri_for)) == 2
+        assert len(remaining_steps(steps, set(), uri_for)) == 2
 
-        # Simulate the first step completing.
-        log.append(
-            source="fred",
-            payload_hash=payload_hash(b"sofr"),
-            source_uri=uri_for["fred:SOFR"],
-            fetched_at=NOW,
-            parser_version="1",
-        )
-        remaining = remaining_steps(steps, log, uri_for)
-        assert [s.key for s in remaining] == ["DGS10"]
+        done = {completion_key("fred", uri_for["fred:SOFR"])}
+        assert [s.key for s in remaining_steps(steps, done, uri_for)] == ["DGS10"]
 
-    def test_nothing_remains_once_all_logged(self, tmp_path: Path) -> None:
-        log = IngestLog(tmp_path / "log.db")
+    def test_nothing_remains_once_all_done(self) -> None:
         steps = [PopulationStep(source_id="fred", key="SOFR")]
         uri_for = {"fred:SOFR": "https://fred.example/SOFR"}
-        log.append(
-            source="fred",
-            payload_hash=payload_hash(b"x"),
-            source_uri=uri_for["fred:SOFR"],
-            fetched_at=NOW,
-            parser_version="1",
-        )
-        assert remaining_steps(steps, log, uri_for) == []
+        done = {completion_key("fred", uri_for["fred:SOFR"])}
+        assert remaining_steps(steps, done, uri_for) == []
 
-    def test_same_key_different_source_is_not_confused(self, tmp_path: Path) -> None:
+    def test_same_key_different_source_is_not_confused(self) -> None:
         # A CIK appears in both EDGAR adapters; completing one must not
         # mark the other done.
-        log = IngestLog(tmp_path / "log.db")
         steps = [
             PopulationStep(source_id="edgar-companyfacts", key="51143"),
             PopulationStep(source_id="edgar-submissions", key="51143"),
@@ -126,14 +107,8 @@ class TestResumability:
             "edgar-companyfacts:51143": "https://data.sec.gov/api/xbrl/companyfacts/CIK0000051143.json",
             "edgar-submissions:51143": "https://data.sec.gov/submissions/CIK0000051143.json",
         }
-        log.append(
-            source="edgar-companyfacts",
-            payload_hash=payload_hash(b"cf"),
-            source_uri=uri_for["edgar-companyfacts:51143"],
-            fetched_at=NOW,
-            parser_version="1",
-        )
-        remaining = remaining_steps(steps, log, uri_for)
+        done = {completion_key("edgar-companyfacts", uri_for["edgar-companyfacts:51143"])}
+        remaining = remaining_steps(steps, done, uri_for)
         assert [s.source_id for s in remaining] == ["edgar-submissions"]
 
 
