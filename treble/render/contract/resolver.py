@@ -13,7 +13,6 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from treble.core.identifiers import SecurityQuery
-from treble.core.provenance import ProvenanceId
 from treble.render.contract.buffer import (
     CellBuffer,
     ResolvedCell,
@@ -30,17 +29,7 @@ from treble.render.contract.schema import (
     ScreenDef,
     StaticCell,
 )
-
-
-class FieldResult(BaseModel):
-    """One resolved field value as TAPI returns it to presentation code."""
-
-    model_config = ConfigDict(frozen=True)
-
-    value: str | float | int | bool | None
-    provenance_id: ProvenanceId | None = None
-    stale: bool = False
-    model_derived: bool = False
+from treble.tapi.types import FieldResult
 
 
 class TapiView(Protocol):
