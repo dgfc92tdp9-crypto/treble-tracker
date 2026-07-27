@@ -12,7 +12,6 @@ from treble.render.contract.buffer import (
     text_snapshot,
 )
 from treble.render.contract.resolver import (
-    FieldResult,
     ScreenContext,
     TapiView,
     resolve,
@@ -34,6 +33,7 @@ from treble.render.contract.schema import (
     TabDef,
     load_screen,
 )
+from treble.tapi.types import FieldResult
 
 __all__ = [
     "Attr",
