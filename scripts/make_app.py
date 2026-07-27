@@ -30,7 +30,8 @@ REPO="{repo}"
 VENV="$REPO/.venv/bin/treble"
 
 if [ ! -x "$VENV" ]; then
-  osascript -e 'display alert "Treble Tracker" message "The virtual environment is missing.\\n\\nRun: cd {repo} && make setup" as critical'
+  MSG="The virtual environment is missing.\\n\\nRun: cd {repo} && make setup"
+  osascript -e "display alert \\"Treble Tracker\\" message \\"$MSG\\" as critical"
   exit 1
 fi
 
@@ -107,17 +108,27 @@ def _make_icon(resources: Path) -> Path | None:
             for scale, suffix in ((1, ""), (2, "@2x")):
                 out = iconset / f"icon_{size}x{size}{suffix}.png"
                 subprocess.run(  # noqa: S603
-                    ["/usr/bin/qlmanage", "-t", "-s", str(size * scale), "-o",
-                     str(iconset), str(svg)],
-                    capture_output=True, check=False, timeout=30,
+                    [
+                        "/usr/bin/qlmanage",
+                        "-t",
+                        "-s",
+                        str(size * scale),
+                        "-o",
+                        str(iconset),
+                        str(svg),
+                    ],
+                    capture_output=True,
+                    check=False,
+                    timeout=30,
                 )
                 rendered = iconset / f"{svg.name}.png"
                 if rendered.exists():
                     rendered.rename(out)
         result = subprocess.run(  # noqa: S603
-            ["/usr/bin/iconutil", "-c", "icns", str(iconset), "-o",
-             str(resources / "icon.icns")],
-            capture_output=True, check=False, timeout=30,
+            ["/usr/bin/iconutil", "-c", "icns", str(iconset), "-o", str(resources / "icon.icns")],
+            capture_output=True,
+            check=False,
+            timeout=30,
         )
         shutil.rmtree(iconset, ignore_errors=True)
         icns = resources / "icon.icns"

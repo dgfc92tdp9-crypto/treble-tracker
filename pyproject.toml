@@ -92,6 +92,8 @@ extend-immutable-calls = ["typer.Option", "typer.Argument"]
 # S101: pytest asserts are the point of test files.
 "tests/**/*.py" = ["S101"]
 "conftest.py" = ["S101"]
+# Build scripts report to the operator; print is their output channel.
+"scripts/*.py" = ["T201"]
 
 [tool.mypy]
 python_version = "3.12"
