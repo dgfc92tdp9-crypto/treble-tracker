@@ -19,6 +19,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from treble.cmd.env import load_env
 from treble.core.universe import load_universe_config
 from treble.ingest.populate import Populator
 from treble.store.duck import DuckStore
@@ -29,6 +30,11 @@ app = typer.Typer(
     add_completion=False,
     help="Treble Tracker — a free and open institutional finance workstation.",
 )
+
+# Credentials live in a gitignored .env. Loading here means every command
+# sees them; without it the file exists and is silently ignored, which is
+# precisely how `treble tui` came to refuse valid credentials.
+load_env()
 console = Console()
 
 DEFAULT_DATA_DIR = Path("data")
