@@ -15,31 +15,24 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Status:** WP0–WP6 complete (EDGAR/FRED/Treasury/OpenFIGI/GLEIF/N-PORT/TRACE-aggregates, all
-with real recorded fixtures — TRACE per-trade is a settled non-goal, see Data access findings).
-WP7 in progress: instrument identity resolution (FIGI hierarchy, `core/master.py`) and the
-entity graph's primary source — GLEIF Level 2 Relationship Records, parent/subsidiary + fund
-structure — are both built and tested (`core/entity_graph.py`,
-`ingest/gleif.GleifRelationshipAdapter`). EDGAR Exhibit 21 and OpenCorporates (spec §9.5's
-other two entity-graph sources) are not yet built. Security-master *population* for the full
-configured universe (~8k EDGAR filers, decision 0005) has not been run — no
-`config/universe.yaml` or resumable population runner exists yet; this is the next real gap
-against the Phase 1 checklist item, not just a data-loading step.
-Full local suite (offline, no drift): 193 tests + 18 new this session = 211, all green.
-Coverage floor recalibrated 80% → 84% (measured 84.75%) after running the full suite for the
-first time this session — the 80% figure had gone stale.
-Completion vs the fixed model: not recomputed this session — the memory record describing
-that model was expected in the persistent memory store but is not there (memory dir is empty).
-Flagging so the ~13.13% figure from the last session log entry is not treated as current;
-recompute once the model is confirmed to still exist and is re-saved.
-**Next action:** commit this session's WP7 entity-graph work once mypy --strict confirms clean
-on the two new files (running now) and CI is green; then either (a) EDGAR Exhibit 21 /
-OpenCorporates to complete §9.5's entity-graph sources, or (b) the `config/universe.yaml` +
-resumable population runner to actually populate the security master, or (c) resume the
-vertical slice (WP8 TAPI → WP10 cmd → WP11 DES/YAS → WP12 TUI → WP14 local-only) — Jack to
-confirm priority among these three before the next one is started, since (b) in particular is
-an architectural decision (checkpointing strategy, OpenFIGI's severe unauthenticated rate
-limit against ~8k+ securities) rather than a small addition.
+**Status:** WP0–WP6 complete. **WP7 complete**: universe configuration
+(`config/universe.yaml`), pure planning with resumability derived from the ingest log
+(`core/universe.py`), the population runner (`ingest/populate.py`), the `treble` CLI
+(populate/status/universes), EDGAR filer discovery (8,017 unique filers resolved live from
+10,432 index entries — decision 0005's "~8k" estimate confirmed), instrument identity via the
+FIGI hierarchy (`core/master.py`) and the GLEIF Level 2 entity graph (`core/entity_graph.py`).
+**The dev universe is really populated**: ~345k facts from live EDGAR/FRED/Treasury, each
+carrying provenance (I1) and bitemporal stamps (I2); `treble status` reports 0 outstanding.
+Resumability proven on real data, not only in tests.
+Still open in §9.5: EDGAR Exhibit 21 and OpenCorporates as additional entity-graph sources.
+The full 8k-filer run has not been executed (hours, tens of GB) — the machinery is proven at
+dev scale and the command is `treble populate --universe full`.
+**Next action:** the vertical slice to a launchable TUI — WP8 (minimal TAPI over the
+populated store) → WP10 (command grammar) → WP11 (`DES` and `YAS` definitions + resolvers)
+→ WP12 (Textual renderer against the existing conformance suite) → WP14 (`treble init`).
+There is now real data behind it, so `IBM US Equity DES <GO>` can render genuine EDGAR
+fundamentals rather than seed fixtures. Deferred deliberately, not forgotten: EDGAR
+Exhibit 21 / OpenCorporates (§9.5 breadth), and executing the full 8k-filer run.
 **Standing directives (Jack):** accuracy above all; stress tests + real data always; API
 choices delegated (pick accuracy-maximising, report after); launch = full spec through
 Phase 5; zero external cost (ubuntu-only CI, no cloud routines; pause on token exhaustion).

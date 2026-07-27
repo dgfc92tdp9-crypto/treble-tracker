@@ -65,9 +65,15 @@ class TestPopulateDryRun:
         assert result.exit_code == 0
         assert "outstanding steps" in result.stdout
 
-    def test_discovery_universe_reports_not_wired_yet(self, tmp_path: Path) -> None:
-        # Honest failure rather than a silent no-op: the full universe needs
-        # run-time filer discovery, which is the remaining WP7 piece.
+    def test_discovery_universe_resolves_filers(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The full universe resolves its filer list at run time (decision
+        0005). Discovery is stubbed here — the parser itself is covered by
+        the recorded-fixture test in tests/ingest/test_populate.py."""
+        from treble.ingest.populate import Populator
+
+        monkeypatch.setattr(Populator, "discover_ciks", lambda self: (51143, 320193))
         result = runner.invoke(
             app,
             [
@@ -80,10 +86,13 @@ class TestPopulateDryRun:
                 str(tmp_path / "data"),
                 "--contact",
                 "test@example.com",
+                "--dry-run",
             ],
         )
-        assert result.exit_code == 2
-        assert "discovery" in result.stdout.lower() or "not wired" in result.stdout.lower()
+        assert result.exit_code == 0
+        assert "discovered 2 filers" in result.stdout
+        # Two EDGAR steps per filer, plus macro and Treasury steps.
+        assert "outstanding steps" in result.stdout
 
     def test_unknown_universe_fails_clearly(self, tmp_path: Path) -> None:
         result = runner.invoke(

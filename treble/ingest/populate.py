@@ -149,6 +149,15 @@ class Populator:
                 )
         raise ValueError(f"no adapter for source {step.source_id!r}")
 
+    def discover_ciks(self) -> tuple[int, ...]:
+        """Resolve the full filer list from EDGAR, de-duplicated and ordered.
+
+        Ordering is deterministic (ascending CIK) so an interrupted full run
+        resumes over a stable sequence rather than a reshuffled one.
+        """
+        payload = fetch_company_index(self._contact)
+        return tuple(sorted(set(iter_discovered_ciks(payload))))
+
     def outstanding(
         self, spec: UniverseSpec, *, discovered_ciks: tuple[int, ...] = ()
     ) -> list[PopulationStep]:
@@ -204,6 +213,28 @@ class Populator:
         self._store.write_provenance(list(batch.provenance))
         self._store.write_facts(list(batch.facts))
         return len(batch.facts)
+
+
+#: EDGAR's published index of every filer with a ticker (~10.4k entries,
+#: verified 2026-07-27). Content changes daily, so the filer list is
+#: resolved at run time rather than enumerated in config (decision 0005).
+COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+
+
+def fetch_company_index(contact_email: str) -> bytes:
+    """Download EDGAR's company index. Network; the parse below is pure."""
+    import httpx
+
+    from treble.ingest.edgar import edgar_user_agent
+
+    response = httpx.get(
+        COMPANY_TICKERS_URL,
+        headers={"User-Agent": edgar_user_agent(contact_email), "Accept-Encoding": "gzip"},
+        timeout=120.0,
+        follow_redirects=True,
+    )
+    response.raise_for_status()
+    return response.content
 
 
 def iter_discovered_ciks(company_tickers_payload: bytes) -> Iterator[int]:

@@ -166,6 +166,19 @@ class TestDiscovery:
         )
         assert sorted(iter_discovered_ciks(payload)) == [51143, 320193]
 
+    def test_parses_the_real_recorded_company_index(self) -> None:
+        """A 50-row slice of EDGAR's actual company_tickers.json (recorded
+        2026-07-27; the live file holds ~10.4k filers and changes daily, so
+        a slice keeps the fixture stable)."""
+        payload = (FIXTURES / "edgar" / "company_tickers_sample.json").read_bytes()
+        ciks = list(iter_discovered_ciks(payload))
+        assert len(ciks) == 50
+        assert all(isinstance(c, int) and c > 0 for c in ciks)
+        # Every CIK must be usable as an EDGAR URL component.
+        from treble.ingest.edgar import COMPANYFACTS_URL
+
+        assert COMPANYFACTS_URL.format(cik=ciks[0]).endswith(".json")
+
     def test_discovery_is_pure(self) -> None:
         payload = b'{"0":{"cik_str":1,"ticker":"A","title":"A"}}'
         assert list(iter_discovered_ciks(payload)) == list(iter_discovered_ciks(payload))

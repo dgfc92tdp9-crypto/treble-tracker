@@ -92,14 +92,16 @@ def populate(
     spec = load_universe_config(config).get(universe)
     populator = _populator(data_dir, _contact_email(contact), history_days)
 
+    discovered: tuple[int, ...] = ()
     if spec.discovers_filers:
-        console.print(
-            f"[yellow]Universe {universe!r} resolves its filer list from EDGAR at run "
-            "time; discovery is not wired up yet (WP7 remainder).[/yellow]"
-        )
-        raise typer.Exit(code=2)
+        # Decision 0005: the full universe resolves its filer list from
+        # EDGAR at run time. ~10.4k filers, so this is announced rather
+        # than silently spending minutes.
+        console.print("[dim]resolving filer list from EDGAR…[/dim]")
+        discovered = populator.discover_ciks()
+        console.print(f"[dim]discovered {len(discovered)} filers[/dim]")
 
-    todo = populator.outstanding(spec)
+    todo = populator.outstanding(spec, discovered_ciks=discovered)
     console.print(f"[bold]{universe}[/bold]: {spec.description}")
     console.print(f"outstanding steps: {len(todo)}")
     if dry_run:
@@ -115,7 +117,7 @@ def populate(
     def progress(step, index: int, total: int) -> None:  # type: ignore[no-untyped-def]
         console.print(f"[dim]{index}/{total}[/dim] {step}")
 
-    result = populator.run(spec, limit=limit, on_step=progress)
+    result = populator.run(spec, discovered_ciks=discovered, limit=limit, on_step=progress)
     console.print(
         f"[green]executed {result.executed}[/green], "
         f"already done {result.already_done}, "
@@ -156,6 +158,13 @@ def status(
     if not spec.discovers_filers:
         populator = _populator(data_dir, _contact_email(contact), 365)
         console.print(f"outstanding steps: {len(populator.outstanding(spec))}")
+    else:
+        # Counting outstanding work for a discovery universe means a live
+        # EDGAR call; say so rather than appearing to hang.
+        console.print(
+            "[dim]outstanding count for a discovery universe requires an EDGAR "
+            "lookup; run `treble populate --dry-run` to see it.[/dim]"
+        )
 
 
 @app.command()
