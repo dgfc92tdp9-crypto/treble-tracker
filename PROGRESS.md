@@ -15,16 +15,21 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Completion: 23.02%** overall (Phase 1 at 69.06% — 11.05 of 16 work packages).
+**Completion: 20.72%** overall (Phase 1 at 69.06% — 11.05 of 16 work packages).
 
-> **The completion model, recorded here because it was folklore before.** Phase 1 is taken as
-> one third of the whole project; the figure is (Phase 1 WPs complete / 16) x 33.33%. Partials
-> are counted by deliverable, not by feeling: WP8 is 0.9 (in-process and HTTP transports plus
-> the field dictionary; gRPC and Arrow Flight are Phase 2 by the spec), WP11 is 0.15 (one of
-> eleven screens exists). **This supersedes the 28.13% reported on 2026-07-27, which was too
-> high**: it counted WP11 and WP12 as nearly done when only `DES` had been built and only the
-> TUI renderer existed. The number went down because the accounting got honest, not because
-> work was lost.
+> **The completion model, written down here so it stops being folklore.** Fixed phase weights:
+> P1 30%, P2 25%, P3 15%, P4 20%, P5 10%. Within the active phase the fraction is completed
+> work packages over the phase total (P1 has WP0-WP15 = 16). So 11.05/16 x 30% = 20.72%. The
+> decimals are arithmetic from this model, not a confidence estimate.
+>
+> Partials are counted by deliverable, not by feeling: WP8 is 0.9 (in-process and HTTP
+> transports plus the field dictionary; gRPC and Arrow Flight are Phase 2 by the spec), WP11
+> is 0.15 (one of eleven screens exists), WP12 is 1.0 (both renderers, one suite).
+>
+> **This supersedes the 28.13% reported earlier on 2026-07-27, which was wrong twice over**: it
+> counted WP11 and WP12 as nearly done when only `DES` existed and only the TUI rendered, and
+> a working figure of 33.33% was used for the P1 weight instead of the recorded 30%. The
+> number went down because the accounting got honest, not because work was lost.
 
 **Status:** WP0-WP7 and WP10 complete. **WP12 complete**: both renderers now pass one
 conformance suite. The Textual TUI and the TypeScript renderer shared by the desktop shell
