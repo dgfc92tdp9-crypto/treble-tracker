@@ -105,6 +105,8 @@ module = ["QuantLib.*", "xlwings.*", "lightgbm.*", "scipy.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
+# The TUI app tests drive a real Textual app, which is async.
+asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = "-q --strict-markers --cov=treble --cov-report=term-missing:skip-covered --cov-fail-under=84 -m 'not drift'"
 markers = [

@@ -168,6 +168,30 @@ def status(
 
 
 @app.command()
+def tui(
+    data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where payloads and the store live."),
+    contact: str | None = typer.Option(None, help="Contact email for the EDGAR User-Agent."),
+    theme: str = typer.Option("default", help="Colour theme: default or high-contrast."),
+) -> None:
+    """Open the workstation.
+
+    Needs a populated store — run `treble populate` first, or screens will
+    render honest em dashes rather than figures.
+    """
+    from treble.ingest.populate import fetch_company_index
+    from treble.render.tui.app import run as run_tui
+    from treble.render.tui.theme import get_theme
+    from treble.tapi.local import LocalTapi, TickerIndex
+
+    _, _, store = _open_stores(data_dir)
+    email = _contact_email(contact)
+    # Ticker resolution comes from EDGAR's own index — the same payload the
+    # population runner uses for discovery, so the two cannot disagree.
+    tickers = TickerIndex.from_company_index(fetch_company_index(email))
+    run_tui(LocalTapi(store, tickers=tickers), theme=get_theme(theme))
+
+
+@app.command()
 def universes(
     config: Path = typer.Option(DEFAULT_CONFIG, help="Universe configuration file."),
 ) -> None:

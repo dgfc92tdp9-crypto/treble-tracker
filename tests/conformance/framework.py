@@ -116,8 +116,17 @@ def reference_renderer(case: Case) -> tuple[str, str]:
     return layout_tree(buffer), text_snapshot(buffer)
 
 
+def tui_renderer(case: Case) -> tuple[str, str]:
+    """The Textual/Rich renderer's own pipeline — not a second call to the
+    reference projection. If the TUI's styling, pane drawing or grid
+    composition diverged, this is what would catch it."""
+    from treble.render.tui.renderer import conformance_artifacts
+
+    return conformance_artifacts(case.reference_buffer())
+
+
 RENDERERS: dict[str, RendererUnderTest] = {
     "reference": reference_renderer,
-    # "tui": added by the Textual renderer work package (same goldens)
+    "tui": tui_renderer,
     # "web": added by the TS renderer work package (same goldens)
 }

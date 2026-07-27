@@ -89,6 +89,26 @@ def layout_tree(buffer: CellBuffer) -> str:
     return json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False)
 
 
+def pane_placeholder(pane: ResolvedPane) -> list[str]:
+    """A pane drawn renderer-neutrally: border, type and binding only.
+
+    Conformance asserts a pane's region, type and data binding — never its
+    pixels (CLAUDE.md §4), because the TUI legitimately draws a sparkline
+    where the desktop draws a WebGL chart. Every renderer uses this shape
+    for its conformance artefacts and draws whatever it likes for display.
+    """
+    r = pane.region
+    horizontal = "+" + "-" * (r.width - 2) + "+" if r.width >= 2 else "+"
+    lines = [horizontal]
+    label = f"[{pane.pane_type.value}:{pane.binding}]"[: max(r.width - 2, 0)]
+    for index in range(1, r.height - 1):
+        body = label if index == 1 else ""
+        lines.append("|" + body.ljust(max(r.width - 2, 0)) + "|")
+    if r.height > 1:
+        lines.append(horizontal)
+    return lines[: r.height]
+
+
 def text_snapshot(buffer: CellBuffer) -> str:
     """Character-grid projection. Pane regions render as a bordered box naming
     the pane type and binding — pixels are renderer-specific, regions are not."""
