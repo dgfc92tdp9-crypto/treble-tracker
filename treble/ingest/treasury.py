@@ -129,15 +129,25 @@ class TreasuryAuctionsAdapter(SourceAdapter):
                 knowledge = payload.fetched_at
             subject = cusip_subject(cusip)
 
-            def emit(field: str, value: float | str | date | None) -> None:
+            # Per-row values are bound as default arguments, not captured: a
+            # late-binding closure would stamp every fact with the *last*
+            # auction's CUSIP and dates if these were called after the loop.
+            def emit(
+                field: str,
+                value: float | str | date | None,
+                *,
+                subject: TUID = subject,
+                auction_day: date = auction_day,
+                knowledge: datetime = knowledge,
+            ) -> None:
                 facts.append(
                     Fact(
-                        subject=subject,  # noqa: B023
+                        subject=subject,
                         field=field,
                         value=value,
-                        effective_from=auction_day,  # noqa: B023
-                        effective_to=auction_day,  # noqa: B023
-                        knowledge_from=knowledge,  # noqa: B023
+                        effective_from=auction_day,
+                        effective_to=auction_day,
+                        knowledge_from=knowledge,
                         provenance_id=provenance.id,
                     )
                 )

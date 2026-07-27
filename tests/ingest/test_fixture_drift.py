@@ -24,6 +24,7 @@ import io
 import json
 import os
 import re
+import zipfile
 from pathlib import Path
 
 import httpx
@@ -118,6 +119,37 @@ def test_gleif_record_shape_unchanged() -> None:
     assert "lei" in attributes
     assert "entity" in attributes and "legalName" in attributes["entity"]
     assert "registration" in attributes
+
+
+def test_gleif_rr_shape_unchanged() -> None:
+    meta = _get("https://leidata.gleif.org/api/v1/concatenated-files/rr").json()
+    publishes = meta.get("data") or []
+    assert publishes, "GLEIF concatenated-files/rr metadata returned no publishes"
+    latest = max(publishes, key=lambda p: p["content_date"])
+    for key in ("id", "content_date", "cdf_version", "record_count"):
+        assert key in latest, f"GLEIF RR publish metadata lost {key!r}"
+
+    zip_bytes = _get(
+        f"https://leidata.gleif.org/api/v1/concatenated-files/rr/get/{latest['id']}/zip"
+    ).content
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
+        xml_names = [name for name in archive.namelist() if name.endswith(".xml")]
+        assert len(xml_names) == 1, f"expected one XML member in the RR zip, found {xml_names}"
+        # A stream read of the first chunk only — the full file decompresses
+        # to ~1GB, and only the parser's element vocabulary is under test.
+        with archive.open(xml_names[0]) as member:
+            head = member.read(300_000).decode("utf-8", errors="replace")
+
+    for tag in (
+        "rr:RelationshipRecords",
+        "rr:StartNode",
+        "rr:EndNode",
+        "rr:NodeIDType",
+        "rr:RelationshipType",
+        "rr:RelationshipStatus",
+        "rr:RelationshipPeriods",
+    ):
+        assert f"<{tag}>" in head, f"RR-CDF lost <{tag}> the parser reads"
 
 
 def test_trace_treasury_header_unchanged() -> None:

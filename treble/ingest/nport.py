@@ -156,10 +156,13 @@ class NportAdapter(SourceAdapter):
                 # Unidentifiable holdings are skipped, never guessed at.
                 continue
 
-            def emit(field: str, value: Any) -> None:
+            # `holding_subject` is bound as a default argument, not captured:
+            # a late-binding closure would attribute every fact to the *last*
+            # holding if these were ever collected and called after the loop.
+            def emit(field: str, value: Any, *, subject: TUID = subject) -> None:
                 facts.append(
                     Fact(
-                        subject=subject,  # noqa: B023
+                        subject=subject,
                         field=f"nport:{field}",
                         value=value,
                         effective_from=period_end,

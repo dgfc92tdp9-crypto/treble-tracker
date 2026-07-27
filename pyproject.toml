@@ -101,7 +101,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q --strict-markers --cov=treble --cov-report=term-missing:skip-covered --cov-fail-under=80 -m 'not drift'"
+addopts = "-q --strict-markers --cov=treble --cov-report=term-missing:skip-covered --cov-fail-under=84 -m 'not drift'"
 markers = [
   "golden: validates an analytic against published reference values",
   "conformance: renderer conformance case",

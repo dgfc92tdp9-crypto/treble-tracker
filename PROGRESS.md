@@ -9,14 +9,31 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 ## Current position
 
 **Phase:** 1 — research workstation
-**Status:** WP0–WP5 complete; WP6 ~90% (EDGAR/FRED/Treasury/OpenFIGI/GLEIF done with real
-recorded fixtures; TRACE-file pending endpoint investigation). Full local gate green at
-`239c48d`: 167 tests, mypy --strict, import contracts, ruff incl. security (S) rules.
-Completion vs the fixed model (see memory/working prefs): ~13.13%.
-**Next action:** confirm ubuntu CI green on `239c48d`; TRACE-file adapter (investigate the
-real public download path first — no guessed endpoints); then WP7 security master; then the
-vertical slice (WP8 TAPI → WP10 cmd → WP11 DES/YAS → WP12 TUI → WP14 local-only) is
-prioritised ahead of full breadth so a launchable TUI exists at the earliest date.
+**Status:** WP0–WP6 complete (EDGAR/FRED/Treasury/OpenFIGI/GLEIF/N-PORT/TRACE-aggregates, all
+with real recorded fixtures — TRACE per-trade is a settled non-goal, see Data access findings).
+WP7 in progress: instrument identity resolution (FIGI hierarchy, `core/master.py`) and the
+entity graph's primary source — GLEIF Level 2 Relationship Records, parent/subsidiary + fund
+structure — are both built and tested (`core/entity_graph.py`,
+`ingest/gleif.GleifRelationshipAdapter`). EDGAR Exhibit 21 and OpenCorporates (spec §9.5's
+other two entity-graph sources) are not yet built. Security-master *population* for the full
+configured universe (~8k EDGAR filers, decision 0005) has not been run — no
+`config/universe.yaml` or resumable population runner exists yet; this is the next real gap
+against the Phase 1 checklist item, not just a data-loading step.
+Full local suite (offline, no drift): 193 tests + 18 new this session = 211, all green.
+Coverage floor recalibrated 80% → 84% (measured 84.75%) after running the full suite for the
+first time this session — the 80% figure had gone stale.
+Completion vs the fixed model: not recomputed this session — the memory record describing
+that model was expected in the persistent memory store but is not there (memory dir is empty).
+Flagging so the ~13.13% figure from the last session log entry is not treated as current;
+recompute once the model is confirmed to still exist and is re-saved.
+**Next action:** commit this session's WP7 entity-graph work once mypy --strict confirms clean
+on the two new files (running now) and CI is green; then either (a) EDGAR Exhibit 21 /
+OpenCorporates to complete §9.5's entity-graph sources, or (b) the `config/universe.yaml` +
+resumable population runner to actually populate the security master, or (c) resume the
+vertical slice (WP8 TAPI → WP10 cmd → WP11 DES/YAS → WP12 TUI → WP14 local-only) — Jack to
+confirm priority among these three before the next one is started, since (b) in particular is
+an architectural decision (checkpointing strategy, OpenFIGI's severe unauthenticated rate
+limit against ~8k+ securities) rather than a small addition.
 **Standing directives (Jack):** accuracy above all; stress tests + real data always; API
 choices delegated (pick accuracy-maximising, report after); launch = full spec through
 Phase 5; zero external cost (ubuntu-only CI, no cloud routines; pause on token exhaustion).
@@ -144,6 +161,40 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-07-27 — WP7: GLEIF relationship-record entity graph
+Continuation of the 2026-07-26 session (this entry also backfills that session's last four
+commits, `1bfbbe2`..`3bbda6d`, which were never logged here: WP6 completed — N-PORT per-bond
+valuations, TRACE `treasuryDailyAggregates`; WP7 core — FIGI-tier identifier resolution in
+`core/master.py`; and the continuous-verification suite — nightly deep workflow, fixture-drift
+tests, `pip-audit`, mutation testing — all six items now landed, not just designed).
+
+This session: ran `make test` for the first time end-to-end (33 min wall-clock, 2s-scale CPU —
+the sandbox I/O bottleneck noted previously is confirmed, not transient). 193 passed at 84.75%
+coverage; recalibrated `--cov-fail-under` from the placeholder 80 to 84 per Jack's instruction
+to calibrate to the real measured figure.
+
+Built the entity-graph half of WP7 (spec §9.5's primary source): downloaded today's live GLEIF
+Level 2 Relationship Record concatenated file directly (660,674 records) to get the real RR-CDF
+2.1 schema rather than guess at it — confirmed every `StartNode`/`EndNode` is LEI-typed with no
+exceptions, and found the six relationship-type values as GLEIF actually spells them (including
+`IS_FUND-MANAGED_BY`, which the prose documentation renders differently). Trimmed 8 real
+records (all 6 types, ACTIVE/INACTIVE/NULL status) into `tests/fixtures/gleif/rr_sample.xml`.
+Built `GleifRelationshipAdapter` (discovers the current publish id via the metadata endpoint,
+since the download URL's id increments daily — CLAUDE.md's no-guessed-endpoints rule) and
+`core/entity_graph.py` (direct/ultimate parent, reverse `children()`, point-in-time resolution,
+conflict reporting — mirrors `core/master.py`'s identifier-resolution pattern deliberately).
+18 new tests, all green; added the `gleif-rr` fixture-drift check in the same commit as the
+adapter, per the standing continuous-verification requirement, and ran it live (not just added)
+to confirm it actually catches a real schema.
+
+Not done: EDGAR Exhibit 21 and OpenCorporates, spec §9.5's other two entity-graph sources.
+Security-master *population* for the full configured universe has not been attempted — there is
+no `config/universe.yaml` or resumable ingest runner yet; this remains the real gap against the
+Phase 1 checklist item and needs a scoping decision (see Current position) before starting.
+Also flagged: the "completion-percentage model" a prior session said it recorded to memory
+is not in the persistent memory store (empty). Recompute the ~13.13% figure once that model is
+confirmed/re-saved — do not treat it as current until then.
 
 ### 2026-07-26 — suite green; WP5/WP6 landed; six harness catches
 Continuation of the 2026-07-25 session. Full gate went green (167 tests) after the harness
