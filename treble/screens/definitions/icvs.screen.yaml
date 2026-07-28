@@ -1,0 +1,59 @@
+# ICVS — Curve viewer (spec §7.6).
+#
+# The constant-maturity Treasury par curve, one row per tenor. Each tenor is
+# an independently published series, so a tenor that has not been ingested is
+# absent rather than interpolated — an invented point on a curve is the kind
+# of plausible fabrication this system exists to refuse.
+#
+# The observation date travels with every point. Tenors publish on slightly
+# different schedules, and a curve that silently mixed yesterday's long end
+# with today's short end would look perfectly reasonable and be wrong.
+#
+# Phase 1 shows the observed par curve. Bootstrapping it to zero rates and
+# forwards runs through the curve engine (WP4, Hagan-West monotone convex)
+# and lands with the analytics wiring that YAS needs.
+#
+# No plot yet, deliberately. A curve is yield against tenor, and the only
+# line-drawing pane type is `timeseries` — yield against *date*. Binding one
+# to the other would draw a correct-looking picture of the wrong thing, so
+# the curve waits for a pane type that means what it shows.
+mnemonic: ICVS
+title: Curve Viewer
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "CURVE VIEWER · US TREASURY CONSTANT MATURITY"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Par yields as published (H.15), per cent. Source: FRED."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "TENOR    YEARS    PAR YIELD   OBSERVED"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 5, col: 0, height: 13, width: 80}
+        pane_type: table_scroll
+        binding: "sys:treasury_curve"
+
+      - kind: static
+        at: {row: 19, col: 0}
+        text: "Missing tenors are omitted, never interpolated."
+        attrs: [label]
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "Zero/forward bootstrapping arrives with the analytics wiring."
+        attrs: [label]

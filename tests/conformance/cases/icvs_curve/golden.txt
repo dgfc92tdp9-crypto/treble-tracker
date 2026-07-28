@@ -1,0 +1,21 @@
+CURVE VIEWER · US TREASURY CONSTANT MATURITY
+────────────────────────────────────────────────────────────────────────────
+Par yields as published (H.15), per cent. Source: FRED.
+
+TENOR    YEARS    PAR YIELD   OBSERVED
++------------------------------------------------------------------------------+
+|[table_scroll:sys:treasury_curve]                                             |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Missing tenors are omitted, never interpolated.
+Zero/forward bootstrapping arrives with the analytics wiring.

@@ -55,7 +55,21 @@ _NUMERIC_FIELDS = (
     "total_accepted",
 )
 _DATE_FIELDS = ("auction_date", "issue_date", "maturity_date", "dated_date")
-_TEXT_FIELDS = ("security_type", "security_term")
+# `security_type` alone does not distinguish a TIPS: Treasury publishes
+# inflation-indexed notes and bonds under the same "Note"/"Bond" types, and
+# only this flag separates them. Without it a TIPS is indistinguishable from
+# a nominal bond in the store, and pricing one as nominal yields a
+# confidently-displayed wrong number — a 5-Year TIPS in this dataset prices
+# to a 1.32% real yield that would read as a nominal yield beside 4% notes.
+#
+# `original_security_term` is carried because a reopening reports its
+# remaining term ("9-Year 10-Month") while the instrument is a 10-year note.
+_TEXT_FIELDS = (
+    "security_type",
+    "security_term",
+    "original_security_term",
+    "inflation_index_security",
+)
 
 
 def cusip_subject(cusip: str) -> TUID:

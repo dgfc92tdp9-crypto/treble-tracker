@@ -157,7 +157,25 @@ class LocalTapi:
     #: coining mnemonics, and these are not fields — no security has a
     #: "sys:models". They back SPTR, MDL and FLDS, the three screens whose
     #: subject is the workstation itself.
-    SYSTEM_BINDINGS = ("sys:provenance", "sys:models", "sys:fields")
+    SYSTEM_BINDINGS = ("sys:provenance", "sys:models", "sys:fields", "sys:treasury_curve")
+
+    #: The constant-maturity Treasury tenors, in curve order with their year
+    #: fractions. Ordered here rather than sorted by name because "DGS1MO"
+    #: sorts after "DGS10" alphabetically, and a yield curve drawn in
+    #: alphabetical order is not a yield curve.
+    CMT_TENORS: tuple[tuple[str, str, float], ...] = (
+        ("DGS1MO", "1M", 1 / 12),
+        ("DGS3MO", "3M", 0.25),
+        ("DGS6MO", "6M", 0.5),
+        ("DGS1", "1Y", 1.0),
+        ("DGS2", "2Y", 2.0),
+        ("DGS3", "3Y", 3.0),
+        ("DGS5", "5Y", 5.0),
+        ("DGS7", "7Y", 7.0),
+        ("DGS10", "10Y", 10.0),
+        ("DGS20", "20Y", 20.0),
+        ("DGS30", "30Y", 30.0),
+    )
 
     def series(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime
@@ -214,10 +232,39 @@ class LocalTapi:
                 )
                 for registered in sorted(load_all_models().values(), key=lambda r: r.meta.model_id)
             )
+        if binding == "sys:treasury_curve":
+            return self._treasury_curve(as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
         return self._provenance_rows(security, as_of=as_of)
+
+    def _treasury_curve(
+        self, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """The CMT par curve: (tenor, years, rate, observation date).
+
+        Each tenor is a separate FRED series, so a tenor that has not been
+        ingested is simply absent — the curve is short, not wrong. The
+        observation date travels with each point because tenors publish on
+        slightly different schedules, and a curve silently mixing yesterday's
+        long end with today's short end would be a plausible-looking lie.
+        """
+        rows: list[tuple[str | float | int | None, ...]] = []
+        for series, label, years in self.CMT_TENORS:
+            facts = self._store.read(TUID(f"fred:{series}"), "PX_LAST", as_of=as_of)
+            if not facts:
+                continue
+            latest = max(facts, key=lambda f: f.effective_from)
+            # A par yield that is not a number is bad data, not a curve
+            # point. Skipping keeps the curve short and honest; coercing
+            # would put something on the chart that was never published.
+            if not isinstance(latest.value, int | float) or isinstance(latest.value, bool):
+                continue
+            # Rounded here rather than in a renderer: 1/12 rendered as
+            # 0.08333333333333333 is noise in every surface that shows it.
+            rows.append((label, round(years, 2), latest.value, latest.effective_from.isoformat()))
+        return tuple(rows)
 
     def _provenance_rows(
         self, security: SecurityQuery, *, as_of: datetime

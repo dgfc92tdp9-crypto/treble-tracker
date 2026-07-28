@@ -40,10 +40,10 @@ phase_1:
                  gRPC/Arrow Flight are Phase 2 by spec 8.3"}
   WP9:  {done: 0.0, name: "TQL — grammar, planner, executor"}
   WP10: {done: 1.0, name: "command grammar + dispatcher"}
-  WP11: {done: 0.45, name: "screens",
-         basis: "5 of 11 screens built (DES, FA, FLDS, MDL, SPTR), each with a
-                 conformance case referencing the shipped definition. GP, HP,
-                 YAS, ICVS, SRCH, EQS outstanding"}
+  WP11: {done: 0.55, name: "screens",
+         basis: "6 of 11 screens built (DES, FA, FLDS, ICVS, MDL, SPTR), each
+                 with a conformance case referencing the shipped definition.
+                 GP, HP, YAS, SRCH, EQS outstanding"}
   WP12: {done: 1.0, name: "renderers — TUI and desktop against one suite"}
   WP13: {done: 0.0, name: "spreadsheet add-in"}
   WP14: {done: 0.0, name: "local-only mode — treble init"}

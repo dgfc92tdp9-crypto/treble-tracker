@@ -1,0 +1,172 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "CURVE VIEWER · US TREASURY CONSTANT MATURITY"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Par yields as published (H.15), per cent. Source: FRED."
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TENOR    YEARS    PAR YIELD   OBSERVED"
+    },
+    {
+      "at": [
+        19,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Missing tenors are omitted, never interpolated."
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Zero/forward bootstrapping arrives with the analytics wiring."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "ICVS",
+  "panes": [
+    {
+      "binding": "sys:treasury_curve",
+      "data": [
+        [
+          "1M",
+          0.08,
+          3.8,
+          "2026-07-24"
+        ],
+        [
+          "3M",
+          0.25,
+          3.96,
+          "2026-07-24"
+        ],
+        [
+          "6M",
+          0.5,
+          4.08,
+          "2026-07-24"
+        ],
+        [
+          "1Y",
+          1.0,
+          4.14,
+          "2026-07-24"
+        ],
+        [
+          "2Y",
+          2.0,
+          4.33,
+          "2026-07-24"
+        ],
+        [
+          "3Y",
+          3.0,
+          4.36,
+          "2026-07-24"
+        ],
+        [
+          "5Y",
+          5.0,
+          4.43,
+          "2026-07-24"
+        ],
+        [
+          "7Y",
+          7.0,
+          4.55,
+          "2026-07-24"
+        ],
+        [
+          "10Y",
+          10.0,
+          4.69,
+          "2026-07-24"
+        ],
+        [
+          "20Y",
+          20.0,
+          5.18,
+          "2026-07-24"
+        ],
+        [
+          "30Y",
+          30.0,
+          5.16,
+          "2026-07-24"
+        ]
+      ],
+      "region": [
+        5,
+        0,
+        13,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}
