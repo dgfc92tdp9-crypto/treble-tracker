@@ -140,8 +140,11 @@ def plan_steps(
         raise ValueError(f"universe {spec.name!r} requires discovery but no CIKs were supplied")
     steps: list[PopulationStep] = []
     for cik in ciks:
-        steps.append(PopulationStep(source_id="edgar-companyfacts", key=str(cik)))
+        # Submissions first, and the order is load-bearing: companyfacts
+        # states only a filing date, and joins to the submissions payload for
+        # the acceptance *time* that orders two filings made on one day.
         steps.append(PopulationStep(source_id="edgar-submissions", key=str(cik)))
+        steps.append(PopulationStep(source_id="edgar-companyfacts", key=str(cik)))
     for series in spec.fred_series:
         steps.append(PopulationStep(source_id="fred", key=series))
     if spec.treasury_auctions_since is not None:

@@ -29,7 +29,7 @@ and rude; the per-company fetch exists for incremental refresh.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from datetime import UTC, date, datetime, time
 from typing import Any
 
@@ -94,10 +94,20 @@ class EdgarCompanyFactsAdapter(SourceAdapter):
         *,
         ciks: tuple[int, ...],
         contact_email: str,
+        accepted: Mapping[str, datetime] | None = None,
     ) -> None:
         super().__init__(payloads, log)
         self._ciks = ciks
         self._user_agent = edgar_user_agent(contact_email)
+        #: accession -> acceptance time, from the submissions payload.
+        #: companyfacts states only a filing *date*, so without this every
+        #: filing made on one day shares a knowledge instant and cannot be
+        #: ordered. Apple filed two documents on 2015-01-28 reporting
+        #: 4,033,000,000 and 4,000,000,000 for the same period; collapsed to
+        #: end-of-day they became an unresolvable pair rather than a
+        #: restatement. Optional so the adapter still works before
+        #: submissions are ingested, falling back to the coarser date.
+        self._accepted: Mapping[str, datetime] = accepted or {}
 
     def fetch(self) -> Iterator[RawPayload]:
         headers = {"User-Agent": self._user_agent, "Accept-Encoding": "gzip"}
@@ -135,6 +145,12 @@ class EdgarCompanyFactsAdapter(SourceAdapter):
                         if end is None or filed is None or value is None:
                             continue
                         start = row.get("start")
+                        # The row's own accession resolves when this figure
+                        # became public. Falling back to end-of-day keeps the
+                        # old behaviour when submissions have not been
+                        # ingested, at the old resolution.
+                        accession = row.get("accn")
+                        known = self._accepted.get(accession) if accession else None
                         facts.append(
                             Fact(
                                 subject=subject,
@@ -144,7 +160,7 @@ class EdgarCompanyFactsAdapter(SourceAdapter):
                                 else str(value),
                                 effective_from=date.fromisoformat(start or end),
                                 effective_to=date.fromisoformat(end),
-                                knowledge_from=_filed_eod_utc(filed),
+                                knowledge_from=known or _filed_eod_utc(filed),
                                 provenance_id=provenance.id,
                             )
                         )
@@ -181,6 +197,15 @@ class EdgarSubmissionsAdapter(SourceAdapter):
                 url = SUBMISSIONS_URL.format(cik=cik)
                 response = client.get(url)
                 response.raise_for_status()
+                for name in submission_pages(response.content):
+                    # Older filings live here; without them the knowledge
+                    # date for anything beyond the most recent 1000 filings
+                    # falls back to end-of-day.
+                    _EDGAR_BUCKET.acquire()
+                    page_url = SUBMISSIONS_PAGE_URL.format(name=name)
+                    page = client.get(page_url)
+                    page.raise_for_status()
+                    yield RawPayload(data=page.content, source_uri=page_url, fetched_at=utcnow())
                 yield RawPayload(data=response.content, source_uri=url, fetched_at=utcnow())
 
     def parse(self, payload: RawPayload, payload_hash: PayloadHash) -> ParsedBatch:
@@ -224,11 +249,32 @@ class EdgarSubmissionsAdapter(SourceAdapter):
         return ParsedBatch(provenance=(provenance,), facts=tuple(facts))
 
 
+SUBMISSIONS_PAGE_URL = "https://data.sec.gov/submissions/{name}"
+
+
+def submission_pages(submissions_payload: bytes) -> tuple[str, ...]:
+    """Names of the older submission files this document points to.
+
+    ``filings.recent`` holds at most 1000 filings. Apple's stops at
+    2015-05-29; everything before that — 1,236 filings back to 1994 — is in
+    a separate page. Without fetching those, acceptance times exist only for
+    recent filings and older ones keep filing-date resolution, which is
+    exactly what left eleven same-day conflicts unresolvable.
+    """
+    doc = json.loads(submissions_payload)
+    files = doc.get("filings", {}).get("files", []) or []
+    return tuple(entry["name"] for entry in files if entry.get("name"))
+
+
 def accepted_times(submissions_payload: bytes) -> dict[str, datetime]:
     """accession number -> acceptanceDateTime (UTC), for the I2 knowledge-date
-    join at security-master population. Pure function of the payload."""
+    join at security-master population. Pure function of the payload.
+
+    Accepts either the main submissions document or one of its older pages;
+    a page carries the same arrays without the ``filings`` wrapper.
+    """
     doc = json.loads(submissions_payload)
-    recent = doc.get("filings", {}).get("recent", {})
+    recent = doc.get("filings", {}).get("recent") or (doc if "accessionNumber" in doc else {})
     out: dict[str, datetime] = {}
     for accession, accepted in zip(
         recent.get("accessionNumber", []),

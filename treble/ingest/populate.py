@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterator
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
@@ -117,6 +117,27 @@ class Populator:
         self._fred_end = fred_end
         self._openfigi_api_key = openfigi_api_key
 
+    def _accepted_times(self, cik: int) -> dict[str, datetime]:
+        """Acceptance times for a filer, from its stored submissions payload.
+
+        Read from the payload store rather than refetched, so this costs no
+        request and stays reproducible under replay. Returns empty when
+        submissions have not been ingested yet, which degrades knowledge
+        dates to filing-date resolution rather than failing the step.
+        """
+        from treble.ingest.edgar import accepted_times
+
+        # Every submissions payload for this filer: the main document plus
+        # its older pages, which is where anything beyond the most recent
+        # 1000 filings lives.
+        marker = f"CIK{cik:010d}"
+        merged: dict[str, datetime] = {}
+        for entry in self._log.read():
+            if entry.source != "edgar-submissions" or marker not in entry.source_uri:
+                continue
+            merged.update(accepted_times(self._payloads.get(entry.payload_hash)))
+        return merged
+
     def _adapter(self, step: PopulationStep) -> SourceAdapter:
         match step.source_id:
             case "edgar-bulk":
@@ -134,6 +155,7 @@ class Populator:
                     self._log,
                     ciks=(int(step.key),),
                     contact_email=self._contact,
+                    accepted=self._accepted_times(int(step.key)),
                 )
             case "edgar-submissions":
                 return EdgarSubmissionsAdapter(
