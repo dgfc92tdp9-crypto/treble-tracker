@@ -127,3 +127,58 @@ def test_universe_spec_rejects_bad_shape() -> None:
     # a stray string must not be silently accepted as a universe.
     with pytest.raises(ValidationError):
         UniverseSpec(name="x", description="y", edgar_ciks="not-a-sentinel")  # type: ignore[arg-type]
+
+
+class TestLoaderRejectsUnreadKeys:
+    """A configured key that the loader silently ignores.
+
+    `edgar_bulk_quarters` was added to `UniverseSpec` and written into
+    `config/universe.yaml`, and nothing happened: the loader maps known keys
+    one at a time and dropped it without a word. Same shape as the `.env`
+    file the CLI once ignored while valid credentials sat in it — the file is
+    read, the value is discarded, and no check fails.
+    """
+
+    @staticmethod
+    def _write(tmp_path: Path, body: str) -> Path:
+        path = tmp_path / "universe.yaml"
+        path.write_text(f"universes:\n  x:\n    description: d\n    edgar_ciks: [1]\n{body}")
+        return path
+
+    def test_a_typo_is_rejected(self, tmp_path: Path) -> None:
+        from treble.core.universe import UnknownUniverseKeyError
+
+        path = self._write(tmp_path, '    edgar_bulk_quarter: ["2026q1"]\n')
+        with pytest.raises(UnknownUniverseKeyError, match="edgar_bulk_quarter"):
+            load_universe_config(path)
+
+    def test_the_error_lists_what_is_readable(self, tmp_path: Path) -> None:
+        """So the fix is obvious from the message alone."""
+        from treble.core.universe import UnknownUniverseKeyError
+
+        path = self._write(tmp_path, "    nonsense: 1\n")
+        with pytest.raises(UnknownUniverseKeyError, match="fred_series"):
+            load_universe_config(path)
+
+    def test_every_spec_field_is_readable_from_config(self, tmp_path: Path) -> None:
+        """The kill-test: add a field to UniverseSpec without wiring it into
+        the loader and this fails, instead of the value vanishing.
+
+        A type error is fine here — it proves the key was read. Only being
+        told the key is unknown means the loader ignores it.
+        """
+        from treble.core.universe import UniverseSpec, UnknownUniverseKeyError
+
+        for field in sorted(set(UniverseSpec.model_fields) - {"name"}):
+            path = self._write(tmp_path, f"    {field}: []\n")
+            try:
+                load_universe_config(path)
+            except UnknownUniverseKeyError as unread:
+                pytest.fail(f"{field} is a UniverseSpec field the loader drops: {unread}")
+            except Exception:  # noqa: S110 - a type error still proves it was read
+                pass
+
+    def test_bulk_quarters_round_trip(self, tmp_path: Path) -> None:
+        path = self._write(tmp_path, '    edgar_bulk_quarters: ["2026q1", "2025q4"]\n')
+        spec = load_universe_config(path).universes["x"]
+        assert spec.edgar_bulk_quarters == ("2026q1", "2025q4")

@@ -37,6 +37,8 @@ from treble.ingest.edgar import (
     EdgarCompanyFactsAdapter,
     EdgarSubmissionsAdapter,
 )
+from treble.ingest.edgar_bulk import ARCHIVE_URL as BULK_URL
+from treble.ingest.edgar_bulk import EdgarBulkFinancialsAdapter
 from treble.ingest.fred import FRED_GRAPH_URL, FredAdapter
 from treble.ingest.nport import ARCHIVE_URL, NportAdapter
 from treble.ingest.treasury import AUCTIONS_URL, TreasuryAuctionsAdapter
@@ -74,6 +76,8 @@ def uri_for_step(step: PopulationStep, *, fred_start: date, fred_end: date) -> s
         case "sec-nport":
             cik, accession = step.key.split("/", 1)
             return ARCHIVE_URL.format(cik=cik, accession=accession.replace("-", ""))
+        case "edgar-bulk":
+            return BULK_URL.format(quarter=step.key)
     raise ValueError(f"no URI mapping for source {step.source_id!r}")
 
 
@@ -115,6 +119,15 @@ class Populator:
 
     def _adapter(self, step: PopulationStep) -> SourceAdapter:
         match step.source_id:
+            case "edgar-bulk":
+                # No cik filter: one archive serves the whole universe, which
+                # is the entire reason this adapter exists.
+                return EdgarBulkFinancialsAdapter(
+                    self._payloads,
+                    self._log,
+                    quarters=(step.key,),
+                    contact_email=self._contact,
+                )
             case "edgar-companyfacts":
                 return EdgarCompanyFactsAdapter(
                     self._payloads,

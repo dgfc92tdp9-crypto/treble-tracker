@@ -32,6 +32,11 @@ universes:
     # bot gate (Stooq) or breaching a ToS (Yahoo) — see PROGRESS.
     fred_series: [DGS1MO, DGS3MO, DGS6MO, DGS1, DGS2, DGS3, DGS5, DGS7, DGS10, DGS20, DGS30, SP500, NASDAQ100, NASDAQCOM, DJIA, VIXCLS, SOFR, T10Y2Y, BAMLC0A0CM]
     treasury_auctions_since: "2026-01-01"
+    # Bulk XBRL: one 85 MB archive per quarter covers every filer, where the
+    # per-CIK API needs a request each. This is what makes the full-universe
+    # run tractable; companyfacts stays the route to deep history on a
+    # single filer, so both are configured rather than one replacing the other.
+    edgar_bulk_quarters: ["2026q1"]
     # N-PORT filings supply per-bond valuations (see ingest/nport.py). Left
     # empty here: filings are discovered by EDGAR full-text search at run
     # time rather than hardcoded, so this list stays honest as funds file.

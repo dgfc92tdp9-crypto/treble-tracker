@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from treble.core.universe import PopulationStep, load_universe_config
+from treble.core.universe import PopulationStep, UniverseSpec, load_universe_config
 from treble.ingest.base import RawPayload
 from treble.ingest.populate import (
     Populator,
@@ -64,10 +64,20 @@ def populator(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Populator:
 
 def fred_only_spec():  # type: ignore[no-untyped-def]
     """The dev universe reduced to its FRED series — enough to prove the
-    orchestration without EDGAR's 5.6 MB payloads in every test."""
+    orchestration without EDGAR's 5.6 MB payloads in every test.
+
+    Built by naming what it *keeps*, not by nulling what it does not.
+    Subtracting fields meant every new source added to the dev universe was
+    switched on here by default: adding `edgar_bulk_quarters` to the config
+    silently put an 85 MB download inside a test whose whole purpose was to
+    avoid a 5.6 MB one. A new field now defaults to absent.
+    """
     dev = load_universe_config(CONFIG).get("dev")
-    return dev.model_copy(
-        update={"edgar_ciks": (), "treasury_auctions_since": None, "nport_filings": ()}
+    return UniverseSpec(
+        name=dev.name,
+        description=dev.description,
+        edgar_ciks=(),
+        fred_series=dev.fred_series,
     )
 
 

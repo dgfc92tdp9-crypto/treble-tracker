@@ -38,6 +38,12 @@ class UniverseSpec(BaseModel):
     fred_series: tuple[str, ...] = ()
     treasury_auctions_since: date | None = None
     nport_filings: tuple[tuple[int, str], ...] = ()
+    #: Quarters of the SEC Financial Statement Data Sets to ingest, e.g.
+    #: ("2026q1",). One archive covers every filer, which is what makes a
+    #: full-universe run tractable; per-CIK companyfacts remains the way to
+    #: get deep history for one filer, so the two are complementary rather
+    #: than alternatives.
+    edgar_bulk_quarters: tuple[str, ...] = ()
 
     @property
     def discovers_filers(self) -> bool:
@@ -67,10 +73,29 @@ class UniverseConfig(BaseModel):
         return self.universes[name]
 
 
+class UnknownUniverseKeyError(ValueError):
+    """A universe declares a key the loader does not read.
+
+    Raised rather than ignored. This loader maps known keys one by one, so
+    adding a field to :class:`UniverseSpec` without adding it here made the
+    config value vanish silently — `edgar_bulk_quarters` was configured, the
+    file was read, and nothing happened. That is the same failure as the
+    `.env` file the CLI once ignored while valid credentials sat in it, and
+    it is caught the same way: by refusing to load rather than shrugging.
+    """
+
+
 def load_universe_config(path: Path) -> UniverseConfig:
     raw = yaml.safe_load(path.read_text())
     universes: dict[str, UniverseSpec] = {}
+    readable = set(UniverseSpec.model_fields) - {"name"}
     for name, body in (raw.get("universes") or {}).items():
+        unknown = sorted(set(body) - readable)
+        if unknown:
+            raise UnknownUniverseKeyError(
+                f"universe {name!r} sets {', '.join(unknown)}, which the loader does not read. "
+                f"Readable keys: {', '.join(sorted(readable))}."
+            )
         ciks = body.get("edgar_ciks")
         universes[name] = UniverseSpec(
             name=name,
@@ -79,6 +104,7 @@ def load_universe_config(path: Path) -> UniverseConfig:
             fred_series=tuple(body.get("fred_series") or ()),
             treasury_auctions_since=body.get("treasury_auctions_since"),
             nport_filings=tuple(tuple(f) for f in (body.get("nport_filings") or ())),
+            edgar_bulk_quarters=tuple(body.get("edgar_bulk_quarters") or ()),
         )
     limits = raw.get("rate_limits") or {}
     return UniverseConfig(
@@ -127,6 +153,8 @@ def plan_steps(
         )
     for cik, accession in spec.nport_filings:
         steps.append(PopulationStep(source_id="sec-nport", key=f"{cik}/{accession}"))
+    for quarter in spec.edgar_bulk_quarters:
+        steps.append(PopulationStep(source_id="edgar-bulk", key=quarter))
     return steps
 
 

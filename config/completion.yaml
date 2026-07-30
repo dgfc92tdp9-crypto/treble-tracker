@@ -32,7 +32,12 @@ phase_1:
   WP3:  {done: 1.0, name: "screen definition contract + conformance harness"}
   WP4:  {done: 1.0, name: "analytics foundations — QuantLib, registry, curves"}
   WP5:  {done: 1.0, name: "bonds analytics — yield, spreads, risk, OAS"}
-  WP6:  {done: 1.0, name: "ingest adapters"}
+  WP6:  {done: 1.0, name: "ingest adapters",
+         basis: "EDGAR companyfacts/submissions, EDGAR bulk XBRL, FRED,
+                 Treasury, TRACE-file, OpenFIGI, GLEIF, N-PORT all ship with
+                 recorded-fixture tests. Counted complete: the adapter set
+                 the phase requires exists, and later sources are additions
+                 rather than gaps"}
   WP7:  {done: 1.0, name: "security master + entity graph"}
   WP8:  {done: 0.9, name: "TAPI",
          basis: "field dictionary, in-process and HTTP transports, Python
