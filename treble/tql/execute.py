@@ -38,6 +38,28 @@ class TqlExecutionError(RuntimeError):
     """The query is valid TQL but cannot be run as asked."""
 
 
+class ModelSource(Protocol):
+    """The analytics side of a query.
+
+    Injected rather than imported: the field dictionary that knows which
+    mnemonics are model-derived lives in `tapi`, which sits *above* `tql`.
+    So TAPI supplies this, and TQL stays able to run against stored facts
+    alone — which is also what lets the executor be tested without QuantLib.
+
+    ``compute`` returns None for a mnemonic it does not handle, so an
+    unwired model falls through to the store rather than becoming a null.
+    """
+
+    def compute(
+        self,
+        subject: TUID,
+        mnemonic: str,
+        overrides: tuple[tuple[str, Value], ...],
+        *,
+        as_of: datetime,
+    ) -> tuple[object, str | None] | None: ...
+
+
 class FactSource(Protocol):
     """The slice of the store a plan needs.
 
@@ -110,6 +132,10 @@ class Row(BaseModel):
 
     subject: str
     values: tuple[tuple[str, object | None], ...]
+    #: Field names whose value came from a model rather than the store.
+    #: Carried so a caller can mark them (§5.4) — a computed number that
+    #: rendered like a reported one would misstate where it came from.
+    model_derived: tuple[str, ...] = ()
     #: Provenance per field, so a TQL result is as accountable as a screen
     #: (I1). A row that could not say where its numbers came from would be
     #: a hole in the one guarantee this system makes everywhere else.
@@ -189,7 +215,7 @@ def _matches(value: object, comparison: Comparison, target: Value) -> bool:
             return bool(left <= right)
 
 
-def execute(plan: Plan, source: FactSource) -> Result:
+def execute(plan: Plan, source: FactSource, models: ModelSource | None = None) -> Result:
     """Run a plan against a fact source.
 
     Predicates filter on *stored* attribute names, which are the source's
@@ -202,7 +228,24 @@ def execute(plan: Plan, source: FactSource) -> Result:
             continue
         values: list[tuple[str, object | None]] = []
         provenance: list[tuple[str, str | None]] = []
+        computed: list[str] = []
         for request in plan.fields:
+            # Models first. A model-derived field must never be served from
+            # a stored value that happens to share its name — the point of
+            # an override is that the number is recomputed under the stated
+            # assumption, not looked up.
+            result = (
+                models.compute(subject, request.mnemonic, request.overrides, as_of=plan.as_of)
+                if models is not None
+                else None
+            )
+            if result is not None:
+                value, provenance_id = result
+                computed.append(request.name)
+                values.append((request.name, value))
+                provenance.append((request.name, provenance_id))
+                continue
+
             fact = None
             for candidate in request.candidates:
                 fact = _latest(source.read(subject, candidate, as_of=plan.as_of))
@@ -210,7 +253,14 @@ def execute(plan: Plan, source: FactSource) -> Result:
                     break
             values.append((request.name, fact.value if fact else None))
             provenance.append((request.name, fact.provenance_id if fact else None))
-        rows.append(Row(subject=str(subject), values=tuple(values), provenance=tuple(provenance)))
+        rows.append(
+            Row(
+                subject=str(subject),
+                values=tuple(values),
+                provenance=tuple(provenance),
+                model_derived=tuple(computed),
+            )
+        )
     return Result(plan=plan, rows=tuple(rows))
 
 

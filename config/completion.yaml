@@ -44,13 +44,12 @@ phase_1:
                  client, and the analytics service path (model-derived fields
                  compute through TAPI) all ship; the tql service is blocked on
                  WP9 and gRPC/Arrow Flight are Phase 2 by spec 8.3"}
-  WP9:  {done: 0.8, name: "TQL — grammar, planner, executor",
-         basis: "grammar, typed AST, planner and executor ship; queries run
-                 against the live store with provenance per value and
-                 point-in-time universes. Outstanding: analytics-engine
-                 calls for model-derived fields (overrides are carried into
-                 the plan but not yet dispatched), and named universes,
-                 which need index membership data"}
+  WP9:  {done: 0.95, name: "TQL — grammar, planner, executor",
+         basis: "grammar, planner, executor and analytics dispatch all ship;
+                 the spec 4.2 query parses and runs, overrides reach the
+                 models and change the answer. Outstanding only: named
+                 universes (members('SPX Index')), which need index
+                 membership data nobody has ingested"}
   WP10: {done: 1.0, name: "command grammar + dispatcher"}
   WP11: {done: 0.82, name: "screens",
          basis: "9 of 11 screens built (DES, FA, FLDS, GP, HP, ICVS, MDL,

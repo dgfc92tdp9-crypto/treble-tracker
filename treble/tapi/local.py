@@ -469,3 +469,70 @@ class LocalTapi:
 def utc_now() -> datetime:
     """Default `as_of` at the TAPI boundary (I2: never inside the store)."""
     return datetime.now(UTC)
+
+
+class TapiModelSource:
+    """Supplies TQL's model-derived fields from TAPI (spec §4.2).
+
+    TQL cannot import the field dictionary — `tapi` sits above `tql` — so
+    the dictionary-aware half lives here and is injected downward. This is
+    what makes `oas_spread_mid(vol_override=0.20)` a real request rather
+    than a parsed string: the override is the assumption the model runs
+    under, and §4.2 calls that "the mechanism by which the entire analytics
+    library is exposed as data".
+    """
+
+    def __init__(self, tapi: LocalTapi) -> None:
+        self._tapi = tapi
+
+    def compute(
+        self,
+        subject: TUID,
+        mnemonic: str,
+        overrides: tuple[tuple[str, object], ...],
+        *,
+        as_of: datetime,
+    ) -> tuple[object, str | None] | None:
+        """The field's value, or None if it is not model-derived.
+
+        Returning None rather than raising lets a non-model field fall
+        through to the store, so TQL does not need to know which is which.
+        """
+        if mnemonic not in FIELDS:
+            return None
+        definition = FIELDS.get(mnemonic)
+        if not definition.model_derived:
+            return None
+        unknown = [name for name, _ in overrides if name not in definition.overrides]
+        if unknown:
+            # An override the model does not accept would otherwise be
+            # dropped, and the result returned as though the assumption had
+            # been applied — a number computed under conditions nobody asked
+            # for, indistinguishable from one that was.
+            raise UnknownOverrideError(
+                f"{mnemonic} does not accept {', '.join(unknown)}; "
+                f"it accepts {', '.join(definition.overrides) or 'no overrides'}"
+            )
+        result = self._tapi.field(
+            _subject_query(subject), mnemonic, {k: str(v) for k, v in overrides}, as_of=as_of
+        )
+        return result.value, result.provenance_id
+
+
+class UnknownOverrideError(ValueError):
+    """An override the field's model does not accept."""
+
+
+def _subject_query(subject: TUID) -> SecurityQuery | None:
+    """A store subject back into a security reference.
+
+    TQL selects subjects; TAPI's field path takes securities. Only the
+    namespaces TQL can select are mapped, and anything else returns None so
+    the field resolves to null rather than to the wrong instrument.
+    """
+    text = str(subject)
+    if text.startswith("cusip:"):
+        return SecurityQuery(ticker=text.removeprefix("cusip:"), key=YellowKey.GOVT)
+    if text.startswith("fred:"):
+        return SecurityQuery(ticker=text.removeprefix("fred:"), key=YellowKey.INDEX)
+    return None
