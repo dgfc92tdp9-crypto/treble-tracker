@@ -124,6 +124,118 @@ _SPEC_FIELDS: tuple[FieldDef, ...] = (
         field_type=FieldType.RATIO,
         sources=("edgar",),
     ),
+    # --- YAS analytics (§7.5) -----------------------------------------
+    #
+    # Names confirmed by Jack, 2026-07-28, rather than chosen here: CLAUDE.md
+    # forbids coining mnemonics. Every mnemonic the spec does name is a
+    # Bloomberg field verbatim (PX_LAST, CUR_MKT_CAP, OAS_SPREAD_MID,
+    # DUR_ADJ_OAS, BEST_EPS, IDX_MWEIGHT), so these continue that vocabulary
+    # instead of starting a second one.
+    FieldDef(
+        mnemonic="YLD_YTM_MID",
+        description="Yield to maturity, mid",
+        field_type=FieldType.YIELD,
+        overrides=("PX_OVERRIDE", "SETTLE_DT_OVERRIDE"),
+        model_id="bonds.yield_from_price",
+        sources=("model",),
+    ),
+    FieldDef(
+        mnemonic="DUR_ADJ_MID",
+        description="Modified duration at the quoted yield",
+        field_type=FieldType.DURATION,
+        overrides=("PX_OVERRIDE", "SETTLE_DT_OVERRIDE"),
+        model_id="bonds.modified_duration",
+        sources=("model",),
+    ),
+    FieldDef(
+        mnemonic="CNVX_MID",
+        description="Convexity at the quoted yield",
+        field_type=FieldType.RATIO,
+        overrides=("PX_OVERRIDE", "SETTLE_DT_OVERRIDE"),
+        model_id="bonds.convexity",
+        sources=("model",),
+    ),
+    FieldDef(
+        mnemonic="DV01",
+        description="Price value of a basis point, per 100 face",
+        field_type=FieldType.PRICE,
+        overrides=("PX_OVERRIDE", "SETTLE_DT_OVERRIDE"),
+        model_id="bonds.dv01",
+        sources=("model",),
+    ),
+    FieldDef(
+        mnemonic="WORKOUT_DT_MID",
+        description="Workout date — maturity for a bullet, else the worst call",
+        field_type=FieldType.DATE,
+        overrides=("PX_OVERRIDE",),
+        model_id="bonds.yield_to_worst",
+        sources=("model",),
+    ),
+)
+
+
+#: Treasury auction fields, under the names Treasury publishes them by.
+#: They are as-reported like the XBRL tags, but bare names rather than
+#: ``taxonomy:Tag:unit`` triples, so the dynamic as-reported rule cannot
+#: recognise them and they are listed explicitly. Nothing here is coined:
+#: every mnemonic is the column name in the FiscalData auctions dataset.
+_TREASURY_FIELDS: tuple[FieldDef, ...] = (
+    FieldDef(
+        mnemonic="int_rate",
+        description="Coupon rate, per cent (Treasury auction)",
+        field_type=FieldType.RATIO,
+        stored_field="int_rate",
+        sources=("treasury",),
+    ),
+    FieldDef(
+        mnemonic="high_price",
+        description="Auction high (stop-out) price per 100 face",
+        field_type=FieldType.PRICE,
+        stored_field="high_price",
+        sources=("treasury",),
+    ),
+    FieldDef(
+        mnemonic="high_yield",
+        description="Auction high (stop-out) yield, per cent",
+        field_type=FieldType.YIELD,
+        stored_field="high_yield",
+        sources=("treasury",),
+    ),
+    FieldDef(
+        mnemonic="maturity_date",
+        description="Maturity date (Treasury auction)",
+        field_type=FieldType.DATE,
+        stored_field="maturity_date",
+        sources=("treasury",),
+    ),
+    FieldDef(
+        mnemonic="dated_date",
+        description="Dated date — interest accrual start, not the issue date",
+        field_type=FieldType.DATE,
+        stored_field="dated_date",
+        sources=("treasury",),
+    ),
+    FieldDef(
+        mnemonic="issue_date",
+        description="Issue date (Treasury auction)",
+        field_type=FieldType.DATE,
+        stored_field="issue_date",
+        sources=("treasury",),
+    ),
+    FieldDef(
+        mnemonic="security_term",
+        description="Security term as auctioned (remaining term on a reopening)",
+        field_type=FieldType.STRING,
+        stored_field="security_term",
+        sources=("treasury",),
+    ),
+    FieldDef(
+        mnemonic="inflation_index_security",
+        description="Whether the security is inflation-indexed (TIPS)",
+        field_type=FieldType.STRING,
+        stored_field="inflation_index_security",
+        sources=("treasury",),
+    ),
 )
 
 
@@ -147,7 +259,9 @@ class FieldDictionary:
     """Lookup over documented mnemonics plus as-reported source tags."""
 
     def __init__(self, extra: tuple[FieldDef, ...] = ()) -> None:
-        self._defs: dict[str, FieldDef] = {f.mnemonic: f for f in (*_SPEC_FIELDS, *extra)}
+        self._defs: dict[str, FieldDef] = {
+            f.mnemonic: f for f in (*_SPEC_FIELDS, *_TREASURY_FIELDS, *extra)
+        }
 
     def __contains__(self, mnemonic: str) -> bool:
         return mnemonic in self._defs or self._is_as_reported(mnemonic)

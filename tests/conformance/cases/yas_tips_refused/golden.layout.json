@@ -1,0 +1,399 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "YIELD AND SPREAD ANALYSIS"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TERMS (as published)"
+    },
+    {
+      "at": [
+        3,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Coupon"
+    },
+    {
+      "at": [
+        3,
+        22
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+      "text": "       1.250"
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Maturity"
+    },
+    {
+      "at": [
+        4,
+        22
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+      "text": "  2031-04-15"
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Dated (accrual from)"
+    },
+    {
+      "at": [
+        5,
+        22
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+      "text": "  2026-04-15"
+    },
+    {
+      "at": [
+        6,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Auction price"
+    },
+    {
+      "at": [
+        6,
+        22
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+      "text": "   98.854348"
+    },
+    {
+      "at": [
+        7,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Auction yield"
+    },
+    {
+      "at": [
+        7,
+        22
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+      "text": "       1.955"
+    },
+    {
+      "at": [
+        8,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Inflation-indexed"
+    },
+    {
+      "at": [
+        8,
+        22
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+      "text": "         Yes"
+    },
+    {
+      "at": [
+        10,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "ANALYTICS (computed from the terms above)"
+    },
+    {
+      "at": [
+        11,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Yield to maturity"
+    },
+    {
+      "at": [
+        11,
+        22
+      ],
+      "attrs": [
+        "model_derived",
+        "stale"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "—"
+    },
+    {
+      "at": [
+        12,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Modified duration"
+    },
+    {
+      "at": [
+        12,
+        22
+      ],
+      "attrs": [
+        "model_derived",
+        "stale"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "—"
+    },
+    {
+      "at": [
+        13,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Convexity"
+    },
+    {
+      "at": [
+        13,
+        22
+      ],
+      "attrs": [
+        "model_derived",
+        "stale"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "—"
+    },
+    {
+      "at": [
+        14,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "DV01 (per 100 face)"
+    },
+    {
+      "at": [
+        14,
+        22
+      ],
+      "attrs": [
+        "model_derived",
+        "stale"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "—"
+    },
+    {
+      "at": [
+        15,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Workout date"
+    },
+    {
+      "at": [
+        15,
+        22
+      ],
+      "attrs": [
+        "model_derived",
+        "stale"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "—"
+    },
+    {
+      "at": [
+        17,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "ICVS",
+      "provenance": null,
+      "text": "ICVS Curve viewer"
+    },
+    {
+      "at": [
+        18,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "91282CQP9 Govt SPTR",
+      "provenance": null,
+      "text": "SPTR Source trace"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Priced off the last auction print, not a live quote; dotted = computed."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Inflation-indexed securities show dashes: nominal maths would mislead."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "YAS",
+  "panes": [],
+  "stale": false,
+  "tab": "main"
+}

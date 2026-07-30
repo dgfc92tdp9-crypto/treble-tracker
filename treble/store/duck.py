@@ -181,6 +181,18 @@ class DuckStore:
 
     # -- reads (as_of is required; I2) ---------------------------------------
 
+    def has_subject(self, subject: TUID) -> bool:
+        """Whether the store holds any fact for this subject.
+
+        Used to reject an unknown identifier at resolution time. Without it
+        a mistyped CUSIP resolves happily and every cell renders as a dash —
+        indistinguishable from a real instrument with no data.
+        """
+        row = self._conn.execute(
+            "SELECT 1 FROM facts WHERE subject = ? LIMIT 1", [subject]
+        ).fetchone()
+        return row is not None
+
     def subject_provenance(self, subject: TUID, *, as_of: datetime) -> list[ProvenanceId]:
         """Distinct provenance ids behind a subject's visible values (I1, I2).
 

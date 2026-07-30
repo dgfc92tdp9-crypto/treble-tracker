@@ -1,0 +1,194 @@
+# YAS — Yield and Spread Analysis (spec §7.5).
+#
+# Reference terms as published by the issuer, and risk measures computed
+# from them. Computed values carry the model_derived attribute, which the
+# renderers show with a dotted underline (§5.4) so a model output is never
+# mistaken on screen for something that was reported.
+#
+# **The price is an auction print, not a live market quote.** There is no
+# secondary-market feed at Phase 1 (TRACE is subscription-gated — see the
+# data access findings in PROGRESS), so every analytic here is as current as
+# the last auction of this CUSIP and no fresher. Saying so on the screen is
+# the difference between a stale number and a lie.
+#
+# An inflation-indexed security renders dashes throughout rather than
+# numbers: nominal maths on a TIPS returns a real yield that reads exactly
+# like a nominal one. Refusing is the only honest option until index-ratio
+# handling exists (§10.3).
+mnemonic: YAS
+title: Yield and Spread Analysis
+rows: 22
+cols: 80
+namespaces: [Govt, Corp]
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "YIELD AND SPREAD ANALYSIS"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+
+      # --- as published by the issuer -----------------------------------
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "TERMS (as published)"
+        attrs: [label, emphasis]
+
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "Coupon"
+      - kind: bound
+        at: {row: 3, col: 22}
+        field: "int_rate"
+        format: "{:>12,.3f}"
+        width: 12
+        conditional:
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "Maturity"
+      - kind: bound
+        at: {row: 4, col: 22}
+        field: "maturity_date"
+        format: "{:>12}"
+        width: 12
+        conditional:
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "Dated (accrual from)"
+      - kind: bound
+        at: {row: 5, col: 22}
+        field: "dated_date"
+        format: "{:>12}"
+        width: 12
+        conditional:
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 6, col: 0}
+        text: "Auction price"
+      - kind: bound
+        at: {row: 6, col: 22}
+        field: "high_price"
+        format: "{:>12,.6f}"
+        width: 12
+        conditional:
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 7, col: 0}
+        text: "Auction yield"
+      - kind: bound
+        at: {row: 7, col: 22}
+        field: "high_yield"
+        format: "{:>12,.3f}"
+        width: 12
+        conditional:
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 8, col: 0}
+        text: "Inflation-indexed"
+      - kind: bound
+        at: {row: 8, col: 22}
+        field: "inflation_index_security"
+        format: "{:>12}"
+        width: 12
+        conditional:
+          - {when: is_null, attrs: [stale]}
+
+      # --- computed ------------------------------------------------------
+      - kind: static
+        at: {row: 10, col: 0}
+        text: "ANALYTICS (computed from the terms above)"
+        attrs: [label, emphasis]
+
+      - kind: static
+        at: {row: 11, col: 0}
+        text: "Yield to maturity"
+      - kind: bound
+        at: {row: 11, col: 22}
+        field: "YLD_YTM_MID"
+        format: "{:>12,.4f}"
+        width: 12
+        attrs: [model_derived]
+        conditional:
+          - {when: is_null, attrs: [stale]}
+          - {when: is_stale, attrs: [stale]}
+
+      - kind: static
+        at: {row: 12, col: 0}
+        text: "Modified duration"
+      - kind: bound
+        at: {row: 12, col: 22}
+        field: "DUR_ADJ_MID"
+        format: "{:>12,.4f}"
+        width: 12
+        attrs: [model_derived]
+        conditional:
+          - {when: is_null, attrs: [stale]}
+          - {when: is_stale, attrs: [stale]}
+
+      - kind: static
+        at: {row: 13, col: 0}
+        text: "Convexity"
+      - kind: bound
+        at: {row: 13, col: 22}
+        field: "CNVX_MID"
+        format: "{:>12,.4f}"
+        width: 12
+        attrs: [model_derived]
+        conditional:
+          - {when: is_null, attrs: [stale]}
+          - {when: is_stale, attrs: [stale]}
+
+      - kind: static
+        at: {row: 14, col: 0}
+        text: "DV01 (per 100 face)"
+      - kind: bound
+        at: {row: 14, col: 22}
+        field: "DV01"
+        format: "{:>12,.4f}"
+        width: 12
+        attrs: [model_derived]
+        conditional:
+          - {when: is_null, attrs: [stale]}
+          - {when: is_stale, attrs: [stale]}
+
+      - kind: static
+        at: {row: 15, col: 0}
+        text: "Workout date"
+      - kind: bound
+        at: {row: 15, col: 22}
+        field: "WORKOUT_DT_MID"
+        format: "{:>12}"
+        width: 12
+        attrs: [model_derived]
+        conditional:
+          - {when: is_null, attrs: [stale]}
+
+      - kind: link
+        at: {row: 17, col: 0}
+        text: "ICVS Curve viewer"
+        command: "ICVS"
+      - kind: link
+        at: {row: 18, col: 0}
+        text: "SPTR Source trace"
+        command: "{security} SPTR"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "Priced off the last auction print, not a live quote; dotted = computed."
+        attrs: [label]
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Inflation-indexed securities show dashes: nominal maths would mislead."
+        attrs: [label]

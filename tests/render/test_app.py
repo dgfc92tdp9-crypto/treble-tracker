@@ -26,6 +26,24 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 COMPANYFACTS = FIXTURES / "edgar" / "companyfacts_CIK0000051143.json"
 FETCHED = datetime(2026, 7, 26, 12, 0, tzinfo=UTC)
 
+
+def an_unbuilt_mnemonic() -> str:
+    """A function the grammar knows but no screen implements yet.
+
+    Derived rather than hard-coded: this test named YAS, and silently
+    started asserting the wrong thing the moment YAS was built. Anything
+    still outstanding works, and the test retires itself when the last
+    screen lands.
+    """
+    from treble.cmd.grammar import KNOWN_MNEMONICS
+    from treble.render.contract.registry import available
+
+    outstanding = sorted(set(KNOWN_MNEMONICS) - set(available()))
+    if not outstanding:
+        pytest.skip("every known mnemonic now has a screen definition")
+    return outstanding[0]
+
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -105,7 +123,7 @@ class TestCommandExecution:
     async def test_function_without_a_screen_says_so(self, tapi: LocalTapi) -> None:
         app = Workstation(tapi)
         async with app.run_test(size=(90, 30)) as pilot:
-            await submit(app, pilot, "IBM US Equity YAS")
+            await submit(app, pilot, f"IBM US Equity {an_unbuilt_mnemonic()}")
         assert "no screen definition yet" in app.last_status
 
     async def test_security_alone_explains_the_menu_is_pending(self, tapi: LocalTapi) -> None:

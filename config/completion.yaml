@@ -34,16 +34,17 @@ phase_1:
   WP5:  {done: 1.0, name: "bonds analytics — yield, spreads, risk, OAS"}
   WP6:  {done: 1.0, name: "ingest adapters"}
   WP7:  {done: 1.0, name: "security master + entity graph"}
-  WP8:  {done: 0.8, name: "TAPI",
-         basis: "field dictionary, in-process transport, HTTP transport and
-                 Python client all ship; the tql service is blocked on WP9 and
-                 gRPC/Arrow Flight are Phase 2 by spec 8.3"}
+  WP8:  {done: 0.9, name: "TAPI",
+         basis: "field dictionary, in-process and HTTP transports, Python
+                 client, and the analytics service path (model-derived fields
+                 compute through TAPI) all ship; the tql service is blocked on
+                 WP9 and gRPC/Arrow Flight are Phase 2 by spec 8.3"}
   WP9:  {done: 0.0, name: "TQL — grammar, planner, executor"}
   WP10: {done: 1.0, name: "command grammar + dispatcher"}
-  WP11: {done: 0.55, name: "screens",
-         basis: "6 of 11 screens built (DES, FA, FLDS, ICVS, MDL, SPTR), each
-                 with a conformance case referencing the shipped definition.
-                 GP, HP, YAS, SRCH, EQS outstanding"}
+  WP11: {done: 0.64, name: "screens",
+         basis: "7 of 11 screens built (DES, FA, FLDS, ICVS, MDL, SPTR, YAS),
+                 each with a conformance case referencing the shipped
+                 definition. GP, HP, SRCH, EQS outstanding"}
   WP12: {done: 1.0, name: "renderers — TUI and desktop against one suite"}
   WP13: {done: 0.0, name: "spreadsheet add-in"}
   WP14: {done: 0.0, name: "local-only mode — treble init"}

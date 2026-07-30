@@ -1,0 +1,66 @@
+{
+  "fields": {
+    "int_rate": {
+      "value": 1.25,
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "maturity_date": {
+      "value": "2031-04-15",
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "dated_date": {
+      "value": "2026-04-15",
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "high_price": {
+      "value": 98.854348,
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "high_yield": {
+      "value": 1.955,
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "inflation_index_security": {
+      "value": "Yes",
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "YLD_YTM_MID": {
+      "value": null,
+      "stale": false,
+      "model_derived": false
+    },
+    "DUR_ADJ_MID": {
+      "value": null,
+      "stale": false,
+      "model_derived": false
+    },
+    "CNVX_MID": {
+      "value": null,
+      "stale": false,
+      "model_derived": false
+    },
+    "DV01": {
+      "value": null,
+      "stale": false,
+      "model_derived": false
+    },
+    "WORKOUT_DT_MID": {
+      "value": null,
+      "stale": false,
+      "model_derived": false
+    }
+  },
+  "series": {}
+}

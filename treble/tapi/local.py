@@ -20,11 +20,15 @@ Two responsibilities:
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
+from treble.analytics._ql import DayCount
+from treble.analytics.bonds.spec import FixedBondSpec, Frequency
+from treble.core.facts import Fact
 from treble.core.identifiers import TUID, SecurityQuery, YellowKey
+from treble.core.provenance import ProvenanceId
 from treble.store.duck import DuckStore
-from treble.tapi.fields import FIELDS, FieldDictionary
+from treble.tapi.fields import FIELDS, FieldDef, FieldDictionary
 from treble.tapi.types import FieldResult
 
 #: A value older than this is displayed as stale (§6.3 mandates that any
@@ -32,6 +36,56 @@ from treble.tapi.types import FieldResult
 #: are quarterly, so the window is generous; the ticker plant tightens this
 #: dramatically at Phase 2.
 DEFAULT_STALE_AFTER = timedelta(days=120)
+
+
+#: Model ids with a wired data path. Anything in the field dictionary but
+#: not here raises rather than returning null, so an unimplemented analytic
+#: is distinguishable from an absent input.
+_WIRED_MODELS = frozenset(
+    {
+        "bonds.yield_from_price",
+        "bonds.modified_duration",
+        "bonds.convexity",
+        "bonds.dv01",
+        "bonds.yield_to_worst",
+    }
+)
+
+
+def _looks_like_cusip(security: SecurityQuery) -> bool:
+    """Whether this bond reference is a CUSIP rather than a description.
+
+    `IBM 4.15 05/15/39 Corp` is a perfectly valid bond reference whose
+    ticker is "IBM" — treating every Govt/Corp ticker as a CUSIP resolved
+    that to `cusip:IBM` and reported a missing instrument instead of an
+    unbuilt lookup. Descriptor-based resolution needs a security-master
+    search over coupon and maturity, which does not exist yet, so those
+    fall through to the honest "no resolution for this namespace" error.
+    """
+    ticker = security.ticker
+    return security.descriptor is None and len(ticker) == 9 and ticker.isalnum()
+
+
+def _wire_value(value: object) -> str | float | int | bool | None:
+    """Narrow a stored value to what crosses the TAPI boundary.
+
+    Dates become ISO strings here rather than at the renderer. Field values
+    travel over HTTP as JSON to the desktop client and are frozen into
+    conformance fixtures, so a type that survives in-process but not through
+    `json.dumps` would make the live path and the tested path differ — the
+    desktop would render something no golden had ever checked.
+    """
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, str | float | int | bool) or value is None:
+        return value
+    return str(value)
+
+
+class _UnpriceableBondError(Exception):
+    """Reference data insufficient (or unsuitable) to price this bond."""
 
 
 class SecurityNotFoundError(KeyError):
@@ -104,6 +158,18 @@ class LocalTapi:
                     f"{security.display()!r}: ticker not in EDGAR's company index"
                 )
             return TUID(f"cik:{cik:010d}")
+        if security.key in (YellowKey.GOVT, YellowKey.CORP) and _looks_like_cusip(security):
+            # Bonds are addressed by CUSIP, the subject the Treasury and
+            # N-PORT adapters write under. Existence is checked rather than
+            # assumed: a mistyped CUSIP would otherwise resolve to a subject
+            # with no facts and render a screen of dashes indistinguishable
+            # from a real bond nobody has data for.
+            subject = TUID(f"cusip:{security.ticker.upper()}")
+            if not self._store.has_subject(subject):
+                raise SecurityNotFoundError(
+                    f"{security.display()!r}: that CUSIP has not been ingested"
+                )
+            return subject
         if security.key == YellowKey.INDEX and security.venue is None:
             # Macro series are addressable as tickers (spec §7.4).
             return TUID(f"fred:{security.ticker.upper()}")
@@ -126,14 +192,7 @@ class LocalTapi:
         definition = self._fields.get(mnemonic)  # raises on unknown mnemonic
 
         if definition.model_derived:
-            # Model outputs are computed by the analytics layer and carry an
-            # I3 envelope. Wiring that through is the YAS screen's work; a
-            # fabricated number here would be exactly the failure mode the
-            # spec calls the worst in this domain.
-            raise NotImplementedError(
-                f"{mnemonic!r} is model-derived ({definition.model_id}); "
-                "analytics wiring lands with the YAS screen (spec §10.1)"
-            )
+            return self._model_field(security, definition, as_of=as_of)
         if definition.stored_field is None or security is None:
             return FieldResult(value=None)
 
@@ -146,7 +205,7 @@ class LocalTapi:
         latest = max(facts, key=lambda f: f.effective_from)
         age = as_of.date() - (latest.effective_to or latest.effective_from)
         return FieldResult(
-            value=latest.value,
+            value=_wire_value(latest.value),
             provenance_id=latest.provenance_id,
             stale=age > self._stale_after,
             model_derived=False,
@@ -176,6 +235,120 @@ class LocalTapi:
         ("DGS20", "20Y", 20.0),
         ("DGS30", "30Y", 30.0),
     )
+
+    # -- model-derived fields (YAS) -------------------------------------
+
+    def _model_field(
+        self, security: SecurityQuery | None, definition: FieldDef, *, as_of: datetime
+    ) -> FieldResult:
+        """Compute an analytic from stored reference data.
+
+        Returns a null result whenever the inputs are not all present rather
+        than substituting a default. A duration computed from a guessed
+        coupon is worse than a dash: the dash is visibly missing, and the
+        number is invisibly wrong.
+        """
+        # A model with no wiring is a gap in this system, not missing data,
+        # and the two must not look the same on screen. OAS needs a
+        # bootstrapped curve and a vol assumption; until that exists, saying
+        # so is better than a dash the user would read as "not reported".
+        if definition.model_id not in _WIRED_MODELS:
+            raise NotImplementedError(
+                f"{definition.mnemonic!r} is model-derived ({definition.model_id}); "
+                "that model is not wired to a data path yet"
+            )
+        if security is None:
+            return FieldResult(value=None)
+        try:
+            spec, price, priced_on, provenance_id = self._bond_inputs(security, as_of=as_of)
+        except (SecurityNotFoundError, _UnpriceableBondError):
+            # Inputs genuinely absent or unsuitable: null, which renders as
+            # an em dash. A number computed from a guessed coupon would be
+            # invisibly wrong where the dash is visibly missing.
+            return FieldResult(value=None)
+
+        from treble.analytics.bonds import pricing
+
+        # The risk measures take a *yield*, not a price. Passing the price
+        # does not fail — QuantLib reads 98.88 as a 9888% yield and returns
+        # a modified duration of 0.006 for a twenty-year bond, which is
+        # small, plausible-looking and completely wrong.
+        quoted_yield = pricing.yield_from_price(spec, price, as_of=priced_on).value
+
+        computations: dict[str, object] = {
+            "bonds.yield_from_price": lambda: quoted_yield * 100.0,
+            "bonds.modified_duration": lambda: (
+                pricing.modified_duration(spec, quoted_yield, as_of=priced_on).value
+            ),
+            "bonds.convexity": lambda: pricing.convexity(spec, quoted_yield, as_of=priced_on).value,
+            "bonds.dv01": lambda: pricing.dv01(spec, quoted_yield, as_of=priced_on).value,
+            # A bullet bond works out at maturity; the worst-call case needs
+            # a call schedule, which Treasury auction data does not carry.
+            "bonds.yield_to_worst": lambda: spec.maturity.isoformat(),
+        }
+        compute = computations[definition.model_id or ""]
+
+        return FieldResult(
+            value=compute(),  # type: ignore[operator]
+            provenance_id=provenance_id,
+            # The inputs are an auction print, so the analytic is exactly as
+            # current as that auction — staleness must follow the input, not
+            # the moment of computation.
+            stale=(as_of.date() - priced_on) > self._stale_after,
+            model_derived=True,
+        )
+
+    def _bond_inputs(
+        self, security: SecurityQuery, *, as_of: datetime
+    ) -> tuple[FixedBondSpec, float, date, ProvenanceId | None]:
+        """Assemble a priceable bond from stored auction facts."""
+        subject = self.resolve(security)
+
+        def latest(field: str) -> Fact | None:
+            facts = self._store.read(subject, field, as_of=as_of)
+            return max(facts, key=lambda f: f.effective_from) if facts else None
+
+        indexed = latest("inflation_index_security")
+        if indexed is not None and str(indexed.value) == "Yes":
+            # Pricing a TIPS with nominal maths yields a real rate that reads
+            # as a nominal one — plausible, and wrong by the inflation
+            # accrual. Refused until index-ratio handling exists (§10.3).
+            raise _UnpriceableBondError("inflation-indexed security")
+
+        def required(field: str) -> Fact:
+            fact = latest(field)
+            if fact is None:
+                raise _UnpriceableBondError(f"no {field}")
+            return fact
+
+        coupon = required("int_rate")
+        dated = required("dated_date")
+        maturity = required("maturity_date")
+        price = required("high_price")
+        issued = required("issue_date")
+
+        # Narrowed by explicit checks rather than `assert`: assertions are
+        # stripped under `python -O`, which would turn a data problem into
+        # an unhandled TypeError inside QuantLib in exactly the deployment
+        # that runs optimised.
+        if not isinstance(coupon.value, int | float) or not isinstance(price.value, int | float):
+            raise _UnpriceableBondError("non-numeric coupon or price")
+        if not isinstance(dated.value, date) or not isinstance(maturity.value, date):
+            raise _UnpriceableBondError("non-date schedule")
+        if not isinstance(issued.value, date):
+            raise _UnpriceableBondError("non-date issue")
+
+        spec = FixedBondSpec(
+            coupon=float(coupon.value) / 100.0,
+            # `dated_date` starts the accrual; on a reopening it precedes the
+            # issue date, and using the issue date shifts the coupon schedule.
+            issue_date=dated.value,
+            maturity=maturity.value,
+            frequency=Frequency.SEMIANNUAL,
+            day_count=DayCount.ACT_ACT_ICMA,  # Treasury notes and bonds
+            settlement_days=0,  # the auction price settles on the issue date
+        )
+        return spec, float(price.value), issued.value, price.provenance_id
 
     def series(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime

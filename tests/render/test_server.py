@@ -31,6 +31,23 @@ COMPANYFACTS = FIXTURES / "edgar" / "companyfacts_CIK0000051143.json"
 FETCHED = datetime(2026, 7, 26, 12, 0, tzinfo=UTC)
 
 
+def an_unbuilt_mnemonic() -> str:
+    """A function the grammar knows but no screen implements yet.
+
+    Derived rather than hard-coded: this test named YAS, and silently
+    started asserting the wrong thing the moment YAS was built. Anything
+    still outstanding works, and the test retires itself when the last
+    screen lands.
+    """
+    from treble.cmd.grammar import KNOWN_MNEMONICS
+    from treble.render.contract.registry import available
+
+    outstanding = sorted(set(KNOWN_MNEMONICS) - set(available()))
+    if not outstanding:
+        pytest.skip("every known mnemonic now has a screen definition")
+    return outstanding[0]
+
+
 @pytest.fixture
 def tapi(tmp_path: Path) -> LocalTapi:
     store = DuckStore(tmp_path / "t.db")
@@ -115,9 +132,10 @@ class TestFailuresAreExplained:
         assert response.json()["status"].startswith("ASK:")
 
     def test_unbuilt_screen_says_so(self, client: TestClient) -> None:
+        line = f"IBM US Equity {an_unbuilt_mnemonic()}"
         assert (
             "no screen definition yet"
-            in (client.post("/command", json={"line": "IBM US Equity YAS"}).json()["status"])
+            in (client.post("/command", json={"line": line}).json()["status"])
         )
 
     def test_empty_command_is_not_an_error(self, client: TestClient) -> None:

@@ -1,0 +1,22 @@
+YIELD AND SPREAD ANALYSIS
+────────────────────────────────────────────────────────────────────────────
+TERMS (as published)
+Coupon                       4.625
+Maturity                2046-02-15
+Dated (accrual from)    2026-02-15
+Auction price            96.735962
+Auction yield                4.883
+Inflation-indexed               No
+
+ANALYTICS (computed from the terms above)
+Yield to maturity           4.8835
+Modified duration          12.6240
+Convexity                 213.1215
+DV01 (per 100 face)         0.1233
+Workout date            2046-02-15
+
+ICVS Curve viewer
+SPTR Source trace
+
+Priced off the last auction print, not a live quote; dotted = computed.
+Inflation-indexed securities show dashes: nominal maths would mislead.

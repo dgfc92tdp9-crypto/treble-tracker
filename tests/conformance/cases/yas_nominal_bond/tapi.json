@@ -1,0 +1,71 @@
+{
+  "fields": {
+    "int_rate": {
+      "value": 4.625,
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "maturity_date": {
+      "value": "2046-02-15",
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "dated_date": {
+      "value": "2026-02-15",
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "high_price": {
+      "value": 96.735962,
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "high_yield": {
+      "value": 4.883,
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "inflation_index_security": {
+      "value": "No",
+      "stale": false,
+      "model_derived": false,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "YLD_YTM_MID": {
+      "value": 4.883517266422233,
+      "stale": false,
+      "model_derived": true,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "DUR_ADJ_MID": {
+      "value": 12.624035303739241,
+      "stale": false,
+      "model_derived": true,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "CNVX_MID": {
+      "value": 213.12154931255023,
+      "stale": false,
+      "model_derived": true,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "DV01": {
+      "value": 0.12328115656605121,
+      "stale": false,
+      "model_derived": true,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    },
+    "WORKOUT_DT_MID": {
+      "value": "2046-02-15",
+      "stale": false,
+      "model_derived": true,
+      "provenance_id": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12"
+    }
+  },
+  "series": {}
+}
