@@ -233,6 +233,26 @@ class DuckStore:
         row = self._conn.execute("select count(*) from facts").fetchone()
         return int(row[0]) if row else 0
 
+    def subjects_with_prefix(self, prefix: str, *, as_of: datetime) -> list[TUID]:
+        """Subjects in a namespace, sorted.
+
+        Backs TQL universe selection: `bonds(...)` is every `cusip:` subject
+        the store holds, narrowed by the query's predicates. Sorted so a
+        query returns rows in the same order twice — an unordered result
+        would make two runs of one query look like different answers.
+
+        Point-in-time like every other read (I2): a subject nothing was
+        known about at ``as_of`` is not in the universe at ``as_of``.
+        Including it would return a row of nulls for an instrument that did
+        not yet exist.
+        """
+        rows = self._conn.execute(
+            "SELECT DISTINCT subject FROM facts "
+            "WHERE starts_with(subject, ?) AND knowledge_from <= ? ORDER BY subject",
+            [prefix, as_of],
+        ).fetchall()
+        return [TUID(row[0]) for row in rows]
+
     def read(self, subject: TUID, field: str, *, as_of: datetime) -> list[Fact]:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")
