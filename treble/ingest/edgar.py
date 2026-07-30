@@ -29,6 +29,7 @@ and rude; the per-company fetch exists for incremental refresh.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator, Mapping
 from datetime import UTC, date, datetime, time
 from typing import Any
@@ -210,8 +211,16 @@ class EdgarSubmissionsAdapter(SourceAdapter):
 
     def parse(self, payload: RawPayload, payload_hash: PayloadHash) -> ParsedBatch:
         doc: dict[str, Any] = json.loads(payload.data)
-        cik = doc.get("cik")
+        # Two shapes: the main document, and the older pages it points to.
+        # A page carries the same arrays bare — no `filings` wrapper and no
+        # `cik` — so the filer is read from the URI it was fetched from.
+        # Parsing pages as well means filings older than the most recent
+        # 1000 are recorded rather than merely stored.
         recent = doc.get("filings", {}).get("recent")
+        cik = doc.get("cik")
+        if recent is None and "accessionNumber" in doc:
+            recent = doc
+            cik = _cik_from_page_uri(payload.source_uri)
         if cik is None or recent is None:
             raise ValueError("not a submissions document")
         subject = cik_subject(cik)
@@ -264,6 +273,16 @@ def submission_pages(submissions_payload: bytes) -> tuple[str, ...]:
     doc = json.loads(submissions_payload)
     files = doc.get("filings", {}).get("files", []) or []
     return tuple(entry["name"] for entry in files if entry.get("name"))
+
+
+def _cik_from_page_uri(source_uri: str) -> int | None:
+    """The filer a submissions page belongs to, from its filename.
+
+    Pages are named `CIK0000320193-submissions-001.json` and carry no `cik`
+    field of their own.
+    """
+    match = re.search(r"CIK(\d{10})", source_uri)
+    return int(match.group(1)) if match else None
 
 
 def accepted_times(submissions_payload: bytes) -> dict[str, datetime]:
