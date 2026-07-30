@@ -1,0 +1,22 @@
+PRICE GRAPH
+────────────────────────────────────────────────────────────────────────────
+Last            7,316.15
+
+CLOSING LEVEL
++------------------------------------------------------------------------------+
+|[timeseries:PX_LAST]                                                          |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+HP  Historical price table
+End of day only; no intraday feed until Phase 2.
+Index levels from FRED. Per-equity prices need a licensed feed.

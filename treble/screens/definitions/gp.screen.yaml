@@ -1,0 +1,66 @@
+# GP — Price Graph (spec §7.3).
+#
+# End-of-day only at Phase 1: there is no ticker plant until Phase 2, so
+# nothing here updates intraday. The blink and stale semantics exist in the
+# contract and are exercised by delayed data rather than pretended at.
+#
+# **Index namespace only, for now.** FRED publishes index levels under terms
+# that permit automated access; the free equity-price options either require
+# defeating a bot gate or breach a ToS, so per-equity GP waits for a licensed
+# key rather than shipping data we should not have taken (see PROGRESS, data
+# access findings). A screen that silently covered fewer securities than it
+# appeared to would be worse than one that says which namespace it serves.
+mnemonic: GP
+title: Price Graph
+rows: 22
+cols: 80
+namespaces: [Index]
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "PRICE GRAPH"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Last"
+      - kind: bound
+        at: {row: 2, col: 10}
+        field: "PX_LAST"
+        format: "{:>14,.2f}"
+        width: 14
+        conditional:
+          - {when: is_stale, attrs: [stale]}
+          - {when: is_null, attrs: [stale]}
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "CLOSING LEVEL"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 5, col: 0, height: 13, width: 80}
+        pane_type: timeseries
+        binding: "PX_LAST"
+        order: asc
+
+      - kind: link
+        at: {row: 19, col: 0}
+        text: "HP  Historical price table"
+        command: "{security} HP"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "End of day only; no intraday feed until Phase 2."
+        attrs: [label]
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Index levels from FRED. Per-equity prices need a licensed feed."
+        attrs: [label]

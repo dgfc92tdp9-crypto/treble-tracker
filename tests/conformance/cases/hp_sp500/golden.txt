@@ -1,0 +1,22 @@
+HISTORICAL PRICE
+────────────────────────────────────────────────────────────────────────────
+Closing levels, most recent first. End of day.
+
+DATE          CLOSE
++--------------------------------------+
+|[table_scroll:PX_LAST]                |
+|                                      |
+|                                      |
+|                                      |
+|                                      |
+|                                      |
+|                                      |
+|                                      |
+|                                      |
+|                                      |
+|                                      |
+|                                      |
++--------------------------------------+
+
+GP  Price graph
+Unadjusted closes as published; no corporate-action adjustment applied.

@@ -123,6 +123,12 @@ class PaneRegion(BaseModel):
     region: Rect
     pane_type: PaneType
     binding: str  # field mnemonic or TQL expression supplying the data
+    #: Row order. A chart wants oldest-first; a history table wants newest
+    #: first, and truncating an ascending series would show the oldest rows
+    #: and hide today's. Declared here rather than inferred, because a
+    #: renderer that reordered rows by guessing what a binding "means" would
+    #: be deciding presentation from data it should not interpret.
+    order: Literal["asc", "desc"] = "asc"
 
 
 Cell = Annotated[

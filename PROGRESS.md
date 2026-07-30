@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Completion: 21.64%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 21.98%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -34,7 +34,8 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > Reported figures over time: 28.13% (wrong — bad weight, over-credited partials), 23.02%
 > (wrong weight only), 20.72% (correct weight, partials still by impression), 20.42%
 > (computed; WP8 0.8 and WP11 0.09 with a stated basis), 21.09% (WP11 0.45 — five of
-> eleven screens), 21.28% (WP11 0.55 — ICVS), **21.64%** (WP11 0.64 and WP8 0.9 — YAS with analytics through TAPI).
+> eleven screens), 21.28% (WP11 0.55 — ICVS), 21.64% (WP11 0.64 and WP8 0.9 — YAS with analytics through TAPI), **21.98%**
+> (WP11 0.82 — GP and HP on the Index namespace).
 
 **Status:** WP0-WP7 and WP10 complete. **WP12 complete**: both renderers now pass one
 conformance suite. The Textual TUI and the TypeScript renderer shared by the desktop shell
@@ -322,6 +323,60 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-07-29 — WP11: ICVS and YAS; the bond maths validated externally
+
+Seven of eleven screens. ICVS renders the CMT par curve (eleven tenors, 1M to 30Y); YAS shows
+published bond terms plus computed yield, modified duration, convexity, DV01 and workout date.
+
+**The analytics reproduce the US Treasury's own auction yields from their own prices to within
+0.07 bp** (mean 0.017 bp) across 46 nominal coupon auctions — external validation, since
+Treasury computes those independently. Pinned offline in
+`tests/analytics/bonds/test_treasury_auction_goldens.py`.
+
+Field mnemonics (`YLD_YTM_MID`, `DUR_ADJ_MID`, `CNVX_MID`, `DV01`, `WORKOUT_DT_MID`) were
+confirmed by Jack, not chosen here: CLAUDE.md forbids coining mnemonics, and every mnemonic
+the spec names is a Bloomberg field verbatim, so these continue that vocabulary.
+
+Defects found, all class A/C — things that produced plausible output rather than errors:
+
+1. **Modified duration wrong by three orders of magnitude.** The risk measures take a *yield*;
+   passing the clean price does not raise, because QuantLib reads 98.88 as a 9888% yield and
+   returns 0.0063 for a twenty-year bond. Now the yield is computed once and fed in; DV01 is
+   cross-checked against duration x price / 10,000 in the tests, which ties two independently
+   computed measures together so a unit error in either shows up off-screen.
+
+2. **TIPS were indistinguishable from nominal bonds in the store.** Treasury publishes
+   inflation-indexed notes under the same "Note"/"Bond" types; only
+   `inflation_index_security` separates them and the adapter did not capture it. Priced as
+   nominal, a 5-Year TIPS returns a 1.32% real yield that sits beside 4% nominals looking
+   entirely plausible. Now ingested, and YAS refuses to compute for one.
+
+3. **My own validation harness was the bug, not the data.** It aggregated facts with `max()`
+   per field, pairing the price from one auction with the yield from another on reopened
+   CUSIPs, and reported 10-30 bp errors that did not exist. Worse, the first draft of the
+   golden test wrote that false explanation into its docstring as though `dated_date` caused
+   it. Corrected to the measured truth: `dated_date` improves the fit about threefold
+   (0.07 bp against 0.20 bp). The store was right throughout — it keeps each auction
+   separately, and every field of an auction shares `effective_from`, so latest-wins picks
+   price and yield from the same auction.
+
+4. **Every Govt/Corp ticker was treated as a CUSIP.** `IBM 4.15 05/15/39 Corp` is a valid
+   reference whose ticker is "IBM"; it resolved to `cusip:IBM` and reported a missing
+   instrument rather than an unbuilt lookup. Shape-checked now, with descriptor-based
+   resolution left honestly unimplemented.
+
+5. **An unwired model returned a silent null**, indistinguishable from missing data.
+   `_WIRED_MODELS` makes it explicit: no data path raises, absent inputs return null.
+
+6. **Two tests used YAS as their example of an unbuilt screen** and would have silently
+   started asserting nothing the moment YAS shipped. They derive an outstanding mnemonic from
+   the grammar now, and skip themselves when the last screen lands.
+
+Also: table panes were misused for the curve and then removed. A curve is yield against
+tenor; the only line-drawing pane type is `timeseries`, yield against *date*. Binding one to
+the other would draw a correct-looking picture of the wrong thing, so ICVS ships as a table
+until a pane type means what it shows.
 
 ### 2026-07-27 — WP11 batch 1: FA, SPTR, MDL, FLDS
 

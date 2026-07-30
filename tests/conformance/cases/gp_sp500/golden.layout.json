@@ -1,0 +1,250 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "PRICE GRAPH"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Last"
+    },
+    {
+      "at": [
+        2,
+        10
+      ],
+      "attrs": [],
+      "input": null,
+      "link": null,
+      "provenance": "731abc7bae87fe3ac590a34e2cf9b575ba7bb2b1fd08643253d4b636f1ff2311",
+      "text": "      7,316.15"
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "CLOSING LEVEL"
+    },
+    {
+      "at": [
+        19,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "SP500 Index HP",
+      "provenance": null,
+      "text": "HP  Historical price table"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "End of day only; no intraday feed until Phase 2."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Index levels from FRED. Per-equity prices need a licensed feed."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "GP",
+  "panes": [
+    {
+      "binding": "PX_LAST",
+      "data": [
+        [
+          "2026-06-18",
+          7500.58
+        ],
+        [
+          "2026-06-19",
+          null
+        ],
+        [
+          "2026-06-22",
+          7472.79
+        ],
+        [
+          "2026-06-23",
+          7365.46
+        ],
+        [
+          "2026-06-24",
+          7358.22
+        ],
+        [
+          "2026-06-25",
+          7357.49
+        ],
+        [
+          "2026-06-26",
+          7354.02
+        ],
+        [
+          "2026-06-29",
+          7440.43
+        ],
+        [
+          "2026-06-30",
+          7499.36
+        ],
+        [
+          "2026-07-01",
+          7483.23
+        ],
+        [
+          "2026-07-02",
+          7483.24
+        ],
+        [
+          "2026-07-03",
+          null
+        ],
+        [
+          "2026-07-06",
+          7537.43
+        ],
+        [
+          "2026-07-07",
+          7503.85
+        ],
+        [
+          "2026-07-08",
+          7482.71
+        ],
+        [
+          "2026-07-09",
+          7543.64
+        ],
+        [
+          "2026-07-10",
+          7575.39
+        ],
+        [
+          "2026-07-13",
+          7515.34
+        ],
+        [
+          "2026-07-14",
+          7543.59
+        ],
+        [
+          "2026-07-15",
+          7572.4
+        ],
+        [
+          "2026-07-16",
+          7533.77
+        ],
+        [
+          "2026-07-17",
+          7457.69
+        ],
+        [
+          "2026-07-20",
+          7443.28
+        ],
+        [
+          "2026-07-21",
+          7509.2
+        ],
+        [
+          "2026-07-22",
+          7498.96
+        ],
+        [
+          "2026-07-23",
+          7408.3
+        ],
+        [
+          "2026-07-24",
+          7411.98
+        ],
+        [
+          "2026-07-27",
+          7413.18
+        ],
+        [
+          "2026-07-28",
+          7428.78
+        ],
+        [
+          "2026-07-29",
+          7316.15
+        ]
+      ],
+      "region": [
+        5,
+        0,
+        13,
+        80
+      ],
+      "type": "timeseries"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

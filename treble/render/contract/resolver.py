@@ -143,6 +143,8 @@ def resolve(
             )
         elif isinstance(cell, PaneRegion):
             data = tapi.series(context.security, cell.binding, as_of=as_of)
+            if cell.order == "desc":
+                data = tuple(reversed(data))
             panes.append(
                 ResolvedPane(
                     region=cell.region,
