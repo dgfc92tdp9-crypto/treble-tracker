@@ -44,7 +44,11 @@ phase_1:
                  client, and the analytics service path (model-derived fields
                  compute through TAPI) all ship; the tql service is blocked on
                  WP9 and gRPC/Arrow Flight are Phase 2 by spec 8.3"}
-  WP9:  {done: 0.0, name: "TQL — grammar, planner, executor"}
+  WP9:  {done: 0.4, name: "TQL — grammar, planner, executor",
+         basis: "grammar and typed AST ship and parse both queries the spec
+                 writes down, including overrides and relative tenors. The
+                 planner (to DuckDB plus analytics calls) and the executor
+                 are outstanding"}
   WP10: {done: 1.0, name: "command grammar + dispatcher"}
   WP11: {done: 0.82, name: "screens",
          basis: "9 of 11 screens built (DES, FA, FLDS, GP, HP, ICVS, MDL,
