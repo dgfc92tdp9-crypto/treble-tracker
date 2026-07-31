@@ -29,6 +29,7 @@ count alongside the number, and why the number alone is never enough.
 from __future__ import annotations
 
 import statistics
+from datetime import date
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
@@ -56,6 +57,10 @@ class ImpliedMark(BaseModel):
     price: float
     #: The filer, so a consensus can be traced back to who valued what.
     filer: str
+    #: The report date this mark describes. Required, because funds file on
+    #: different period ends and a consensus that mixed them would measure
+    #: time drift as though it were disagreement.
+    as_of: date
 
 
 class Consensus(BaseModel):
@@ -64,6 +69,8 @@ class Consensus(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     price: float
+    #: The single report date every contributing mark shares.
+    as_of: date
     #: Number of independent filers contributing a mark.
     filers: int
     #: Half the interquartile range, in the same units as the price. Reported
@@ -130,6 +137,19 @@ def consensus_price(marks: tuple[ImpliedMark, ...]) -> Consensus:
     if not marks:
         raise UnpriceableHoldingError("no marks to combine")
 
+    dates = {mark.as_of for mark in marks}
+    if len(dates) > 1:
+        # Refused rather than blended. Funds file on different period ends,
+        # and combining across them makes the spread measure elapsed time
+        # plus disagreement, with nothing in the number saying which. A
+        # spread that conflates two causes is worse than no spread, because
+        # a reader would act on it. Same rule ICVS applies to curve tenors.
+        raise UnpriceableHoldingError(
+            "marks span report dates "
+            f"({', '.join(d.isoformat() for d in sorted(dates))}); "
+            "group by date before combining"
+        )
+
     prices = sorted(mark.price for mark in marks)
     median = statistics.median(prices)
 
@@ -145,6 +165,7 @@ def consensus_price(marks: tuple[ImpliedMark, ...]) -> Consensus:
 
     return Consensus(
         price=median,
+        as_of=dates.pop(),
         filers=len(prices),
         dispersion=dispersion,
         low=prices[0],

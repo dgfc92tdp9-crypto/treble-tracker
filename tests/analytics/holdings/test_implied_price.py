@@ -8,6 +8,8 @@ hundred and still looks like a price.
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from treble.analytics.holdings.implied_price import (
@@ -65,8 +67,25 @@ class TestSingleHolding:
 
 class TestConsensus:
     @staticmethod
-    def marks(*prices: float) -> tuple[ImpliedMark, ...]:
-        return tuple(ImpliedMark(price=p, filer=f"fund{i}") for i, p in enumerate(prices))
+    def marks(*prices: float, on: date = date(2026, 3, 31)) -> tuple[ImpliedMark, ...]:
+        return tuple(ImpliedMark(price=p, filer=f"fund{i}", as_of=on) for i, p in enumerate(prices))
+
+    def test_marks_from_different_dates_are_refused(self) -> None:
+        """Found in production: five fund families filed on three different
+        period ends, and combining them made the spread measure elapsed time
+        as well as disagreement — 447 bp on Equinix — with nothing in the
+        number saying so. A spread that conflates two causes is worse than
+        no spread, because a reader would act on it."""
+        mixed = (
+            *self.marks(100.0, on=date(2026, 3, 31)),
+            *self.marks(104.0, on=date(2026, 4, 30)),
+        )
+        with pytest.raises(UnpriceableHoldingError, match="span report dates"):
+            consensus_price(mixed)
+
+    def test_the_date_travels_with_the_consensus(self) -> None:
+        """So a caller can say what the price is a price *as of*."""
+        assert consensus_price(self.marks(100.0, 101.0)).value.as_of == date(2026, 3, 31)
 
     def test_median_is_used_not_the_mean(self) -> None:
         """One filer off by a factor of ten must not move the answer. A mean

@@ -180,9 +180,21 @@ it is given. The caller must group by report date first. Until it does, the
 dispersion figure overstates filer disagreement and must not be read as a
 confidence measure.
 
-**Fix:** group marks by `effective_to` before calling the model, and refuse
-to combine across dates rather than silently blending them — the same rule
-ICVS already applies to curve tenors, for the same reason.
+**Fixed.** `ImpliedMark` now carries its report date and `consensus_price`
+refuses marks that span dates, so blending is impossible by construction
+rather than a rule a caller must remember.
+
+**And the fix validated the method.** Grouped correctly, dispersion across
+three independent fund families collapses to **0.0 bp** — Exxon at 169.66,
+Phillips 66 at 182.18, Targa at 250.73, each priced identically by three
+filers who never saw each other's books. The earlier 113-447 bp spreads
+were entirely elapsed time.
+
+That is a stronger result than the fix was aiming for. It means
+`valUSD / balance` does not approximate the market price, it recovers it:
+three-way independent agreement to the cent, from primary filings, at zero
+cost. The dispersion figure is now a real confidence signal, and where it
+reads zero that is evidence rather than an absence of data.
 
 ## Priority
 
