@@ -1,5 +1,1 @@
-"""Fundamental normalisation, estimates, valuation, screening.
-
-Implements specification section §14.
-See docs/treble-tracker-spec.md and CLAUDE.md.
-"""
+"""Equity analytics (spec §14.1). Ratios derived from as-reported fundamentals."""
