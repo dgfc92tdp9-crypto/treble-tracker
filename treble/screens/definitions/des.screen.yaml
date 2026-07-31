@@ -61,6 +61,11 @@ tabs:
         at: {row: 5, col: 0}
         text: "BALANCE SHEET (as reported, USD)"
         attrs: [label, emphasis]
+      # The period is a property of the data, not the screen: a figure
+      # without it reads as annual when it may be a quarter.
+      - kind: period
+        at: {row: 5, col: 34}
+        field: "us-gaap:Assets:USD"
 
       - kind: static
         at: {row: 6, col: 0}
@@ -105,6 +110,9 @@ tabs:
         at: {row: 10, col: 0}
         text: "INCOME (as reported, USD)"
         attrs: [label, emphasis]
+      - kind: period
+        at: {row: 10, col: 34}
+        field: "us-gaap:NetIncomeLoss:USD"
 
       - kind: static
         at: {row: 11, col: 0}

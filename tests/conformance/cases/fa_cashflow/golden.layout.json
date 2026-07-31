@@ -42,6 +42,19 @@
     },
     {
       "at": [
+        2,
+        20
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "3 months to 2026-03-31"
+    },
+    {
+      "at": [
         4,
         0
       ],
@@ -63,7 +76,7 @@
       ],
       "input": null,
       "link": null,
-      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
       "text": "       5,169,000,000"
     },
     {
@@ -89,7 +102,7 @@
       ],
       "input": null,
       "link": null,
-      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
       "text": "     -10,489,000,000"
     },
     {
@@ -115,7 +128,7 @@
       ],
       "input": null,
       "link": null,
-      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
       "text": "       2,719,000,000"
     },
     {
@@ -139,7 +152,7 @@
       "attrs": [],
       "input": null,
       "link": null,
-      "provenance": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1",
+      "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
       "text": "       7,172,000,000"
     },
     {

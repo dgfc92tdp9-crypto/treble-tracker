@@ -3,37 +3,51 @@
     "dei:EntityCommonStockSharesOutstanding:shares": {
       "value": 942134390.0,
       "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-06-30",
+      "effective_to": "2026-06-30"
     },
     "dei:EntityPublicFloat:USD": {
       "value": 274500000000.0,
       "stale": true,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2025-06-30",
+      "effective_to": "2025-06-30"
     },
     "us-gaap:Assets:USD": {
       "value": 152099000000.0,
       "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-06-30",
+      "effective_to": "2026-06-30"
     },
     "us-gaap:Liabilities:USD": {
       "value": 117558000000.0,
       "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-06-30",
+      "effective_to": "2026-06-30"
     },
     "us-gaap:StockholdersEquity:USD": {
       "value": 34452000000.0,
       "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
-    },
-    "us-gaap:Revenues:USD": {
-      "value": 17162000000.0,
-      "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-06-30",
+      "effective_to": "2026-06-30"
     },
     "us-gaap:NetIncomeLoss:USD": {
       "value": 2165000000.0,
       "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-04-01",
+      "effective_to": "2026-06-30"
+    },
+    "us-gaap:Revenues:USD": {
+      "value": 17162000000.0,
+      "stale": false,
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-04-01",
+      "effective_to": "2026-06-30"
     }
   },
   "series": {}

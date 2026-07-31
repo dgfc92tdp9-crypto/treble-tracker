@@ -235,6 +235,8 @@ class LocalTapi:
             provenance_id=latest.provenance_id,
             stale=age > self._stale_after,
             model_derived=False,
+            effective_from=latest.effective_from,
+            effective_to=latest.effective_to or latest.effective_from,
         )
 
     #: Bindings that introspect the system rather than a security. Prefixed

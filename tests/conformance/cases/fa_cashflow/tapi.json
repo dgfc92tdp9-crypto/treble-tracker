@@ -3,22 +3,30 @@
     "us-gaap:NetCashProvidedByUsedInOperatingActivities:USD": {
       "value": 5169000000.0,
       "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-01-01",
+      "effective_to": "2026-03-31"
     },
     "us-gaap:NetCashProvidedByUsedInInvestingActivities:USD": {
       "value": -10489000000.0,
       "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-01-01",
+      "effective_to": "2026-03-31"
     },
     "us-gaap:NetCashProvidedByUsedInFinancingActivities:USD": {
       "value": 2719000000.0,
       "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-01-01",
+      "effective_to": "2026-03-31"
     },
     "us-gaap:CashAndCashEquivalentsAtCarryingValue:USD": {
       "value": 7172000000.0,
       "stale": false,
-      "provenance_id": "76c0fc532b1bb6c45fb6e6008cd43f8f812fd22841622f6584e4b01dcc3ddce1"
+      "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+      "effective_from": "2026-06-30",
+      "effective_to": "2026-06-30"
     }
   },
   "series": {}

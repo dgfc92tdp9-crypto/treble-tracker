@@ -96,6 +96,25 @@ class InputCell(BaseModel):
     default: str | None = None
 
 
+class PeriodCell(BaseModel):
+    """Renders the period a bound field covers, e.g. "3 months to 2026-06-30".
+
+    Declarative rather than baked into the label, because the period is a
+    property of the *data*, not of the screen: a filer on a 52/53-week year
+    reports periods the definition cannot know in advance. A static label
+    would be right for one company and wrong for the next.
+    """
+
+    model_config = ConfigDict(frozen=True)
+    kind: Literal["period"] = "period"
+    at: Pos
+    #: The field whose period is being stated.
+    field: str
+    overrides: dict[str, str] = Field(default_factory=dict)
+    width: int = Field(gt=0, default=28)
+    attrs: tuple[Attr, ...] = (Attr.LABEL,)
+
+
 class LinkCell(BaseModel):
     """A drillable cell: <GO> executes the command template (spec §5.4)."""
 
@@ -132,7 +151,7 @@ class PaneRegion(BaseModel):
 
 
 Cell = Annotated[
-    StaticCell | BoundCell | InputCell | LinkCell | PaneRegion,
+    StaticCell | BoundCell | InputCell | LinkCell | PeriodCell | PaneRegion,
     Field(discriminator="kind"),
 ]
 

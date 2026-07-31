@@ -3,12 +3,12 @@ SECURITY DESCRIPTION
 Shares out    942,134,390
 Public float  274,500,000,000
 
-BALANCE SHEET (as reported, USD)
+BALANCE SHEET (as reported, USD)  at 2026-06-30
 Assets        152,099,000,000
 Liabilities   117,558,000,000
 Equity        34,452,000,000
 
-INCOME (as reported, USD)
+INCOME (as reported, USD)         3 months to 2026-06-30
 Revenue       17,162,000,000
 Net income    2,165,000,000
 

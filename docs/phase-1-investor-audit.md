@@ -205,6 +205,31 @@ three-way independent agreement to the cent, from primary filings, at zero
 cost. The dispersion figure is now a real confidence signal, and where it
 reads zero that is evidence rather than an absence of data.
 
+## Finding 10 — screens show a figure without its period
+
+Found by the Finding 7 end-to-end test, which is what that test is for.
+
+IBM's companyfacts holds two `NetIncomeLoss` rows ending 2026-06-30: a
+half-year of **3,381,000,000** and a quarter of **2,165,000,000**. TAPI
+breaks the tie by latest start, so screens show the quarter. That is a
+defensible rule and consistently applied — `DES` shows quarterly revenue
+beside quarterly net income.
+
+**But the screen never states the period.** A reader sees "Net income
+2,165,000,000" under "INCOME (as reported, USD)" with nothing saying it
+covers three months. IBM's annual net income is about 10.6bn, so the figure
+is off by a factor of five from what someone scanning the screen is likely
+to assume, and nothing on screen corrects them.
+
+This is the project's own stated failure mode: a plausible number meaning
+something other than what a reader takes it to mean. It is not a wrong
+value — it is a value whose meaning is not carried with it.
+
+**Fix:** `FieldResult` already knows the fact's effective dates; carry them
+through the resolver and render the period alongside the section heading,
+so "INCOME (as reported, USD)" becomes "INCOME · 3 months to 2026-06-30".
+The data needed is already in hand and stops one column short of the screen.
+
 ## Priority
 
 1. **Run the three unrun adapters** and gate on it — closes Finding 1, and

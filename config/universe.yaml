@@ -53,7 +53,11 @@ universes:
     # per-CIK API needs a request each. This is what makes the full-universe
     # run tractable; companyfacts stays the route to deep history on a
     # single filer, so both are configured rather than one replacing the other.
-    edgar_bulk_quarters: ["2026q1"]
+    # Five quarters, so year-on-year is computable across the whole filer
+    # universe rather than only for the ten CIKs with companyfacts history.
+    # Annual figures arrive in Q1 filings, so 2025q1 and 2026q1 together give
+    # FY2024 and FY2025 — the pair every growth measure needs.
+    edgar_bulk_quarters: ["2025q1", "2025q2", "2025q3", "2025q4", "2026q1"]
     # N-PORT filings supply per-bond valuations — the only licence-clean
     # route to corporate bond prices, since TRACE is subscription-gated.
     # Named explicitly rather than discovered: the Phase 1 audit found this

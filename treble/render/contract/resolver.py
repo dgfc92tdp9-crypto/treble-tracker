@@ -25,6 +25,7 @@ from treble.render.contract.schema import (
     InputCell,
     LinkCell,
     PaneRegion,
+    PeriodCell,
     Predicate,
     ScreenDef,
     StaticCell,
@@ -115,6 +116,20 @@ def resolve(
                     text=text[: cell.width].ljust(0),
                     attrs=attrs,
                     provenance_id=result.provenance_id,
+                )
+            )
+        elif isinstance(cell, PeriodCell):
+            result = tapi.field(context.security, cell.field, cell.overrides, as_of=as_of)
+            label = result.period_label
+            cells.append(
+                ResolvedCell(
+                    row=cell.at.row,
+                    col=cell.at.col,
+                    # An unknown period says so rather than rendering blank:
+                    # a missing label would read as "no period qualifier
+                    # needed", which is the ambiguity this cell exists to fix.
+                    text=(label or "period not stated")[: cell.width],
+                    attrs=cell.attrs,
                 )
             )
         elif isinstance(cell, InputCell):
