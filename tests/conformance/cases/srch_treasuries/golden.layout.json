@@ -1,0 +1,162 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "FIXED INCOME SEARCH"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Coupon-bearing Treasuries. Analytics computed at query time."
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "CUSIP        TERM        CPN     MATURITY      YTM     DUR"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "ICVS",
+      "provenance": null,
+      "text": "ICVS Curve viewer"
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "YTM and DUR are computed off the last auction price, not a live quote."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "SRCH",
+  "panes": [
+    {
+      "binding": "tql:get(security_term, int_rate, maturity_date, YLD_YTM_MID, DUR_ADJ_MID) for(bonds(security_type='Bond'))",
+      "data": [
+        [
+          "912810UP1",
+          "29-Year 10-Month",
+          4.625,
+          "2055-11-15",
+          4.8254,
+          15.7443
+        ],
+        [
+          "912810UQ9",
+          "19-Year 10-Month",
+          4.625,
+          "2045-11-15",
+          4.8465,
+          12.6281
+        ],
+        [
+          "912810UR7",
+          "29-Year 10-Month",
+          4.75,
+          "2056-02-15",
+          4.8764,
+          15.6054
+        ],
+        [
+          "912810US5",
+          "30-Year",
+          2.375,
+          "2056-02-15",
+          null,
+          null
+        ],
+        [
+          "912810UT3",
+          "19-Year 10-Month",
+          4.625,
+          "2046-02-15",
+          4.8835,
+          12.624
+        ],
+        [
+          "912810UU0",
+          "29-Year 10-Month",
+          5.0,
+          "2056-05-15",
+          5.0585,
+          15.2274
+        ],
+        [
+          "912810UV8",
+          "19-Year 10-Month",
+          5.0,
+          "2046-05-15",
+          5.1636,
+          12.2788
+        ]
+      ],
+      "region": [
+        5,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

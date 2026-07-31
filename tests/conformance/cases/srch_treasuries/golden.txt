@@ -1,0 +1,22 @@
+FIXED INCOME SEARCH
+────────────────────────────────────────────────────────────────────────────
+Coupon-bearing Treasuries. Analytics computed at query time.
+
+CUSIP        TERM        CPN     MATURITY      YTM     DUR
++------------------------------------------------------------------------------+
+|[table_scroll:tql:get(security_term, int_rate, maturity_date, YLD_YTM_MID, DUR|
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+ICVS Curve viewer
+YTM and DUR are computed off the last auction price, not a live quote.

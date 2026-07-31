@@ -42,14 +42,14 @@ GRAMMAR = r"""
     for_clause:  "for"i  "(" selector ")"
     with_clause: "with"i "(" [option ("," option)*] ")"
 
-    field: NAME ["(" [override ("," override)*] ")"]
+    field: FIELD_NAME ["(" [override ("," override)*] ")"]
     override: NAME "=" value
 
     // A universe takes predicates, positional arguments, or both:
     // bonds(currency='USD') and members('SPX Index') are both selectors.
     selector: NAME "(" [argument ("," argument)*] ")"
     ?argument: predicate | value
-    predicate: NAME COMPARISON value
+    predicate: FIELD_NAME COMPARISON value
 
     option: NAME "=" value
 
@@ -62,6 +62,11 @@ GRAMMAR = r"""
     // "-1" of "-1Y" and leave a stray "Y".
     TENOR.2: /[+-]?\d+[DWMY]/
     NAME: /[A-Za-z_][A-Za-z0-9_]*/
+    // As-reported source tags are the system's primary vocabulary and are
+    // not identifiers: `us-gaap:Assets:USD` carries hyphens, colons and a
+    // unit that may contain a slash. Higher priority than NAME so a
+    // qualified tag is one token rather than three and a syntax error.
+    FIELD_NAME.3: /[A-Za-z_][A-Za-z0-9_-]*(:[A-Za-z0-9_.\/-]+)+|[A-Za-z_][A-Za-z0-9_]*/
     STRING: /'[^']*'/ | /"[^"]*"/
 
     %import common.SIGNED_NUMBER
@@ -153,9 +158,14 @@ class Field(BaseModel):
 
     @property
     def mnemonic(self) -> str:
-        """The field-dictionary name. TQL is written lower-case by
-        convention and mnemonics are upper-case (§9.6)."""
-        return self.name.upper()
+        """The field-dictionary name.
+
+        TQL is written lower-case by convention and documented mnemonics are
+        upper-case (§9.6). An as-reported tag is left exactly as written:
+        `us-gaap:Assets:USD` is the filer's own name for the thing, and
+        upper-casing it would name a tag that does not exist.
+        """
+        return self.name if ":" in self.name else self.name.upper()
 
 
 class Predicate(BaseModel):
@@ -215,6 +225,9 @@ class _Builder(Transformer):  # type: ignore[type-arg]
         return int(number) if number.is_integer() and "." not in text.lower() else number
 
     def NAME(self, token: Token) -> str:  # noqa: N802
+        return str(token)
+
+    def FIELD_NAME(self, token: Token) -> str:  # noqa: N802
         return str(token)
 
     def COMPARISON(self, token: Token) -> Comparison:  # noqa: N802

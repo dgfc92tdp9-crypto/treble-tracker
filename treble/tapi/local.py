@@ -84,6 +84,32 @@ def _wire_value(value: object) -> str | float | int | bool | None:
     return str(value)
 
 
+#: A pane binding carrying this prefix is a TQL query rather than a field
+#: mnemonic. Screens reach TQL only through here, which is what keeps I7
+#: intact while `tql` sits *below* `tapi` in the layering.
+TQL_BINDING = "tql:"
+
+
+def _cell(value: object) -> str | float | int | None:
+    """A query value narrowed to what a pane can carry.
+
+    Dates become ISO strings for the same reason field values do: a pane's
+    rows cross the HTTP boundary to the desktop client and are frozen into
+    conformance fixtures, so a type that survives in-process but not through
+    `json.dumps` would make the live path differ from the tested one.
+    """
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, float):
+        # Query panes are read by people; full float expansion is noise.
+        return round(value, 4)
+    if isinstance(value, str | int) or value is None:
+        return value
+    return str(value)
+
+
 class _UnpriceableBondError(Exception):
     """Reference data insufficient (or unsuitable) to price this bond."""
 
@@ -354,6 +380,8 @@ class LocalTapi:
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime
     ) -> tuple[tuple[str | float | int | None, ...], ...]:
         """Tabular data for a pane: a time series, or a system table."""
+        if binding.startswith(TQL_BINDING):
+            return self._tql_series(binding.removeprefix(TQL_BINDING), as_of=as_of)
         if binding in self.SYSTEM_BINDINGS:
             return self._system_series(security, binding, as_of=as_of)
         if security is None:
@@ -374,6 +402,33 @@ class LocalTapi:
         return self._fields.search(query, limit=limit)
 
     # -- system introspection (SPTR, MDL, FLDS) -------------------------
+
+    def _tql_series(
+        self, query_text: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """A pane backed by a TQL query (spec §7.7, §14.3).
+
+        This is the only path from a screen to TQL, and it goes through
+        TAPI — which is what keeps I7 intact while `tql` itself sits below
+        `tapi` in the layering.
+
+        A query that cannot run surfaces its reason as a row rather than an
+        empty table: `SRCH` returning nothing must be distinguishable from
+        `SRCH` failing, or a screen reports "no matches" for a broken query.
+        """
+        from treble.tql.execute import TqlExecutionError, execute, plan
+        from treble.tql.grammar import TqlSyntaxError, parse_tql
+
+        try:
+            compiled = plan(parse_tql(query_text), as_of=as_of)
+            result = execute(compiled, self._store, TapiModelSource(self))
+        except (TqlSyntaxError, TqlExecutionError, UnknownOverrideError) as error:
+            return ((f"query failed: {error}",),)
+
+        return tuple(
+            (row.subject.split(":", 1)[-1], *(_cell(value) for _, value in row.values))
+            for row in result.rows
+        )
 
     def _system_series(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime

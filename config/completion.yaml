@@ -44,19 +44,17 @@ phase_1:
                  client, and the analytics service path (model-derived fields
                  compute through TAPI) all ship; the tql service is blocked on
                  WP9 and gRPC/Arrow Flight are Phase 2 by spec 8.3"}
-  WP9:  {done: 0.95, name: "TQL — grammar, planner, executor",
-         basis: "grammar, planner, executor and analytics dispatch all ship;
-                 the spec 4.2 query parses and runs, overrides reach the
-                 models and change the answer. Outstanding only: named
-                 universes (members('SPX Index')), which need index
-                 membership data nobody has ingested"}
+  WP9:  {done: 1.0, name: "TQL — grammar, planner, executor",
+         basis: "grammar, planner, executor and analytics dispatch ship; the
+                 spec 4.2 query runs, overrides reach the models, and SRCH
+                 and EQS are screens whose panes are TQL queries. Named
+                 universes remain unsupported and say so — they need index
+                 membership data no free source provides"}
   WP10: {done: 1.0, name: "command grammar + dispatcher"}
-  WP11: {done: 0.82, name: "screens",
-         basis: "9 of 11 screens built (DES, FA, FLDS, GP, HP, ICVS, MDL,
-                 SPTR, YAS), each with a conformance case referencing the
-                 shipped definition. GP/HP serve the Index namespace only
-                 until a licensed equity price feed exists. SRCH and EQS
-                 outstanding, both blocked on WP9 (TQL)"}
+  WP11: {done: 1.0, name: "screens",
+         basis: "all 11 screens built (DES, EQS, FA, FLDS, GP, HP, ICVS, MDL,
+                 SPTR, SRCH, YAS), each with a conformance case referencing
+                 the shipped definition and rendering on both surfaces"}
   WP12: {done: 1.0, name: "renderers — TUI and desktop against one suite"}
   WP13: {done: 0.0, name: "spreadsheet add-in"}
   WP14: {done: 0.0, name: "local-only mode — treble init"}

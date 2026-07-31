@@ -1,0 +1,178 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "EQUITY SCREENING"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Filers with assets over $100bn, as reported. Screened via TQL."
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "CIK              ASSETS            LIABILITIES         NET INCOME"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "FLDS",
+      "provenance": null,
+      "text": "FLDS Field dictionary"
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "As-reported tags; standardised comparability is Phase 2 (§14.1)."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "EQS",
+  "panes": [
+    {
+      "binding": "tql:get(us-gaap:Assets:USD, us-gaap:Liabilities:USD, us-gaap:NetIncomeLoss:USD) for(filers(us-gaap:Assets:USD > 100e9))",
+      "data": [
+        [
+          "0000004904",
+          114460000000.0,
+          82204000000.0,
+          null
+        ],
+        [
+          "0000004962",
+          300052000000.0,
+          266578000000.0,
+          10833000000.0
+        ],
+        [
+          "0000004977",
+          116470000000.0,
+          86980000000.0,
+          3646000000.0
+        ],
+        [
+          "0000005272",
+          161254000000.0,
+          120092000000.0,
+          3096000000.0
+        ],
+        [
+          "0000012927",
+          168235000000.0,
+          162778000000.0,
+          2235000000.0
+        ],
+        [
+          "0000019617",
+          4900475000000.0,
+          4536437000000.0,
+          16494000000.0
+        ],
+        [
+          "0000021344",
+          104816000000.0,
+          null,
+          13107000000.0
+        ],
+        [
+          "0000034088",
+          464410000000.0,
+          203414000000.0,
+          4183000000.0
+        ],
+        [
+          "0000035527",
+          214376000000.0,
+          192652000000.0,
+          2522000000.0
+        ],
+        [
+          "0000036104",
+          692345000000.0,
+          626694000000.0,
+          7570000000.0
+        ],
+        [
+          "0000036270",
+          213510000000.0,
+          184333000000.0,
+          2851000000.0
+        ],
+        [
+          "0000037996",
+          289160000000.0,
+          253180000000.0,
+          null
+        ]
+      ],
+      "region": [
+        5,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

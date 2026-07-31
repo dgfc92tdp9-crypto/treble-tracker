@@ -1,0 +1,22 @@
+EQUITY SCREENING
+────────────────────────────────────────────────────────────────────────────
+Filers with assets over $100bn, as reported. Screened via TQL.
+
+CIK              ASSETS            LIABILITIES         NET INCOME
++------------------------------------------------------------------------------+
+|[table_scroll:tql:get(us-gaap:Assets:USD, us-gaap:Liabilities:USD, us-gaap:Net|
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+FLDS Field dictionary
+As-reported tags; standardised comparability is Phase 2 (§14.1).

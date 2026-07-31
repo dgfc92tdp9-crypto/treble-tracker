@@ -1,0 +1,57 @@
+# SRCH — Fixed income search (spec §7.7).
+#
+# A screen whose pane is a TQL query. The query is written in the definition
+# rather than compiled into code, so what SRCH searches is data — visible,
+# forkable, and changeable without touching a renderer (§7 "every function is
+# a declarative screen definition plus a resolver").
+#
+# Yield, duration and convexity are computed per bond at query time, under
+# the assumptions the query states. They carry the model_derived marking for
+# the same reason YAS does: a computed number must not read like a reported
+# one.
+#
+# Phase 1 searches the Treasury universe, which is what has been ingested.
+# Corporate bonds arrive with per-bond valuations from N-PORT; TRACE prints
+# remain subscription-gated (see PROGRESS, data access findings).
+mnemonic: SRCH
+title: Fixed Income Search
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "FIXED INCOME SEARCH"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Coupon-bearing Treasuries. Analytics computed at query time."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "CUSIP        TERM        CPN     MATURITY      YTM     DUR"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 5, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: >-
+          tql:get(security_term, int_rate, maturity_date, YLD_YTM_MID, DUR_ADJ_MID)
+          for(bonds(security_type='Bond'))
+
+      - kind: link
+        at: {row: 20, col: 0}
+        text: "ICVS Curve viewer"
+        command: "ICVS"
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "YTM and DUR are computed off the last auction price, not a live quote."
+        attrs: [label]

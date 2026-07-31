@@ -1,0 +1,56 @@
+# EQS — Equity screening (spec §14.3).
+#
+# The spec's ambition is "a global universe of 100,000+ listed equities
+# across thousands of fields ... executes as TQL over the columnar store".
+# The mechanism is here and the universe is what has been ingested: the
+# store holds 5,907 filers from one quarterly bulk XBRL archive, so the
+# screen runs over those rather than over a number this system cannot yet
+# honour.
+#
+# Screening on as-reported tags rather than standardised ones is deliberate
+# at Phase 1. A standardised global chart of accounts is Phase 2 scale, and
+# screening on half-mapped accounts would rank companies against each other
+# on figures that are not comparable — which looks exactly like a working
+# screen.
+mnemonic: EQS
+title: Equity Screening
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "EQUITY SCREENING"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Filers with assets over $100bn, as reported. Screened via TQL."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "CIK              ASSETS            LIABILITIES         NET INCOME"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 5, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: >-
+          tql:get(us-gaap:Assets:USD, us-gaap:Liabilities:USD, us-gaap:NetIncomeLoss:USD)
+          for(filers(us-gaap:Assets:USD > 100e9))
+
+      - kind: link
+        at: {row: 20, col: 0}
+        text: "FLDS Field dictionary"
+        command: "FLDS"
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "As-reported tags; standardised comparability is Phase 2 (§14.1)."
+        attrs: [label]
