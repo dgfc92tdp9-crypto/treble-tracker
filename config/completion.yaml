@@ -39,11 +39,13 @@ phase_1:
                  the phase requires exists, and later sources are additions
                  rather than gaps"}
   WP7:  {done: 1.0, name: "security master + entity graph"}
-  WP8:  {done: 0.9, name: "TAPI",
+  WP8:  {done: 1.0, name: "TAPI",
          basis: "field dictionary, in-process and HTTP transports, Python
-                 client, and the analytics service path (model-derived fields
-                 compute through TAPI) all ship; the tql service is blocked on
-                 WP9 and gRPC/Arrow Flight are Phase 2 by spec 8.3"}
+                 client, the analytics service path, and the tql service
+                 (which SRCH, EQS and the spreadsheet =TQL() all consume)
+                 ship. gRPC and Arrow Flight belong to the server deployment
+                 path and are Phase 2 by spec 8.3, so they are out of Phase 1
+                 scope rather than missing from it"}
   WP9:  {done: 1.0, name: "TQL — grammar, planner, executor",
          basis: "grammar, planner, executor and analytics dispatch ship; the
                  spec 4.2 query runs, overrides reach the models, and SRCH
@@ -66,8 +68,7 @@ phase_1:
                  real figures on it, verified with networking blocked: seven
                  screens render offline from recorded SEC and Treasury
                  payloads run through the real adapters"}
-  WP15: {done: 0.7, name: "Phase 1 gate audit",
-         basis: "every criterion audited by running it, one gap found and
-                 fixed (I7 had no test protecting its own config). Remaining:
-                 the clean-checkout run and a green CI on the audited commit,
-                 which cannot be claimed until both have actually happened"}
+  WP15: {done: 1.0, name: "Phase 1 gate audit",
+         basis: "every criterion audited by running it; one gap found and
+                 fixed (I7 had no test protecting its own config); clean
+                 checkout green at 88.38%; CI green on commit 13a87b4"}

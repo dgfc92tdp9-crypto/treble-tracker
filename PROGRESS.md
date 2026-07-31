@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Completion: 29.25%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 30.00%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -182,6 +182,12 @@ are from running the thing, not from reading the code that implements it.
 | TQL parses and executes the §4.2 example | **met** |
 | One command from clean checkout to working workstation | **met** — `treble init`, verified with sockets blocked |
 | PROGRESS.md current | **met** |
+
+**Verified on a clean checkout**, not only in the working directory: fresh clone,
+`uv venv`, `uv pip install -e ".[dev]"`, `treble init`, then the full gate — green at
+88.38%. CI green on the audited commit `13a87b4`.
+
+**Phase 1 is complete.** All sixteen work packages, all twelve gate criteria.
 
 **What the audit found.** Criterion 1 says every invariant needs "a test that
 fails if the mechanism is removed". I7's mechanism is `lint-imports` against
