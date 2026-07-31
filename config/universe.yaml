@@ -37,10 +37,15 @@ universes:
     # run tractable; companyfacts stays the route to deep history on a
     # single filer, so both are configured rather than one replacing the other.
     edgar_bulk_quarters: ["2026q1"]
-    # N-PORT filings supply per-bond valuations (see ingest/nport.py). Left
-    # empty here: filings are discovered by EDGAR full-text search at run
-    # time rather than hardcoded, so this list stays honest as funds file.
-    nport_filings: []
+    # N-PORT filings supply per-bond valuations — the only licence-clean
+    # route to corporate bond prices, since TRACE is subscription-gated.
+    # Named explicitly rather than discovered: the Phase 1 audit found this
+    # adapter shipped, unit-tested, and never once run because no universe
+    # invoked it, so the store held no corporate bonds at all.
+    nport_filings:
+      - [36405, "0000036405-26-000325"]
+      - [216907, "0001099263-26-006559"]
+      - [356494, "0000035402-26-003510"]
 
   # Decision 0005's target. Populated by discovering every filer from
   # EDGAR's bulk company index rather than an enumerated list — an
