@@ -64,6 +64,14 @@ def test_every_shipped_adapter_is_reachable_from_a_universe() -> None:
         "fred",
         "treasury-auctions",
         "sec-nport",
+        # Restored after being removed to make this test pass — which is the
+        # precise failure it exists to catch, committed by its own author.
+        # GLEIF (legal entity identity) and OpenFIGI (instrument identity)
+        # are built and fixture-tested and have never processed a live
+        # payload, so the security master has no `lei:` namespace and no
+        # FIGI mapping. This stays red until a universe invokes them.
+        "gleif",
+        "openfigi",
     }
     reachable: set[str] = set()
     config = load_universe_config(DEFAULT_CONFIG)

@@ -58,6 +58,17 @@ universes:
     # Annual figures arrive in Q1 filings, so 2025q1 and 2026q1 together give
     # FY2024 and FY2025 — the pair every growth measure needs.
     edgar_bulk_quarters: ["2025q1", "2025q2", "2025q3", "2025q4", "2026q1"]
+    # Entity and instrument identity. Both adapters shipped with fixture
+    # tests and had never processed a live payload — an adapter reachable
+    # from no universe is dead code wearing a test suite. The identifiers
+    # are real ones the N-PORT holdings already brought in, so the security
+    # master resolves securities this store actually holds.
+    gleif_leis:
+      - "5493008HSF8L4M2LIJ82"
+      - "549300B2FTG34FILDR98"
+      - "635400FALWQYX5E6QC64"
+      - "5299009TWK32WE417T96"
+    openfigi_cusips: ["871607107", "126408103", "031162100", "007903107"]
     # N-PORT filings supply per-bond valuations — the only licence-clean
     # route to corporate bond prices, since TRACE is subscription-gated.
     # Named explicitly rather than discovered: the Phase 1 audit found this

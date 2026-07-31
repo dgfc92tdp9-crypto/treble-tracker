@@ -44,6 +44,13 @@ class UniverseSpec(BaseModel):
     #: get deep history for one filer, so the two are complementary rather
     #: than alternatives.
     edgar_bulk_quarters: tuple[str, ...] = ()
+    #: Legal entity identifiers to resolve through GLEIF, and instrument
+    #: identifiers to map through OpenFIGI. Declared rather than discovered
+    #: so the security master's coverage is a stated decision: an adapter
+    #: reachable from no universe is dead code wearing a test suite, which is
+    #: exactly what these two were until now.
+    gleif_leis: tuple[str, ...] = ()
+    openfigi_cusips: tuple[str, ...] = ()
 
     @property
     def discovers_filers(self) -> bool:
@@ -105,6 +112,8 @@ def load_universe_config(path: Path) -> UniverseConfig:
             treasury_auctions_since=body.get("treasury_auctions_since"),
             nport_filings=tuple(tuple(f) for f in (body.get("nport_filings") or ())),
             edgar_bulk_quarters=tuple(body.get("edgar_bulk_quarters") or ()),
+            gleif_leis=tuple(body.get("gleif_leis") or ()),
+            openfigi_cusips=tuple(body.get("openfigi_cusips") or ()),
         )
     limits = raw.get("rate_limits") or {}
     return UniverseConfig(
@@ -158,6 +167,10 @@ def plan_steps(
         steps.append(PopulationStep(source_id="sec-nport", key=f"{cik}/{accession}"))
     for quarter in spec.edgar_bulk_quarters:
         steps.append(PopulationStep(source_id="edgar-bulk", key=quarter))
+    for lei in spec.gleif_leis:
+        steps.append(PopulationStep(source_id="gleif", key=lei))
+    for cusip in spec.openfigi_cusips:
+        steps.append(PopulationStep(source_id="openfigi", key=cusip))
     return steps
 
 

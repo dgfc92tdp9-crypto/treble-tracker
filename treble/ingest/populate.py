@@ -40,7 +40,11 @@ from treble.ingest.edgar import (
 from treble.ingest.edgar_bulk import ARCHIVE_URL as BULK_URL
 from treble.ingest.edgar_bulk import EdgarBulkFinancialsAdapter
 from treble.ingest.fred import FRED_GRAPH_URL, FredAdapter
+from treble.ingest.gleif import RECORDS_URL as GLEIF_RECORDS_URL
+from treble.ingest.gleif import GleifAdapter
 from treble.ingest.nport import ARCHIVE_URL, NportAdapter
+from treble.ingest.openfigi import MAPPING_URL as OPENFIGI_URL
+from treble.ingest.openfigi import OpenFigiAdapter
 from treble.ingest.treasury import AUCTIONS_URL, TreasuryAuctionsAdapter
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
@@ -78,6 +82,10 @@ def uri_for_step(step: PopulationStep, *, fred_start: date, fred_end: date) -> s
             return ARCHIVE_URL.format(cik=cik, accession=accession.replace("-", ""))
         case "edgar-bulk":
             return BULK_URL.format(quarter=step.key)
+        case "gleif":
+            return f"{GLEIF_RECORDS_URL}/{step.key}"
+        case "openfigi":
+            return f"{OPENFIGI_URL}#ID_CUSIP={step.key}"
     raise ValueError(f"no URI mapping for source {step.source_id!r}")
 
 
@@ -140,6 +148,15 @@ class Populator:
 
     def _adapter(self, step: PopulationStep) -> SourceAdapter:
         match step.source_id:
+            case "gleif":
+                return GleifAdapter(self._payloads, self._log, leis=(step.key,))
+            case "openfigi":
+                return OpenFigiAdapter(
+                    self._payloads,
+                    self._log,
+                    jobs=({"idType": "ID_CUSIP", "idValue": step.key},),
+                    api_key=self._openfigi_api_key,
+                )
             case "edgar-bulk":
                 # No cik filter: one archive serves the whole universe, which
                 # is the entire reason this adapter exists.
