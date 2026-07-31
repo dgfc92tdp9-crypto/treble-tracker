@@ -51,6 +51,11 @@ class UniverseSpec(BaseModel):
     #: exactly what these two were until now.
     gleif_leis: tuple[str, ...] = ()
     openfigi_cusips: tuple[str, ...] = ()
+    #: ECB SDMX series keys (D.USD.EUR.SP00.A) and Coinbase products
+    #: (BTC-USD). Both are keyless primary sources: the ECB's own daily
+    #: fixing, and an exchange's own prints.
+    ecb_series: tuple[str, ...] = ()
+    coinbase_products: tuple[str, ...] = ()
 
     @property
     def discovers_filers(self) -> bool:
@@ -114,6 +119,8 @@ def load_universe_config(path: Path) -> UniverseConfig:
             edgar_bulk_quarters=tuple(body.get("edgar_bulk_quarters") or ()),
             gleif_leis=tuple(body.get("gleif_leis") or ()),
             openfigi_cusips=tuple(body.get("openfigi_cusips") or ()),
+            ecb_series=tuple(body.get("ecb_series") or ()),
+            coinbase_products=tuple(body.get("coinbase_products") or ()),
         )
     limits = raw.get("rate_limits") or {}
     return UniverseConfig(
@@ -171,6 +178,10 @@ def plan_steps(
         steps.append(PopulationStep(source_id="gleif", key=lei))
     for cusip in spec.openfigi_cusips:
         steps.append(PopulationStep(source_id="openfigi", key=cusip))
+    for key in spec.ecb_series:
+        steps.append(PopulationStep(source_id="ecb-fx", key=key))
+    for product in spec.coinbase_products:
+        steps.append(PopulationStep(source_id="coinbase", key=product))
     return steps
 
 

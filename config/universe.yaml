@@ -69,6 +69,11 @@ universes:
       - "635400FALWQYX5E6QC64"
       - "5299009TWK32WE417T96"
     openfigi_cusips: ["871607107", "126408103", "031162100", "007903107"]
+    # The ECB's own daily fixing (Crncy) and an exchange's own prints
+    # (Crypto) — both keyless primary sources, so a rate traces to the
+    # institution that set it rather than to a vendor that averaged it.
+    ecb_series: ["D.USD.EUR.SP00.A", "D.GBP.EUR.SP00.A", "D.JPY.EUR.SP00.A"]
+    coinbase_products: ["BTC-USD", "ETH-USD"]
     # N-PORT filings supply per-bond valuations — the only licence-clean
     # route to corporate bond prices, since TRACE is subscription-gated.
     # Named explicitly rather than discovered: the Phase 1 audit found this
