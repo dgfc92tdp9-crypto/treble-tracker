@@ -21,6 +21,7 @@ from rich.console import Console
 from rich.table import Table
 
 from treble.cmd.env import load_env
+from treble.cmd.seed import FIXTURES, seed, seed_available, seed_company_index
 from treble.core.universe import load_universe_config
 from treble.ingest.populate import Populator
 from treble.render.server import DEFAULT_HOST, DEFAULT_PORT
@@ -163,6 +164,61 @@ def populate(
             console.print(f"  · {failed_step}: {error}")
         console.print("[dim]Failed steps stay outstanding; re-run to retry.[/dim]")
         raise typer.Exit(code=1)
+
+
+@app.command()
+def init(
+    data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where payloads and the store live."),
+    contact: str | None = typer.Option(None, help="Contact email for the EDGAR User-Agent."),
+) -> None:
+    """Set up a fresh install: create the store, seed it, and say what is next.
+
+    One command from a clean checkout to a workstation with figures on it.
+    A store with no data renders every bound cell as an em dash, which is
+    indistinguishable from a company that reports nothing — so a new install
+    is seeded with recorded SEC and Treasury payloads rather than left empty.
+
+    Idempotent: running it on a populated install reports what is there and
+    changes nothing.
+    """
+    data_dir.mkdir(parents=True, exist_ok=True)
+    payloads, log, store = _open_stores(data_dir)
+
+    existing = store.fact_count()
+    if existing:
+        console.print(f"Already set up: {existing:,} facts in {data_dir}.")
+        console.print("Run [bold]treble tui[/] to open the workstation.")
+        return
+
+    try:
+        email = _contact_email(contact)
+    except ContactMissingError as missing:
+        # EDGAR requires an identifying contact on every request, so this is
+        # needed before any real population — but the seed does not touch
+        # the network, so the install is still usable now.
+        console.print(f"[bold yellow]note[/]: {missing}")
+        console.print("Seeding anyway; set it before running `treble populate`.")
+        email = "unset@example.invalid"
+
+    if not seed_available():
+        console.print(
+            f"[bold yellow]warning[/]: no recorded payloads found at {FIXTURES}. "
+            "The store is empty, so screens will render dashes until "
+            "`treble populate` runs."
+        )
+        return
+
+    written = seed(payloads, log, store, contact_email=email)
+    tickers = seed_company_index(data_dir)
+    console.print(f"Seeded {written:,} facts from recorded SEC and Treasury payloads.")
+    if tickers:
+        console.print(f"Seeded a {tickers}-ticker company index, so the workstation opens offline.")
+    console.print(
+        "[dim]A point-in-time snapshot, not live data — run "
+        "`treble populate` for current figures.[/dim]"
+    )
+    console.print()
+    console.print("Try:  [bold]treble tui[/]  then type  [bold]IBM US Equity DES[/]")
 
 
 @app.command()

@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Completion: 24.19%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 26.06%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -35,8 +35,9 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > (wrong weight only), 20.72% (correct weight, partials still by impression), 20.42%
 > (computed; WP8 0.8 and WP11 0.09 with a stated basis), 21.09% (WP11 0.45 — five of
 > eleven screens), 21.28% (WP11 0.55 — ICVS), 21.64% (WP11 0.64 and WP8 0.9 — YAS with analytics through TAPI), 21.98% (WP11 0.82 — GP and HP on the Index namespace), 22.72% (WP9 0.4 — the
-> TQL grammar; WP6 1.0 with bulk XBRL), 23.47% (WP9 0.8 — planner and executor), 23.76% (WP9 0.95 — overrides reach the models), **24.19%** (WP9 and WP11 complete —
-> SRCH and EQS are TQL-backed screens; all eleven screens exist).
+> TQL grammar; WP6 1.0 with bulk XBRL), 23.47% (WP9 0.8 — planner and executor), 23.76% (WP9 0.95 — overrides reach the models), 24.19% (WP9 and WP11 complete —
+> SRCH and EQS are TQL-backed screens; all eleven screens exist), **26.06%**
+> (WP14 — `treble init`).
 
 **Status:** WP0-WP7 and WP10 complete. **WP12 complete**: both renderers now pass one
 conformance suite. The Textual TUI and the TypeScript renderer shared by the desktop shell

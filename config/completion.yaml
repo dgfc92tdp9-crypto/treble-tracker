@@ -57,5 +57,9 @@ phase_1:
                  the shipped definition and rendering on both surfaces"}
   WP12: {done: 1.0, name: "renderers — TUI and desktop against one suite"}
   WP13: {done: 0.0, name: "spreadsheet add-in"}
-  WP14: {done: 0.0, name: "local-only mode — treble init"}
+  WP14: {done: 1.0, name: "local-only mode — treble init",
+         basis: "`treble init` takes a clean checkout to a workstation with
+                 real figures on it, verified with networking blocked: seven
+                 screens render offline from recorded SEC and Treasury
+                 payloads run through the real adapters"}
   WP15: {done: 0.0, name: "Phase 1 gate audit"}
