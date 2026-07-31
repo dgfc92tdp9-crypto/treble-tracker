@@ -30,7 +30,24 @@ universes:
     # Index levels back GP/HP for the Index namespace. FRED is the only
     # free source whose terms permit automated access without defeating a
     # bot gate (Stooq) or breaching a ToS (Yahoo) — see PROGRESS.
-    fred_series: [DGS1MO, DGS3MO, DGS6MO, DGS1, DGS2, DGS3, DGS5, DGS7, DGS10, DGS20, DGS30, SP500, NASDAQ100, NASDAQCOM, DJIA, VIXCLS, SOFR, T10Y2Y, BAMLC0A0CM]
+    # Chosen deliberately rather than hoarded — FRED carries ~800,000 series
+    # and nineteen were loaded, with no inflation, employment, policy rate or
+    # breakeven anywhere. Each block below answers a question a research
+    # workstation is actually asked.
+    #   curve      — the CMT tenors ICVS draws
+    #   indices    — what GP and HP plot
+    #   policy     — the front end and what the Fed is doing
+    #   inflation  — headline and core, both CPI and PCE, plus breakevens
+    #   activity   — the labour market and output
+    #   credit     — investment grade and high yield spreads
+    #   external   — the dollar and two major crosses
+    fred_series: [DGS1MO, DGS3MO, DGS6MO, DGS1, DGS2, DGS3, DGS5, DGS7, DGS10, DGS20, DGS30,
+                  SP500, NASDAQ100, NASDAQCOM, DJIA, VIXCLS,
+                  SOFR, DFF, T10Y2Y,
+                  CPIAUCSL, CPILFESL, PCEPI, PCEPILFE, T10YIE, T5YIFR,
+                  UNRATE, PAYEMS, ICSA, GDPC1, M2SL,
+                  BAMLC0A0CM, BAMLH0A0HYM2, BAMLC0A4CBBB,
+                  DTWEXBGS, DEXUSEU, DEXJPUS]
     treasury_auctions_since: "2026-01-01"
     # Bulk XBRL: one 85 MB archive per quarter covers every filer, where the
     # per-CIK API needs a request each. This is what makes the full-universe

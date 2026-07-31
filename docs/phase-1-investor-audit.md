@@ -92,8 +92,17 @@ complete (11 CMT tenors) and the index set is reasonable, but there is no
 inflation, no employment, no policy rate history, no credit spreads beyond
 one index, and no international data.
 
-**Fix:** cheap and keyless. The constraint is choosing series deliberately
-rather than hoarding, and recording why each was chosen.
+**Fixed.** 36 series, chosen deliberately and grouped in the config by the
+question each answers: policy (SOFR, DFF), inflation (CPI headline and core,
+PCE headline and core, 10y breakeven, 5y5y forward), activity (unemployment,
+payrolls, claims, real GDP, M2), credit (IG, BBB and HY spreads) and
+external (dollar index, EURUSD, USDJPY) — on top of the CMT curve and the
+index set.
+
+Not exhaustive, and deliberately so: FRED carries ~800,000 series, and a
+store that ingests everything answers no question better than one that
+ingests the right things. Each block is annotated in `config/universe.yaml`
+with what it is for, so the next addition has to justify itself.
 
 ---
 
