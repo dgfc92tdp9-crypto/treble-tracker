@@ -66,4 +66,8 @@ phase_1:
                  real figures on it, verified with networking blocked: seven
                  screens render offline from recorded SEC and Treasury
                  payloads run through the real adapters"}
-  WP15: {done: 0.0, name: "Phase 1 gate audit"}
+  WP15: {done: 0.7, name: "Phase 1 gate audit",
+         basis: "every criterion audited by running it, one gap found and
+                 fixed (I7 had no test protecting its own config). Remaining:
+                 the clean-checkout run and a green CI on the audited commit,
+                 which cannot be claimed until both have actually happened"}

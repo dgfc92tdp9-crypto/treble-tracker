@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Completion: 27.94%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 29.25%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -162,6 +162,44 @@ compensate for every mistake found/made. Time doesn't matter, only that it
 is the highest level project produced." Every defect found — in the code or
 in the process — gets a mechanism that prevents its recurrence, not a note
 to be more careful.
+
+## Phase 1 gate audit (WP15, 2026-07-31)
+
+Each CLAUDE.md §8 Phase 1 criterion, checked rather than asserted. Verdicts
+are from running the thing, not from reading the code that implements it.
+
+| Criterion | Verdict |
+|---|---|
+| Seven invariants, each with a kill-test | **met, after a fix** — I7 had none; see below |
+| Screen schema, resolver, conformance suite; both renderers pass | **met** — 3 renderers registered, 14 cases |
+| Command grammar parses §5.1 plus a fuzz corpus | **met** |
+| EDGAR, FRED, Treasury, TRACE-file, OpenFIGI, GLEIF adapters with offline fixtures | **met** — plus bulk XBRL and N-PORT |
+| Security master and entity graph populated | **met** — 5,907 filers, 2.02M facts |
+| Eleven screens working in both clients | **met** — each with a conformance case on the shipped definition |
+| Curve repricing inputs to 1e-10 | **met** — asserted as a property on every curve |
+| `YAS` goldens against published references | **met** — and independently against 46 Treasury auctions to 0.07 bp |
+| TAPI with Python client; TDP/TDH/TDS via xlwings | **met** |
+| TQL parses and executes the §4.2 example | **met** |
+| One command from clean checkout to working workstation | **met** — `treble init`, verified with sockets blocked |
+| PROGRESS.md current | **met** |
+
+**What the audit found.** Criterion 1 says every invariant needs "a test that
+fails if the mechanism is removed". I7's mechanism is `lint-imports` against
+`.importlinter`, and the gate runs it — but nothing protected the config
+itself. Deleting a module from the forbidden list leaves `lint-imports`
+passing with less to check, and every other test stays green. Demonstrated:
+with `treble.store` removed from the forbidden list, `lint-imports` exits 0.
+
+`tests/test_i7_contracts.py` closes it by asserting both contracts still
+exist, name the right modules, and declare the seven layers in order — and
+that `gate.sh` still runs the linter, because a correct config nothing
+executes enforces nothing. Verified to fail against the weakened config and
+pass against the real one.
+
+This is the second time an enforcement mechanism turned out to be
+unenforced (the first was the universe loader silently dropping a config
+key). Both share a shape worth naming: **the mechanism worked, and nothing
+checked that the mechanism was still switched on.**
 
 ## Failure modes and what catches them (standing, Jack 2026-07-27)
 
