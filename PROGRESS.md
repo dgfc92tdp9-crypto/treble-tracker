@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 1 — research workstation
-**Completion: 26.06%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 27.94%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -36,8 +36,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > (computed; WP8 0.8 and WP11 0.09 with a stated basis), 21.09% (WP11 0.45 — five of
 > eleven screens), 21.28% (WP11 0.55 — ICVS), 21.64% (WP11 0.64 and WP8 0.9 — YAS with analytics through TAPI), 21.98% (WP11 0.82 — GP and HP on the Index namespace), 22.72% (WP9 0.4 — the
 > TQL grammar; WP6 1.0 with bulk XBRL), 23.47% (WP9 0.8 — planner and executor), 23.76% (WP9 0.95 — overrides reach the models), 24.19% (WP9 and WP11 complete —
-> SRCH and EQS are TQL-backed screens; all eleven screens exist), **26.06%**
-> (WP14 — `treble init`).
+> SRCH and EQS are TQL-backed screens; all eleven screens exist), 26.06% (WP14 — `treble init`), **27.94%** (WP13 — the spreadsheet add-in).
 
 **Status:** WP0-WP7 and WP10 complete. **WP12 complete**: both renderers now pass one
 conformance suite. The Textual TUI and the TypeScript renderer shared by the desktop shell
@@ -116,7 +115,7 @@ Not started. Criteria in `CLAUDE.md` §8. Do not begin a phase until the previou
 
 Non-blocking, proceeding on stated defaults (flag if wrong):
 
-- **Spreadsheet add-in host** — xlwings requires Excel; if not installed on this Mac, WP13 targets LibreOffice Calc instead. Default: build on xlwings, verify against whichever is present.
+- ~~Spreadsheet add-in host~~ — **settled 2026-07-31**: Microsoft Excel is installed on the dev Mac, so WP13 targets xlwings as planned. LibreOffice Calc is not installed and was not needed.
 - **`FA` standardisation depth in Phase 1** — as-reported XBRL in full + core standardised statement set; unmapped extension tags surfaced, never dropped. Full global chart of accounts is Phase 2 scale.
 - **`GP`/`HP` are EOD/historical only in Phase 1** (no ticker plant until Phase 2); blink/stale semantics built into the contract now.
 - **Spec nit** — §23.3 Phase 1 lists `HP` but the §7 function tables omit it (it appears in §5.2 and the glossary). Treating `HP` as the historical price table, flagged here per the no-invented-mnemonics rule.

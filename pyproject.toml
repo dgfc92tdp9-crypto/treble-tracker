@@ -105,6 +105,11 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = ["QuantLib.*", "xlwings.*", "lightgbm.*", "scipy.*"]
 ignore_missing_imports = true
+# xlwings re-exports its decorators (`func`, `arg`, `ret`) implicitly, which
+# strict mode rejects. Relaxed for this dependency only rather than
+# scattering `type: ignore` across the add-in, so a real attribute error in
+# our own code is still caught.
+implicit_reexport = true
 
 [tool.pytest.ini_options]
 # The TUI app tests drive a real Textual app, which is async.

@@ -56,7 +56,11 @@ phase_1:
                  SPTR, SRCH, YAS), each with a conformance case referencing
                  the shipped definition and rendering on both surfaces"}
   WP12: {done: 1.0, name: "renderers — TUI and desktop against one suite"}
-  WP13: {done: 0.0, name: "spreadsheet add-in"}
+  WP13: {done: 1.0, name: "spreadsheet add-in",
+         basis: "TDP, TDH, TDS and TQL ship as plain functions over TAPI with
+                 an xlwings shell; Excel is installed on the dev machine so
+                 the open question about targeting LibreOffice is closed.
+                 `treble addin` prints the install steps"}
   WP14: {done: 1.0, name: "local-only mode — treble init",
          basis: "`treble init` takes a clean checkout to a workstation with
                  real figures on it, verified with networking blocked: seven

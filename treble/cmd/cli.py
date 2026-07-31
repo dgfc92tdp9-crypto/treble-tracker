@@ -222,6 +222,29 @@ def init(
 
 
 @app.command()
+def addin() -> None:
+    """How to load the spreadsheet functions into Excel (spec §4.1)."""
+    from treble.addin import udf
+
+    console.print("[bold]Treble Tracker spreadsheet functions[/]")
+    console.print()
+    console.print('  =TDP("IBM US Equity", "us-gaap:Assets:USD")')
+    console.print('  =TDH("SP500 Index", "PX_LAST", "1/1/2026", "12/31/2026")')
+    console.print('  =TDS("SPX Index", "INDX_MWEIGHT_HIST")')
+    console.print("  =TQL(\"get(int_rate) for(bonds(security_type='Bond'))\")")
+    console.print()
+    console.print("To install, once:")
+    console.print("  [bold]uv run xlwings addin install[/]")
+    console.print("Then in Excel, set the UDF Modules field to:")
+    console.print(f"  [bold]{Path(udf.__file__).with_suffix('').as_posix()}[/]")
+    console.print()
+    console.print(
+        "[dim]No rate limit and no redistribution restriction on this surface "
+        "(§4.1): the data is public, and there is nothing to meter.[/dim]"
+    )
+
+
+@app.command()
 def status(
     universe: str = typer.Option("dev", help="Universe name from the config file."),
     data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where payloads and the store live."),
