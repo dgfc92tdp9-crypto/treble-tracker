@@ -39,6 +39,9 @@ mutate:               ## mutation testing: proves the suite detects damage. Slow
 gate:                 ## the single pre-commit gate; fails loudly, never silently
 	./scripts/gate.sh
 
+mutation:              ## measure whether the tests would notice wrong numbers
+	uv run python scripts/mutation_check.py
+
 completion:            ## print the completion figure (computed, never hand-written)
 	uv run python scripts/completion.py --verbose
 

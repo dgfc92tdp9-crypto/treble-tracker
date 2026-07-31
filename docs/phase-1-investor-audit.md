@@ -166,9 +166,32 @@ a screen and asserts a named cell equals an independently computed figure.
 
 ## Finding 8 — mutation testing still does not run
 
-Recorded as a known defect since 2026-07-27 and still true. The suite's
-strength is therefore unmeasured: 88% line coverage says the lines execute,
-not that a test would notice if they were wrong.
+**Fixed, and it found a real gap on its first run.**
+
+Not with mutmut. The recorded diagnosis holds: mutmut 3.x synthesises mutated
+functions at runtime, and this project's invariant tests reflect over its own
+code, so mutants get "killed" by tests that never executed the mutated line.
+Five structural collisions, none of them configuration.
+
+`scripts/mutation_check.py` (`make mutation`) instead edits the source text of
+one module, runs the tests covering it, and restores — nothing synthesised,
+nothing for a reflection test to mistake for real code. Scoped to
+`hagan_west.py`: pure numerics, where a survivor means a wrong *interest rate*.
+Each mutation is a plausible mistake with a stated consequence, not a random
+operator flip.
+
+**First run killed 3 of 6.** The survivors were both positivity clamps and the
+terminal extrapolation sign — precisely the *amelioration* step that makes
+Hagan-West monotone convex. The suite checked that a curve reprices its
+inputs, which it does with or without amelioration for well-behaved data, so
+the property the algorithm is named for was never tested. Deleting it left
+everything green.
+
+`tests/analytics/curves/test_hagan_west_amelioration.py` closes it and the
+score is now 6/6. Writing it also surfaced a genuine behaviour worth pinning:
+the clamp preserves the sign the data implies rather than forcing positivity,
+so genuinely negative forwards — real in several markets since 2014 — pass
+through as negative rather than being reported as zero.
 
 ---
 
