@@ -163,6 +163,27 @@ not that a test would notice if they were wrong.
 
 ---
 
+## Finding 9 — consensus must group by report date (found while fixing Finding 2)
+
+Widening N-PORT coverage took the store to **1,681 securities priced from
+primary filings**, 341 of them held by more than one filer and therefore
+cross-checkable. That is the mechanism working.
+
+But the filings ingested carry **three different report dates**
+(2026-03-31, 2026-04-30, 2026-05-31), and marks were combined across them.
+The resulting dispersion — 113 bp on Exxon, 447 bp on Equinix — measures
+*time drift plus valuation disagreement*, not valuation disagreement, and
+nothing in the output says so.
+
+The `holdings.consensus_price` model is not at fault; it combines the marks
+it is given. The caller must group by report date first. Until it does, the
+dispersion figure overstates filer disagreement and must not be read as a
+confidence measure.
+
+**Fix:** group marks by `effective_to` before calling the model, and refuse
+to combine across dates rather than silently blending them — the same rule
+ICVS already applies to curve tenors, for the same reason.
+
 ## Priority
 
 1. **Run the three unrun adapters** and gate on it — closes Finding 1, and
@@ -171,4 +192,8 @@ not that a test would notice if they were wrong.
 3. **More XBRL quarters** — Finding 6, unlocks every growth measure.
 4. **Broader FRED coverage** — Finding 4, keyless.
 5. **Screen-to-analytics end-to-end test** — Finding 7.
-6. **Equity prices** — Finding 2, blocked on one free registration.
+6. **Equity prices** — Finding 2, largely addressed via N-PORT (1,681
+   securities); a licensed daily feed still needs one free registration.
+7. **Group consensus by report date** — Finding 9, and the most urgent of
+   these because it is a number currently presented as more meaningful than
+   it is.

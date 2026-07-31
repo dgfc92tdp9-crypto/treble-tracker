@@ -46,6 +46,13 @@ universes:
       - [36405, "0000036405-26-000325"]
       - [216907, "0001099263-26-006559"]
       - [356494, "0000035402-26-003510"]
+      # More fund families widen coverage and, where two funds hold the same
+      # security, give a cross-filer consensus with a measurable dispersion —
+      # a confidence signal no single vendor price can provide.
+      - [745467, "0000940400-26-023135"]
+      - [813900, "0001410368-26-053202"]
+      - [1593547, "0002048251-26-005678"]
+      - [904333, "0001410368-26-075036"]
 
   # Decision 0005's target. Populated by discovering every filer from
   # EDGAR's bulk company index rather than an enumerated list — an
