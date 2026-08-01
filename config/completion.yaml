@@ -21,7 +21,7 @@ weights:
   phase_4: 20
   phase_5: 10
 
-active_phase: phase_1
+active_phase: phase_2
 
 # Phase 1 has 16 work packages, WP0–WP15. `done` is a fraction in [0, 1].
 # Every value other than 0 or 1 needs a `basis` stating what was counted.
@@ -72,3 +72,26 @@ phase_1:
          basis: "every criterion audited by running it; one gap found and
                  fixed (I7 had no test protecting its own config); clean
                  checkout green at 88.38%; CI green on commit 13a87b4"}
+
+# Phase 2 — real-time, portfolio, risk. One entry per CLAUDE.md §8 criterion,
+# because the criteria *are* the deliverables here: unlike Phase 1 there is no
+# separate work-package plan to track against, and inventing one would put a
+# second set of numbers beside the gate's own.
+phase_2:
+  P2_1:  {done: 0.35, name: "ticker plant — conflated display, unconflated TPIPE",
+          basis: "the conflation split, current-state cache, sequence-gap
+                  detection and bounded TPIPE buffer ship and are
+                  mutation-verified. Outstanding: venue adapters, security
+                  master enrichment, TGN/TCMP composites, and the Redpanda and
+                  NATS transports"}
+  P2_2:  {done: 0.5, name: "ALLQ correct-when-empty; contribution API",
+          basis: "the quote book is correct when empty — expired quotes leave
+                  it empty rather than stale, it records when it last held a
+                  live quote, and a one-way market has no spread. Outstanding:
+                  the ALLQ screen definition and the contribution API surface"}
+  P2_3:  {done: 0.0, name: "PORT with TFM3 v1; factor model validation"}
+  P2_4:  {done: 0.0, name: "TVAL v1 with transparency drill-down"}
+  P2_5:  {done: 0.0, name: "CDSW against ISDA published test cases"}
+  P2_6:  {done: 0.0, name: "SWPM multi-curve CSA-aware discounting"}
+  P2_7:  {done: 0.0, name: "Canvas with FDC3 context propagation"}
+  P2_8:  {done: 0.0, name: "gRPC + Arrow Flight transports"}
