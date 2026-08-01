@@ -91,7 +91,14 @@ phase_2:
                   the ALLQ screen definition and the contribution API surface"}
   P2_3:  {done: 0.0, name: "PORT with TFM3 v1; factor model validation"}
   P2_4:  {done: 0.0, name: "TVAL v1 with transparency drill-down"}
-  P2_5:  {done: 0.0, name: "CDSW against ISDA published test cases"}
+  P2_5:  {done: 0.4, name: "CDSW against ISDA published test cases",
+          basis: "the ISDA-convention model ships — both legs, upfront, risky
+                  PV01, par-spread solver, ACT/360, accrued-on-default and
+                  continuous protection — and is internally consistent (a par
+                  coupon settles at zero). Deliberately NOT counted higher:
+                  the criterion is validation against ISDA's *published test
+                  cases*, and internal consistency is not external
+                  confirmation"}
   P2_6:  {done: 0.0, name: "SWPM multi-curve CSA-aware discounting"}
   P2_7:  {done: 0.0, name: "Canvas with FDC3 context propagation"}
   P2_8:  {done: 0.0, name: "gRPC + Arrow Flight transports"}

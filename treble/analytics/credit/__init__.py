@@ -1,5 +1,1 @@
-"""CDS valuation, hazard curves, DRSK.
-
-Implements specification section §13.
-See docs/treble-tracker-spec.md and CLAUDE.md.
-"""
+"""Credit analytics (spec §7, §15) — CDS and credit curve models."""
