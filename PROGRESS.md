@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 35.47%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 36.56%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -38,31 +38,19 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > TQL grammar; WP6 1.0 with bulk XBRL), 23.47% (WP9 0.8 — planner and executor), 23.76% (WP9 0.95 — overrides reach the models), 24.19% (WP9 and WP11 complete —
 > SRCH and EQS are TQL-backed screens; all eleven screens exist), 26.06% (WP14 — `treble init`), **27.94%** (WP13 — the spreadsheet add-in).
 
-**Status:** WP0-WP7 and WP10 complete. **WP12 complete**: both renderers now pass one
-conformance suite. The Textual TUI and the TypeScript renderer shared by the desktop shell
-are compared against the same goldens (`RENDERERS = {reference, tui, web}`), the web renderer
-driven from Python through `treble/render/web/conformance.mjs` so it is a renderer *under
-test* rather than a parallel suite that could drift.
+**Status:** **Phase 1 is complete** — 16/16 work packages, 12/12 gate criteria, green in CI on a
+clean checkout. Phase 2 is in progress; see the table below for per-criterion state.
 
-**The desktop application exists and opens from the Dock.** `Treble Tracker.app` is a Tauri
-v2 bundle (4.0 MB, `org.trebletracker.desktop`) built by `make desktop-install`. It is a real
-macOS application in its own window, not a browser: the Rust shell owns the window and starts
-`treble serve` as a sidecar, skipping the spawn when a server is already listening so a
-hand-run server is never fought over, and killing only a child it started. Launched from
-Launchpad with no terminal involved, `IBM US Equity DES` renders 942,134,390 shares and
-$152,099,000,000 of assets from the live 345,326-fact store, every figure provenance-backed.
-The TUI launcher bundle is renamed `Treble Tracker Terminal.app` so the two cannot overwrite
-each other.
+Phase 1 left a workstation that is real rather than demonstrative: **8 namespaces, ~10,000
+subjects, ~8.1M facts**, a Tauri desktop app that opens from the Dock, twelve screens rendering
+identically on two surfaces from one definition, and bond analytics that reproduce the US
+Treasury's own auction yields to **0.07bp** worst case across 46 auctions.
 
-Screens are served resolved, never as raw data: `treble/render/server.py` hands the client the
-same CellBuffer the TUI renders, so the desktop is never given the opportunity to resolve
-anything itself (I6 across a process boundary, I7 intact).
+**Next action:** the `SWPM` screen needs a forecast curve (see Phase 2). Then the untouched
+Phase 2 criteria: `PORT`/TFM3, `TVAL`, Canvas + FDC3, gRPC + Arrow Flight. Deferred deliberately,
+not forgotten: EDGAR Exhibit 21 / OpenCorporates (spec §9.5 breadth), and `CDSW` against ISDA's
+published test cases.
 
-**Next action:** WP11 is the long pole - ten screens remain (`FA`, `GP`, `HP`, `YAS`, `ICVS`,
-`SRCH`, `EQS`, `FLDS`, `SPTR`, `MDL`), each a definition plus resolver plus conformance case,
-and every one now renders on both surfaces for free. Then WP9 (TQL), WP13 (spreadsheet
-add-in), WP14 (`treble init`), WP15 (gate audit). Deferred deliberately, not forgotten: EDGAR
-Exhibit 21 / OpenCorporates (9.5 breadth), and executing the full 8k-filer run.
 **Standing directives (Jack):** accuracy above all; stress tests + real data always; API
 choices delegated (pick accuracy-maximising, report after); launch = full spec through
 Phase 5; zero external cost (ubuntu-only CI, no cloud routines; pause on token exhaustion).
@@ -83,23 +71,26 @@ Phase 5; zero external cost (ubuntu-only CI, no cloud routines; pause on token e
 
 ## Phase 1 — research workstation
 
-Criteria are copied from `CLAUDE.md` §8. Tick only when passing in CI on a clean checkout.
+Criteria copied from `CLAUDE.md` §8. **All twelve verified green in CI on a clean checkout**
+(WP15 gate audit, commit `13a87b4`). One gap was found and fixed during the audit: I7 had no
+test protecting its own `.importlinter` config, so deleting the contracts left `lint-imports`
+exiting 0.
 
-- [ ] All seven invariants have enforcement mechanisms, each with a test that fails if the mechanism is removed
-- [ ] Screen definition schema, resolver contract, and conformance suite exist; both renderers pass it
-- [ ] Command grammar parses every example in spec §5.1 plus a fuzz corpus; yellow-key namespace resolution correct
-- [ ] Ingest adapters: EDGAR, FRED, Treasury, TRACE-file, OpenFIGI, GLEIF — each with offline fixture tests
-- [ ] Security master and entity graph populated for the configured universe subsets
-- [ ] Screens working in both clients: `DES` `FA` `GP` `HP` `YAS` `ICVS` `SRCH` `EQS` `FLDS` `SPTR` `MDL`
-- [ ] Curve bootstrapping reprices inputs to 1e-10 across all supported interpolation methods
-- [ ] `YAS` golden-value tests passing against published references
-- [ ] TAPI with Python client; `TDP`/`TDH`/`TDS` spreadsheet functions via xlwings
-- [ ] TQL parses and executes the spec §4.2 example
-- [ ] Local-only mode: one command from clean checkout to working workstation
-- [ ] Pane form selection enforced at load time; CI validates every `.screen.yaml` against
+- [x] All seven invariants have enforcement mechanisms, each with a test that fails if the mechanism is removed
+- [x] Screen definition schema, resolver contract, and conformance suite exist; both renderers pass it
+- [x] Command grammar parses every example in spec §5.1 plus a fuzz corpus; yellow-key namespace resolution correct
+- [x] Ingest adapters: EDGAR, FRED, Treasury, TRACE-file, OpenFIGI, GLEIF — each with offline fixture tests
+- [x] Security master and entity graph populated for the configured universe subsets
+- [x] Screens working in both clients: `DES` `FA` `GP` `HP` `YAS` `ICVS` `SRCH` `EQS` `FLDS` `SPTR` `MDL`
+- [x] Curve bootstrapping reprices inputs to 1e-10 across all supported interpolation methods
+- [x] `YAS` golden-value tests passing against published references
+- [x] TAPI with Python client; `TDP`/`TDH`/`TDS` spreadsheet functions via xlwings
+- [x] TQL parses and executes the spec §4.2 example
+- [x] Local-only mode: one command from clean checkout to working workstation
+- [x] Pane form selection enforced at load time; CI validates every `.screen.yaml` against
       the screen-definition contract (spec §6.1 — requested by Jack citing §6.4; §6.4 is
       currently the charting engine, reconcile if the spec is revised)
-- [ ] `PROGRESS.md` current
+- [x] `PROGRESS.md` current
 
 ---
 
@@ -116,19 +107,60 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 | `PORT` with TFM3 v1 | 0.00 | not started |
 | `TVAL` v1 | 0.00 | not started |
 | `CDSW` vs ISDA test cases | 0.40 | the published cases themselves — the model is internally consistent, not externally confirmed |
-| `SWPM` multi-curve CSA-aware | 0.50 | **the screen is blocked on market data** (below); plus the §12.1 product breadth |
+| `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
 | Canvas with FDC3 | 0.00 | not started |
 | gRPC + Arrow Flight | 0.00 | not started |
 
-**`SWPM` is blocked on a swap curve, not on the engine.** The multi-curve, CSA-aware pricer is
-built and validated (see the session log for 2026-08-01). What does not exist is a *market* to
-build a USD swap curve from: the store holds overnight SOFR (`fred:SOFR`) and the Treasury CMT
-curve (`fred:DGS*`) and nothing at swap tenors. FRED discontinued its swap-rate series in 2016.
-A screen fed the Treasury curve relabelled as a swap curve, or fed fabricated quotes, is exactly
-the plausible-looking lie this project exists to refuse — so the screen waits. The spec's own
-answer (§11.1) is **the DTCC SDR public dissemination feed** (`pddata.dtcc.com`, free and
-keyless) for swap rates, plus **exchange futures settlement files** for the front and middle of
-the curve. Neither has an adapter yet; either would unblock the screen.
+**The swap curves exist, and the whole chain is verified on them.** The DTCC SDR adapter
+(2026-08-02) ingests CFTC Part 43 public price dissemination — ~20,000 interest-rate prints a
+day — and builds **four curves**, 15 trading days each in the store:
+
+| Curve | Role | Latest 10Y |
+|---|---|---|
+| `USD-SOFR-OIS` | discounting | 4.306% |
+| `EUR-ESTR-OIS` | discounting | 2.970% |
+| `EUR-EURIBOR-6M` | forecasting, 6M index | 3.218% |
+| `EUR-EURIBOR-3M` | forecasting, 3M index | 3.108% |
+
+This is the source spec §11.1 names, and the only free one: FRED discontinued its swap series in
+2016 and the Treasury CMT curve is a government curve, not a swap curve.
+
+**The euro pair is what makes `SWPM` work end to end.** An overnight index compounds daily, so
+an OIS curve discounts but cannot project a discrete index — the pricer refuses it as a forecast
+curve. EURIBOR is a term index and can. On real prints, ESTR discounting against EURIBOR-6M
+forecasting gives a **0.0000bp** cross-check (a trade matching a curve input reprices to its
+quote through the independent cash-flow pricer) and breaks the single-curve telescoping identity
+by **EUR 2,110,467 on EUR 100m**.
+
+**The index tenor is not in the payload's index name.** `EUR-EURIBOR` is the underlier for both
+3M and 6M swaps; only the floating leg's reset frequency separates them. Merging them would blend
+two curves that a tenor basis separates by about 11bp, and the merged curve would look entirely
+ordinary.
+
+> **DTCC terms of use are UNVERIFIED — read this before extending the adapter.**
+> DTCC's terms live at `https://www.dtcc.com/legal.php`, which is served behind Cloudflare bot
+> protection and returns HTTP 403 to any non-browser client. They could not be read, and
+> circumventing the block was refused (same line as the Stooq refusal — see Data access
+> findings). DTCC separately sells *OTC Direct Connect*, a paid systematic-delivery product for
+> this same dashboard data. **Jack was shown both facts on 2026-08-01 and chose "build it
+> anyway"**, accepting the ToS risk explicitly. That is a recorded decision, not an oversight.
+> The source is marked `redistribution_restricted` and throttled to one request per five
+> seconds. If the terms are later read and prohibit automated access,
+> `treble/ingest/dtcc.py` is the thing to delete.
+
+**The `SWPM` screen ships** (2026-08-02): three tabs — valuation, curve environment, cash flow
+schedule — rendering on both surfaces from one definition, with a conformance case per tab. It
+shows a spot-starting 10-year par swap against the live ESTR/EURIBOR-6M pair: PV, par rate,
+annuity, DV01 of EUR 85,861, thirty cash flows, and the basis per tenor. The trade is a
+**template, not a position** — this system books none — and the screen says so on its face.
+
+What remains on this criterion is spec §12.1's wider product set (swaptions, caps/floors, CMS,
+cross-currency with MtM resets, inflation, asset swaps, cancellable/extendible, total return),
+not the multi-curve CSA-aware discounting the criterion names.
+
+Keeping the curve current means extending `dtcc_report_dates` in `config/universe.yaml`; dates
+are explicit rather than a rolling window so each step has a predictable URI and population stays
+resumable. A `discover` mode is the follow-up.
 
 ## Phases 3–5
 
@@ -396,6 +428,82 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-08-02 (later still) — the `SWPM` screen
+
+Twelve screens now. `swpm.screen.yaml` + `treble/tapi/swap_market.py` + three conformance cases
+(one per tab). The screen is pane-driven rather than security-keyed, like `ICVS`, because a swap
+trade is not in the security master.
+
+`build_swap_market` assembles the CurveSet from stored `swap:*` facts and refuses two things
+that would each produce a plausible screen: **curves from different trading days** (a front end
+from today and a long end from last Tuesday bootstraps fine and is wrong), and **forecast nodes
+past the discount curve's last node** (extrapolated discounting does not announce itself). Both
+have tests; neither failure mode raises on its own.
+
+Verified on the live store: PV −0.00 on a par swap, DV01 EUR 85,861, annuity EUR 859m, 10 annual
+fixed against 20 semiannual floating flows.
+
+### 2026-08-02 (later) — the EUR forecast curve: `SWPM` works end to end on real prints
+
+`EUR-ESTR-OIS` discounting against `EUR-EURIBOR-6M` forecasting, both from the same DTCC file.
+This is what the criterion actually needed: an OIS curve discounts but cannot project, so until
+a term index existed the multi-curve pricer had real data for only half of itself.
+
+**The index tenor had to come from the floating leg.** `UPI Underlier Name` is `EUR-EURIBOR` for
+both 3M and 6M swaps — nothing in the index name separates them. Only the reset frequency does,
+and merging them blends two curves a tenor basis separates by ~11bp.
+
+**One normalisation earned its place.** The file spells an annual leg as both `YEAR`x1 and
+`MNTH`x12. Comparing the raw pair dropped 11% of the ESTR prints and 5% of the SOFR prints for no
+economic reason — an exclusion nobody would see, because the curve left behind still looks
+complete. `frequency_months` normalises to months.
+
+**Verified on real data:** a trade matching a curve input reprices to its quote at **0.0000bp**
+through the independent cash-flow pricer, and the single-curve telescoping identity is broken by
+**EUR 2,110,467 on EUR 100m**.
+
+**Mutation testing found one more dead test.** Every EURIBOR print in the real file accrues
+ACT/360, so deleting the float day-count filter changed nothing and the mutation survived — the
+fixture could not exercise it. That is not evidence the filter is unnecessary; it is evidence
+real data alone cannot prove it. Fixed with an injection test, and the reason is written into the
+test so nobody deletes it as redundant. **25/25 across all three mutation targets.**
+
+The 15 stored days were re-derived by **replaying the recorded payloads** rather than re-fetching
+— the raw bytes are content-addressed and already in the payload store (I5), so no new requests
+went to DTCC. The re-parse wrote restatements rather than overwriting, which is I2 doing its job.
+
+**Next:** the `SWPM` screen. Nothing is blocking it now.
+
+### 2026-08-02 — the DTCC SDR adapter: a real USD swap curve
+
+`treble/ingest/dtcc.py`. CFTC Part 43 public dissemination, ~20,000 interest-rate prints a day,
+reduced to a **USD SOFR OIS curve 1Y–30Y**. Fifteen trading days ingested through the real
+`treble populate` path; every input reprices to 1e-10 through the Phase 1 bootstrap.
+
+**The terms could not be read, and Jack chose to proceed anyway.** `dtcc.com/legal.php` is behind
+Cloudflare bot protection (HTTP 403 to any non-browser client); circumventing it was refused.
+DTCC sells *OTC Direct Connect*, a paid systematic-access product for this same data. Both facts
+were put to Jack before any code was written; he chose "build it anyway". Recorded in the adapter
+docstring, in its `SourceMeta.licence`, and in Phase 2 above — three places, because a decision
+like this must not survive only in a commit message.
+
+**These are transacted rates, not quotes**, and that drives the design: median never mean (the
+real 10Y prints ranged −0.50% to +0.70% around a 4.31% median), interquartile dispersion
+published beside every node, and a tenor with fewer than three prints omitted rather than
+published.
+
+**Mutation testing found four dead tests, which is the point of running it.** The first version
+of the filter tests removed a category of row by hand and compared to the unfiltered run — which
+proves nothing when those rows were already excluded by some *other* filter. 4 of 8 mutations
+survived. Rewritten as injections: clone a real print, change exactly one field, price it
+absurdly. Two still survived because changing one *field* changed which *filter* fired (moving
+the effective date shortened the tenor, so the tenor filter did the work). Fixed by moving dates
+coherently. **Now 22/22 across all three mutation targets.** The harness also caught a
+constructor change that had broken two fixtures — a failure the earlier green run could not have
+shown, because it predated the change.
+
+**Next:** the `SWPM` screen still needs a *forecast* curve. See Phase 2 above.
 
 ### 2026-08-01 — Phase 2 `SWPM`: the multi-curve, CSA-aware pricer
 

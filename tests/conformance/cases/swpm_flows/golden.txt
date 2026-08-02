@@ -1,0 +1,22 @@
+SWAP MANAGER · CASH FLOW SCHEDULE
+────────────────────────────────────────────────────────────────────────────
+Fixed pays annual 30/360; floating pays semiannual ACT/360 off the 6M index.
+
+LEG      PAY DATE      NOTIONAL      RATE %     AMOUNT      DF        PV
++------------------------------------------------------------------------------+
+|[table_scroll:sys:swpm_cashflows]                                             |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Floating rates are projected forwards, not fixings — no rate here has set.

@@ -99,7 +99,7 @@ phase_2:
                   the criterion is validation against ISDA's *published test
                   cases*, and internal consistency is not external
                   confirmation"}
-  P2_6:  {done: 0.5, name: "SWPM multi-curve CSA-aware discounting",
+  P2_6:  {done: 0.85, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
                   bootstrapped against an exogenous discount curve (never
@@ -113,18 +113,30 @@ phase_2:
                   a curve input reprices to its quote to under 0.01bp
                   through a code path independent of the bootstrap residual,
                   and 6/6 targeted mutations of the pricer are killed.
-                  Outstanding, and why this is not higher: (a) the SWPM
-                  *screen* is not built, because no free source in the store
-                  supplies USD swap or OIS term quotes — FRED carries
-                  overnight SOFR and the Treasury CMT curve and nothing at
-                  swap tenors, so a screen would have to be fed fabricated
-                  quotes or the Treasury curve mislabelled as a swap curve;
-                  the spec's own answer is the DTCC SDR public feed plus
-                  exchange futures settlements (§11.1) and neither has an
-                  adapter. (b) spec §12.1 lists a product set this does not
-                  yet cover: OIS legs (daily compounding), cross-currency
-                  with notional exchange and MtM resets, inflation,
-                  swaptions/caps/floors, CMS, asset swaps, cancellable and
-                  extendible, total return"}
+                  The market data exists and the whole chain is verified on
+                  it: the DTCC SDR adapter builds four curves from CFTC Part
+                  43 public dissemination — USD-SOFR-OIS and EUR-ESTR-OIS
+                  for discounting, EUR-EURIBOR-6M and -3M for forecasting —
+                  15 trading days each in the store, 14/14 mutations killed.
+                  ESTR discounting against EURIBOR-6M forecasting is a real
+                  multi-curve environment on real prints: a trade matching a
+                  curve input reprices to its quote at 0.0000bp, and the
+                  single-curve telescoping identity is broken by EUR 2.11m
+                  on EUR 100m. Outstanding, and why this is not 1.0: (a) the
+                  SWPM *screen* is still not built — the engine and its data
+                  are done, the presentation is not; (b) spec §12.1 lists a
+                  product set this does not yet cover: OIS legs (daily
+                  compounding), cross-currency with notional exchange and
+                  MtM resets, inflation, swaptions/caps/floors, CMS, asset
+                  swaps, cancellable and extendible, total return.
+                  The SWPM *screen* now ships: three tabs (valuation, curve
+                  environment, cash flow schedule) rendering on both
+                  surfaces from one definition, with conformance cases per
+                  tab. It shows a spot-starting 10Y par swap against the
+                  live ESTR/EURIBOR-6M pair — PV, par rate, annuity, DV01,
+                  30 cash flows, and the basis per tenor. Counted 0.85
+                  rather than 1.0 because the trade is a template rather
+                  than a bookable position, and because the §12.1 product
+                  set above is genuinely part of what SWPM means"}
   P2_7:  {done: 0.0, name: "Canvas with FDC3 context propagation"}
   P2_8:  {done: 0.0, name: "gRPC + Arrow Flight transports"}

@@ -1,0 +1,171 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SWAP MANAGER · CURVE ENVIRONMENT"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Discounting is EUR-ESTR-OIS; forecasting is EUR-EURIBOR-6M. Not one curve."
+    },
+    {
+      "at": [
+        4,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TENOR    ESTR %    EURIBOR 6M %    BASIS bp"
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Tenors absent from either curve are omitted, never extrapolated."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "SWPM",
+  "panes": [
+    {
+      "binding": "sys:swap_curves",
+      "data": [
+        [
+          "2Y",
+          2.7077,
+          3.0107,
+          30.3
+        ],
+        [
+          "3Y",
+          2.733,
+          3.027,
+          29.4
+        ],
+        [
+          "4Y",
+          2.757,
+          3.013,
+          25.6
+        ],
+        [
+          "5Y",
+          2.7795,
+          3.0497,
+          27.0
+        ],
+        [
+          "6Y",
+          2.795,
+          3.0856,
+          29.1
+        ],
+        [
+          "7Y",
+          2.8356,
+          3.106,
+          27.0
+        ],
+        [
+          "8Y",
+          2.8922,
+          3.1488,
+          25.7
+        ],
+        [
+          "9Y",
+          2.906,
+          3.1828,
+          27.7
+        ],
+        [
+          "10Y",
+          2.9697,
+          3.2178,
+          24.8
+        ],
+        [
+          "15Y",
+          3.1328,
+          3.357,
+          22.4
+        ],
+        [
+          "20Y",
+          3.2163,
+          3.381,
+          16.5
+        ],
+        [
+          "25Y",
+          3.2075,
+          3.3698,
+          16.2
+        ],
+        [
+          "30Y",
+          3.1785,
+          3.3025,
+          12.4
+        ]
+      ],
+      "region": [
+        5,
+        0,
+        15,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "curves"
+}

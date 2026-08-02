@@ -1,0 +1,22 @@
+SWAP MANAGER · EUR VANILLA IRS
+────────────────────────────────────────────────────────────────────────────
+Template trade at today's par rate — not a booked position.
+Curves from DTCC SDR prints: transacted rates, not dealer quotes.
+
+VALUATION
++------------------------------------------------------------------------------+
+|[table_scroll:sys:swpm_valuation]                                             |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+CURVES · FLOWS tabs · a par swap settles at zero by construction.

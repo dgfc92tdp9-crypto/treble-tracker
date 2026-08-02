@@ -74,6 +74,14 @@ universes:
     # institution that set it rather than to a vendor that averaged it.
     ecb_series: ["D.USD.EUR.SP00.A", "D.GBP.EUR.SP00.A", "D.JPY.EUR.SP00.A"]
     coinbase_products: ["BTC-USD", "ETH-USD"]
+    # DTCC SDR public price dissemination — the only free source of USD swap
+    # rates, and the one spec 11.1 names. Dates rather than a rolling window
+    # so each step has a predictable URI and population stays resumable;
+    # extending the curve forward means extending this list. See the
+    # adapter's module docstring for the unverified-terms position.
+    dtcc_report_dates: ["2026-07-13", "2026-07-14", "2026-07-15", "2026-07-16", "2026-07-17",
+                        "2026-07-20", "2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24",
+                        "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31"]
     # N-PORT filings supply per-bond valuations — the only licence-clean
     # route to corporate bond prices, since TRACE is subscription-gated.
     # Named explicitly rather than discovered: the Phase 1 audit found this

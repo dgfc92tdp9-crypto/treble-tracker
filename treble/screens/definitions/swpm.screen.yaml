@@ -1,0 +1,121 @@
+# SWPM — Swap Manager (spec §12.1).
+#
+# A swap valued under a real multi-curve environment: EUR-ESTR-OIS
+# discounting, EUR-EURIBOR-6M forecasting, both bootstrapped from DTCC SDR
+# public price dissemination.
+#
+# **The trade shown is a template, not a position.** This system books no
+# trades, so the screen shows what a spot-starting ten-year swap struck at
+# today's par rate looks like — cash flows, annuity, DV01. Presenting it as
+# a holding would be inventing a position, and the caption says so on the
+# screen rather than only here.
+#
+# **The rates behind the curves are transacted, not quoted.** CFTC Part 43
+# publishes trades, not dealer quotes, and a print is a price two people
+# agreed rather than one anyone will honour now. Each node is the median of
+# a day's prints at that tenor. The caption says this too: a curve that
+# looked like a quote curve would be read as firmer than it is.
+#
+# **Discount and forecast are separate curves and the screen names both.**
+# That is the whole point of the multi-curve architecture (§11.1), and
+# "which curve discounted this" is the question a swap PV most often needs
+# answered. The basis between them is shown per tenor on the CURVES tab —
+# about 25bp at ten years — because a reader who can see the basis can see
+# immediately whether a single-curve mistake has been made.
+mnemonic: SWPM
+title: Swap Manager
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SWAP MANAGER · EUR VANILLA IRS"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Template trade at today's par rate — not a booked position."
+        attrs: [label]
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "Curves from DTCC SDR prints: transacted rates, not dealer quotes."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "VALUATION"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 6, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:swpm_valuation"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "CURVES · FLOWS tabs · a par swap settles at zero by construction."
+        attrs: [label]
+
+  - name: curves
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SWAP MANAGER · CURVE ENVIRONMENT"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Discounting is EUR-ESTR-OIS; forecasting is EUR-EURIBOR-6M. Not one curve."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "TENOR    ESTR %    EURIBOR 6M %    BASIS bp"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 5, col: 0, height: 15, width: 80}
+        pane_type: table_scroll
+        binding: "sys:swap_curves"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Tenors absent from either curve are omitted, never extrapolated."
+        attrs: [label]
+
+  - name: flows
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SWAP MANAGER · CASH FLOW SCHEDULE"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Fixed pays annual 30/360; floating pays semiannual ACT/360 off the 6M index."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 4, col: 0}
+        text: "LEG      PAY DATE      NOTIONAL      RATE %     AMOUNT      DF        PV"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 5, col: 0, height: 15, width: 80}
+        pane_type: table_scroll
+        binding: "sys:swpm_cashflows"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Floating rates are projected forwards, not fixings — no rate here has set."
+        attrs: [label]

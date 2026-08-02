@@ -1,0 +1,22 @@
+SWAP MANAGER · CURVE ENVIRONMENT
+────────────────────────────────────────────────────────────────────────────
+Discounting is EUR-ESTR-OIS; forecasting is EUR-EURIBOR-6M. Not one curve.
+
+TENOR    ESTR %    EURIBOR 6M %    BASIS bp
++------------------------------------------------------------------------------+
+|[table_scroll:sys:swap_curves]                                                |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Tenors absent from either curve are omitted, never extrapolated.

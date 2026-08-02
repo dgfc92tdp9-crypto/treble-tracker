@@ -33,6 +33,7 @@ from treble.core.universe import (
 from treble.ingest.base import ParsedBatch, SourceAdapter
 from treble.ingest.coinbase import CANDLES_URL as COINBASE_URL
 from treble.ingest.coinbase import CoinbaseCandlesAdapter
+from treble.ingest.dtcc import DtccSdrRatesAdapter, file_url
 from treble.ingest.ecb import SERIES_URL as ECB_SERIES_URL
 from treble.ingest.ecb import EcbExchangeRatesAdapter
 from treble.ingest.edgar import (
@@ -94,6 +95,8 @@ def uri_for_step(step: PopulationStep, *, fred_start: date, fred_end: date) -> s
             return ECB_SERIES_URL.format(key=step.key)
         case "coinbase":
             return f"{COINBASE_URL.format(product=step.key)}?granularity=86400"
+        case "dtcc-sdr":
+            return file_url(date.fromisoformat(step.key))
     raise ValueError(f"no URI mapping for source {step.source_id!r}")
 
 
@@ -160,6 +163,10 @@ class Populator:
                 return EcbExchangeRatesAdapter(self._payloads, self._log, series=(step.key,))
             case "coinbase":
                 return CoinbaseCandlesAdapter(self._payloads, self._log, products=(step.key,))
+            case "dtcc-sdr":
+                return DtccSdrRatesAdapter(
+                    self._payloads, self._log, report_dates=(date.fromisoformat(step.key),)
+                )
             case "gleif":
                 return GleifAdapter(self._payloads, self._log, leis=(step.key,))
             case "openfigi":

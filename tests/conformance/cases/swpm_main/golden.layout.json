@@ -1,0 +1,162 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SWAP MANAGER · EUR VANILLA IRS"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Template trade at today's par rate — not a booked position."
+    },
+    {
+      "at": [
+        3,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Curves from DTCC SDR prints: transacted rates, not dealer quotes."
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "VALUATION"
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "CURVES · FLOWS tabs · a par swap settles at zero by construction."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "SWPM",
+  "panes": [
+    {
+      "binding": "sys:swpm_valuation",
+      "data": [
+        [
+          "Curve date",
+          "2026-07-31"
+        ],
+        [
+          "Discount curve",
+          "EUR-ESTR-OIS"
+        ],
+        [
+          "Forecast curve",
+          "EUR-EURIBOR-6M (6M index)"
+        ],
+        [
+          "Collateral",
+          "EUR cash CSA · EUR-ESTR-OIS"
+        ],
+        [
+          "Notional",
+          100000000.0
+        ],
+        [
+          "Fixed rate",
+          3.21785
+        ],
+        [
+          "Effective",
+          "2026-08-04"
+        ],
+        [
+          "Maturity",
+          "2036-08-04"
+        ],
+        [
+          "Par rate %",
+          3.21785
+        ],
+        [
+          "Fixed leg PV",
+          27643159.77
+        ],
+        [
+          "Float leg PV",
+          27643159.77
+        ],
+        [
+          "PV (pay fixed)",
+          -0.0
+        ],
+        [
+          "Annuity",
+          859056816.64
+        ],
+        [
+          "DV01 (+1bp)",
+          85861.53
+        ]
+      ],
+      "region": [
+        6,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

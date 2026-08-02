@@ -24,11 +24,13 @@ from datetime import UTC, date, datetime, timedelta
 
 from treble.analytics._ql import DayCount
 from treble.analytics.bonds.spec import FixedBondSpec, Frequency
+from treble.analytics.derivatives.swap import SwapSpec
 from treble.core.facts import Fact
 from treble.core.identifiers import TUID, SecurityQuery, YellowKey
 from treble.core.provenance import ProvenanceId
 from treble.store.duck import DuckStore
 from treble.tapi.fields import FIELDS, FieldDef, FieldDictionary
+from treble.tapi.swap_market import SwapMarket
 from treble.tapi.types import FieldResult
 
 #: A value older than this is displayed as stale (§6.3 mandates that any
@@ -244,7 +246,15 @@ class LocalTapi:
     #: coining mnemonics, and these are not fields — no security has a
     #: "sys:models". They back SPTR, MDL and FLDS, the three screens whose
     #: subject is the workstation itself.
-    SYSTEM_BINDINGS = ("sys:provenance", "sys:models", "sys:fields", "sys:treasury_curve")
+    SYSTEM_BINDINGS = (
+        "sys:provenance",
+        "sys:models",
+        "sys:fields",
+        "sys:treasury_curve",
+        "sys:swap_curves",
+        "sys:swpm_valuation",
+        "sys:swpm_cashflows",
+    )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
     #: fractions. Ordered here rather than sorted by name because "DGS1MO"
@@ -464,6 +474,8 @@ class LocalTapi:
             )
         if binding == "sys:treasury_curve":
             return self._treasury_curve(as_of=as_of)
+        if binding in ("sys:swap_curves", "sys:swpm_valuation", "sys:swpm_cashflows"):
+            return self._swpm(binding, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -495,6 +507,111 @@ class LocalTapi:
             # 0.08333333333333333 is noise in every surface that shows it.
             rows.append((label, round(years, 2), latest.value, latest.effective_from.isoformat()))
         return tuple(rows)
+
+    # -- SWPM (spec §12.1) ----------------------------------------------
+
+    def _swpm(
+        self, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """The three `SWPM` panes, off one built curve environment.
+
+        A failure to build returns the reason as a row rather than an empty
+        table. `SWPM` with no curve and `SWPM` with a broken curve must not
+        look the same, and neither may look like a swap worth nothing.
+        """
+        from treble.analytics.derivatives.csa import CsaTerms
+        from treble.analytics.derivatives.swap import price_swap, swap_dv01, swap_par_rate
+        from treble.tapi.swap_market import (
+            DISCOUNT_CURVE,
+            FORECAST_CURVE,
+            SwapMarketUnavailableError,
+            build_swap_market,
+        )
+
+        try:
+            market = build_swap_market(self._store, as_of=as_of)
+        except SwapMarketUnavailableError as error:
+            return ((f"no curve environment: {error}",),)
+
+        if binding == "sys:swap_curves":
+            basis = market.basis_bp
+            return tuple(
+                (
+                    tenor,
+                    round(market.discount_rates[tenor] * 100, 4),
+                    round(market.forecast_rates[tenor] * 100, 4),
+                    round(basis[tenor], 1),
+                )
+                for tenor in market.tenors
+            )
+
+        spec = self._swpm_trade(market)
+        csa = CsaTerms(collateral_currency="EUR", discount_curve=DISCOUNT_CURVE)
+        priced = price_swap.__wrapped__(spec, market.curves, csa)  # type: ignore[attr-defined]
+
+        if binding == "sys:swpm_cashflows":
+            return tuple(
+                (
+                    flow.leg,
+                    flow.accrual_end.isoformat(),
+                    round(flow.notional, 2),
+                    round(flow.rate * 100, 4),
+                    round(flow.amount, 2),
+                    round(flow.discount_factor, 6),
+                    round(flow.present_value, 2),
+                )
+                for flow in priced.cashflows
+            )
+
+        par = swap_par_rate.__wrapped__(spec, market.curves, csa)  # type: ignore[attr-defined]
+        dv01 = swap_dv01.__wrapped__(spec, market.curves, csa)  # type: ignore[attr-defined]
+        return (
+            ("Curve date", market.report_date.isoformat()),
+            ("Discount curve", DISCOUNT_CURVE),
+            ("Forecast curve", f"{FORECAST_CURVE} (6M index)"),
+            ("Collateral", csa.label),
+            ("Notional", round(spec.notional, 2)),
+            ("Fixed rate", round(spec.fixed_rate * 100, 6)),
+            ("Effective", spec.effective.isoformat()),
+            ("Maturity", spec.maturity.isoformat()),
+            ("Par rate %", round(par * 100, 6)),
+            ("Fixed leg PV", round(priced.fixed_leg_pv, 2)),
+            ("Float leg PV", round(priced.float_leg_pv, 2)),
+            ("PV (pay fixed)", round(priced.pv, 2)),
+            ("Annuity", round(priced.annuity, 2)),
+            ("DV01 (+1bp)", round(dv01, 2)),
+        )
+
+    def _swpm_trade(self, market: SwapMarket) -> SwapSpec:
+        """The template trade: a spot-starting 10-year par swap.
+
+        A template, not a position. `SWPM` structures trades and this
+        system books none, so the screen shows what a 10-year swap struck
+        at today's par rate looks like — cash flows, annuity, DV01 — and
+        says on its face that it is a template. Presenting it as a holding
+        would be inventing a position.
+        """
+        import QuantLib as ql
+
+        from treble.analytics import _ql
+        from treble.tapi.swap_market import CALENDAR, FORECAST_CURVE
+
+        calendar = _ql.calendar(CALENDAR)
+        start = _ql.to_ql_date(market.report_date)
+        spot = _ql.from_ql_date(calendar.advance(start, ql.Period(2, ql.Days)))
+        tenor = "10Y" if "10Y" in market.tenors else market.tenors[-1]
+        maturity = _ql.from_ql_date(calendar.advance(_ql.to_ql_date(spot), ql.Period(tenor)))
+        return SwapSpec(
+            notional=100_000_000.0,
+            fixed_rate=market.forecast_rates[tenor],
+            effective=spot,
+            maturity=maturity,
+            forecast_curve=FORECAST_CURVE,
+            fixed_frequency=1,
+            fixed_day_count=DayCount.THIRTY_360,
+            float_day_count=DayCount.ACT_360,
+            calendar=CALENDAR,
+        )
 
     def _provenance_rows(
         self, security: SecurityQuery, *, as_of: datetime

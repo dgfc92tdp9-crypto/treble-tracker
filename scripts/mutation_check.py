@@ -28,6 +28,11 @@ Targets:
 - `swap.py` — `SWPM`. Its mutations are the four ways a multi-curve pricer
   silently reverts to the single-curve world, each of which produces a
   plausible PV and no error.
+- `dtcc.py` — the swap-curve ingest. Every mutation removes one filter, and
+  every one of them leaves a curve that still bootstraps and still looks
+  like a swap curve. The first version of its tests killed only 4 of 8;
+  they were rewritten to inject rows that are standard in every respect but
+  one, which is the only way to test one filter at a time.
 
     python scripts/mutation_check.py
 """
@@ -157,6 +162,107 @@ SWAP_MUTATIONS: tuple[Mutation, ...] = (
     ),
 )
 
+# Each of these leaves a curve that bootstraps cleanly and reads as
+# plausible. None raises. The 30-year node moving 40bp because forward-
+# starting trades leaked in is not visible without a reference curve, and
+# there is no free reference curve — which is the whole reason this data is
+# being used in the first place.
+DTCC_MUTATIONS: tuple[Mutation, ...] = (
+    Mutation(
+        "day-count filter removed",
+        """if row.get("Fixed rate day count convention-leg 1") != convention.fixed_day_count:
+            continue""",
+        """if False:
+            continue""",
+        "30/360 and ACT/365F prints would blend with ACT/360, shifting the "
+        "curve by the ratio between conventions",
+    ),
+    Mutation(
+        "spot-start filter removed",
+        """if abs((effective - executed).days) > SPOT_WINDOW_DAYS:
+            continue""",
+        """if False:
+            continue""",
+        "forward-starting trades carry forward rates; on a rising curve they "
+        "drag every node upward smoothly",
+    ),
+    Mutation(
+        "index filter removed",
+        """if (row.get("UPI Underlier Name") or "") not in convention.underliers:
+            continue""",
+        """if False:
+            continue""",
+        "CME Term SOFR and the ICE Swap Rate are different curves and would "
+        "be averaged into this one",
+    ),
+    Mutation(
+        "currency filter removed",
+        """if row.get("Notional currency-Leg 1") != convention.currency:
+            continue""",
+        """if False:
+            continue""",
+        "EUR, JPY and GBP swaps would enter a curve labelled USD",
+    ),
+    Mutation(
+        "withdrawn prints not excluded",
+        'and row.get("Dissemination Identifier", "") not in withdrawn',
+        "",
+        "prints the reporting party has retracted would still price the curve",
+    ),
+    Mutation(
+        "lifecycle events counted as prints",
+        'and row.get("Event type") == "TRAD"',
+        "",
+        "novations and clearing events would each count as a new trade",
+    ),
+    Mutation(
+        "wrong trading day accepted",
+        "if executed != report_date:",
+        "if False:",
+        "late reports of older trades would be dated to the wrong curve",
+    ),
+    Mutation(
+        "standard-tenor tolerance removed",
+        "if whole < 1 or abs(years - whole) > TENOR_TOLERANCE_YEARS:",
+        "if whole < 1:",
+        "a 7y3m swap would be rounded into the 7-year node",
+    ),
+    Mutation(
+        "thin-tenor threshold removed",
+        "if len(samples) < MIN_TRADES_PER_TENOR:",
+        "if False:",
+        "a node built from one print would be published as a curve point",
+    ),
+    Mutation(
+        "median replaced by mean",
+        "rate=statistics.median(rates),",
+        "rate=statistics.fmean(rates),",
+        "one off-market print — and there are always some — would move the node",
+    ),
+    Mutation(
+        "index tenor not read from the floating leg",
+        """        if convention.float_reset_months is not None:""",
+        """        if False:""",
+        "3M and 6M EURIBOR would merge into one curve, blending two curves a "
+        "tenor basis separates by about 11bp",
+    ),
+    Mutation(
+        "floating leg day count ignored",
+        """if row.get("Floating rate day count convention-leg 2") != convention.float_day_count:
+                continue""",
+        """if False:
+                continue""",
+        "a EURIBOR leg on a different accrual basis would enter the forecast curve",
+    ),
+    Mutation(
+        "frequency spellings no longer normalised",
+        """    months = _MONTHS_PER_PERIOD.get((period or "").strip().upper())""",
+        """    months = {"YEAR": 12}.get((period or "").strip().upper())""",
+        "annual legs spelled MNTHx12 would be dropped, and semiannual EURIBOR "
+        "legs would vanish entirely — taking the whole forecast curve with them",
+    ),
+)
+
 TARGETS: tuple[Target, ...] = (
     Target(
         path=ROOT / "treble" / "analytics" / "curves" / "hagan_west.py",
@@ -167,6 +273,11 @@ TARGETS: tuple[Target, ...] = (
         path=ROOT / "treble" / "analytics" / "derivatives" / "swap.py",
         tests=ROOT / "tests" / "analytics" / "derivatives",
         mutations=SWAP_MUTATIONS,
+    ),
+    Target(
+        path=ROOT / "treble" / "ingest" / "dtcc.py",
+        tests=ROOT / "tests" / "ingest" / "test_dtcc.py",
+        mutations=DTCC_MUTATIONS,
     ),
 )
 

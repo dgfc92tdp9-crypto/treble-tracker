@@ -56,6 +56,10 @@ class UniverseSpec(BaseModel):
     #: fixing, and an exchange's own prints.
     ecb_series: tuple[str, ...] = ()
     coinbase_products: tuple[str, ...] = ()
+    #: DTCC SDR cumulative-file report dates (ISO), or DISCOVER to ask the
+    #: dashboard which trading days exist. Dates rather than a day count so
+    #: a step's URI is predictable and population stays resumable.
+    dtcc_report_dates: tuple[str, ...] = ()
 
     @property
     def discovers_filers(self) -> bool:
@@ -121,6 +125,7 @@ def load_universe_config(path: Path) -> UniverseConfig:
             openfigi_cusips=tuple(body.get("openfigi_cusips") or ()),
             ecb_series=tuple(body.get("ecb_series") or ()),
             coinbase_products=tuple(body.get("coinbase_products") or ()),
+            dtcc_report_dates=tuple(body.get("dtcc_report_dates") or ()),
         )
     limits = raw.get("rate_limits") or {}
     return UniverseConfig(
@@ -182,6 +187,8 @@ def plan_steps(
         steps.append(PopulationStep(source_id="ecb-fx", key=key))
     for product in spec.coinbase_products:
         steps.append(PopulationStep(source_id="coinbase", key=product))
+    for report_date in spec.dtcc_report_dates:
+        steps.append(PopulationStep(source_id="dtcc-sdr", key=report_date))
     return steps
 
 
