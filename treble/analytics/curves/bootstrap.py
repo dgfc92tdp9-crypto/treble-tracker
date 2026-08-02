@@ -67,6 +67,7 @@ class Curve:
         self.node_times = node_times
         self.node_zeros = node_zeros
         self._interp: Interpolator = make_interpolator(config.interpolation, node_times, node_zeros)
+        self._day_counter = _ql.day_counter(config.day_count)
 
     @property
     def content_hash(self) -> str:
@@ -77,6 +78,26 @@ class Curve:
 
     def discount(self, t: float) -> float:
         return self._interp.discount(t)
+
+    # -- date-based access ---------------------------------------------
+    #
+    # Multi-curve pricing reads a discount factor from one curve and a
+    # forward from another, and the two curves need not share a day count.
+    # A time computed under ACT/365F and handed to an ACT/360 curve is a
+    # silently wrong discount factor — off by ~1.4%, which on a 30-year
+    # swap is real money and looks entirely plausible. Times therefore
+    # never cross a curve boundary: callers pass dates, and each curve
+    # converts using its own day counter.
+
+    def time_to(self, d: date) -> float:
+        """Year fraction from ``as_of`` to ``d`` in *this curve's* day count."""
+        return float(self._day_counter.yearFraction(_ql.to_ql_date(self.as_of), _ql.to_ql_date(d)))
+
+    def discount_at(self, d: date) -> float:
+        return self.discount(self.time_to(d))
+
+    def zero_at(self, d: date) -> float:
+        return self.zero(self.time_to(d))
 
     def forward(self, t1: float, t2: float) -> float:
         """Continuously compounded forward between two times."""

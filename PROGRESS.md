@@ -14,8 +14,8 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > write timeouts). After the move the full suite runs in 10s. **Do not move it back under
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
-**Phase:** 1 — research workstation
-**Completion: 33.91%** — computed by `python scripts/completion.py`, never written by hand.
+**Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
+**Completion: 35.47%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -103,7 +103,34 @@ Criteria are copied from `CLAUDE.md` §8. Tick only when passing in CI on a clea
 
 ---
 
-## Phases 2–5
+## Phase 2 — real-time, portfolio, risk
+
+Criteria in `CLAUDE.md` §8. The ledger (`config/completion.yaml`) tracks one entry per criterion,
+because here the criteria *are* the deliverables — unlike Phase 1 there is no separate work-package
+plan, and inventing one would put a second set of numbers beside the gate's own.
+
+| Criterion | State | What is outstanding |
+|---|---|---|
+| Ticker plant (conflated / TPIPE) | 0.35 | venue adapters, security master enrichment, TGN/TCMP composites, Redpanda + NATS transports |
+| `ALLQ` correct-when-empty | 0.50 | the screen definition and the contribution API surface |
+| `PORT` with TFM3 v1 | 0.00 | not started |
+| `TVAL` v1 | 0.00 | not started |
+| `CDSW` vs ISDA test cases | 0.40 | the published cases themselves — the model is internally consistent, not externally confirmed |
+| `SWPM` multi-curve CSA-aware | 0.50 | **the screen is blocked on market data** (below); plus the §12.1 product breadth |
+| Canvas with FDC3 | 0.00 | not started |
+| gRPC + Arrow Flight | 0.00 | not started |
+
+**`SWPM` is blocked on a swap curve, not on the engine.** The multi-curve, CSA-aware pricer is
+built and validated (see the session log for 2026-08-01). What does not exist is a *market* to
+build a USD swap curve from: the store holds overnight SOFR (`fred:SOFR`) and the Treasury CMT
+curve (`fred:DGS*`) and nothing at swap tenors. FRED discontinued its swap-rate series in 2016.
+A screen fed the Treasury curve relabelled as a swap curve, or fed fabricated quotes, is exactly
+the plausible-looking lie this project exists to refuse — so the screen waits. The spec's own
+answer (§11.1) is **the DTCC SDR public dissemination feed** (`pddata.dtcc.com`, free and
+keyless) for swap rates, plus **exchange futures settlement files** for the front and middle of
+the curve. Neither has an adapter yet; either would unblock the screen.
+
+## Phases 3–5
 
 Not started. Criteria in `CLAUDE.md` §8. Do not begin a phase until the previous one is fully green.
 
@@ -135,6 +162,7 @@ Non-blocking, proceeding on stated defaults (flag if wrong):
 - [0003](docs/decisions/0003-phase1-oas-user-vol.md) — Phase 1 OAS: HW lattice with explicit user-supplied vol; VCUB is a Phase 2 drop-in
 - [0004](docs/decisions/0004-ci-github-actions.md) — CI = GitHub Actions on a private remote; `make check` is the single gate locally and in CI
 - [0005](docs/decisions/0005-phase1-universe-all-edgar-filers.md) — Phase 1 default universe = all EDGAR filers; bulk-first resumable ingest; CI fixture-only
+- [0006](docs/decisions/0006-curve-config-carries-index-and-leg-conventions.md) — `CurveConfig` carries the index tenor and the swap legs' conventions; the I4 pinned hash is re-pinned once
 
 ---
 
@@ -368,6 +396,32 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-08-01 — Phase 2 `SWPM`: the multi-curve, CSA-aware pricer
+
+`treble/analytics/curves/multicurve.py`, `derivatives/csa.py`, `derivatives/swap.py`. A forecast
+curve is bootstrapped against an *exogenous* discount curve; tenor basis swaps connect index
+curves; a cross-currency-basis CSA discount curve is built off the overnight curve; the CSA
+resolves to a named discount curve or refuses. DV01 and bucketed DV01 rebuild the curve set from
+bumped market quotes rather than shifting solved zeros.
+
+**Validation.** A trade written to match a curve input reprices to its quote to **under 0.01bp**,
+through a code path that shares nothing with the bootstrap's residual function — two
+implementations agreeing, not one agreeing with itself. The single-curve telescoping identity is
+broken by **$2.76m on $100m** notional, and a companion test shows the same assertion *pass* when
+the two curves are deliberately made one, so it is a check that can fail. `make mutation` now
+covers `swap.py`: **12/12 killed** across both targets.
+
+**Three mechanisms fired and were right.** (1) The pinned I4 hash rejected the `CurveConfig`
+schema change and demanded ADR-0006 — which found a real defect on the way: the Phase 1 bootstrap
+accrued both swap legs in one day count, so the curve repriced its inputs under its own
+definition of them while a *market* swap came out 3.4bp off. Now fixed with per-leg conventions.
+(2) The I3 registry walk caught the two curve builders. (3) Widening the I3 exclusion list is now
+itself bounded by `test_the_exclusion_list_stays_within_its_stated_category`, verified to fail —
+the list was the obvious way to delete the invariant instead of satisfying it, and that has
+happened here before.
+
+**Next:** the `SWPM` screen is blocked on a swap-curve data source (see Phase 2 above).
 
 ### 2026-07-29 — WP11: ICVS and YAS; the bond maths validated externally
 

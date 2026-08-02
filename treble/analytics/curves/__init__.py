@@ -17,15 +17,27 @@ from treble.analytics.curves.config import (
     Interpolation,
 )
 from treble.analytics.curves.hagan_west import MonotoneConvex
+from treble.analytics.curves.multicurve import (
+    CurveSet,
+    CurveSpec,
+    UnknownCurveError,
+    build_csa_discount_curve,
+    build_forecast_curve,
+)
 
 __all__ = [
     "REPRICE_TOLERANCE",
     "Curve",
     "CurveBuildError",
     "CurveConfig",
+    "CurveSet",
+    "CurveSpec",
     "InstrumentKind",
     "InstrumentSpec",
     "Interpolation",
     "MonotoneConvex",
+    "UnknownCurveError",
+    "build_csa_discount_curve",
     "build_curve",
+    "build_forecast_curve",
 ]

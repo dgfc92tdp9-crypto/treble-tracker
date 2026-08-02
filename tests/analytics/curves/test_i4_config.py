@@ -34,12 +34,34 @@ REFERENCE_CONFIG = CurveConfig(
 # Pinned. If this assertion ever fails, the serialisation changed and every
 # stamped envelope hash in existence is invalidated — that is a breaking
 # change requiring a decision record, not a test update.
-PINNED_HASH = "af6a2d6d50a23b145059314a1bf480719c488c801ec48310d3afc912eaffa227"
+#
+# Re-pinned once, on 2026-08-01, for ADR-0006: `index_tenor` and the swap
+# legs' day counts and frequency joined the config so that a forecast curve's
+# identity does not rest on its display name. The previous value was
+# af6a2d6d50a23b145059314a1bf480719c488c801ec48310d3afc912eaffa227. This test
+# is the reason that change could not be made quietly, which is its job.
+PINNED_HASH = "0f5b8cdc8fe6bc817904e681a3ed73458fc1b2931559016d788f83a487316fe6"
 
 
 class TestContentHash:
     def test_hash_is_stable_golden(self) -> None:
         assert REFERENCE_CONFIG.content_hash == PINNED_HASH
+
+    def test_the_new_identity_fields_change_the_hash(self) -> None:
+        """ADR-0006: the fields were added *because* they change identity.
+
+        A curve forecasting a 3M index and one forecasting 6M can otherwise
+        be identical in every respect that the hash sees, and would then be
+        indistinguishable in an I3 envelope.
+        """
+        for change in (
+            {"index_tenor": "3M"},
+            {"fixed_leg_day_count": DayCount.THIRTY_360},
+            {"float_leg_day_count": DayCount.ACT_360},
+            {"swap_fixed_frequency": 2},
+        ):
+            altered = REFERENCE_CONFIG.model_copy(update=change)
+            assert altered.content_hash != REFERENCE_CONFIG.content_hash, change
 
     def test_hash_deterministic_across_instances(self) -> None:
         clone = REFERENCE_CONFIG.model_copy(deep=True)

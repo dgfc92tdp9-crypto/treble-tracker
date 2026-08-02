@@ -31,7 +31,47 @@ _INFRASTRUCTURE_MODULES = {
     "treble.analytics.curves.bootstrap",
     "treble.analytics.curves.interpolators",
     "treble.analytics.curves.hagan_west",
+    "treble.analytics.curves.multicurve",
 }
+
+# The exclusion list is a *category*, not a convenience. Everything in it is
+# either the registry itself, the QuantLib adapter, or curve construction —
+# and curve construction is excluded for one stated reason: it returns
+# `Curve` objects whose identity travels as the config content hash (I4),
+# not as an envelope of their own.
+#
+# This bound exists because the list is the obvious way to make the walk
+# pass by deleting the mechanism instead of fixing the code, which has
+# happened before in this project: a drift check was once "fixed" by
+# removing the two adapters it was failing on. Adding a pricing module here
+# now fails a different test, so the escape hatch is closed.
+_ALLOWED_EXCLUSION_PREFIXES = (
+    "treble.analytics.registry",
+    "treble.analytics._ql",
+    "treble.analytics.curves.",
+)
+
+
+def test_the_exclusion_list_stays_within_its_stated_category() -> None:
+    """Guards the guard: only curve construction may be excluded.
+
+    Verified to fail: adding `treble.analytics.derivatives.swap` to the list
+    above trips this test, which is the whole point of it existing.
+    """
+    stray = sorted(
+        name for name in _INFRASTRUCTURE_MODULES if not name.startswith(_ALLOWED_EXCLUSION_PREFIXES)
+    )
+    assert stray == [], (
+        "these modules are excluded from the I3 walk but are not curve "
+        "construction, the registry, or the QuantLib adapter: " + ", ".join(stray)
+    )
+
+
+def test_every_excluded_module_exists() -> None:
+    """A stale entry silently stops excluding anything — and would go on
+    reading as though it did."""
+    for name in _INFRASTRUCTURE_MODULES:
+        importlib.import_module(name)
 
 
 def _walk_public_callables() -> list[tuple[str, str, object]]:

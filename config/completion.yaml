@@ -99,6 +99,32 @@ phase_2:
                   the criterion is validation against ISDA's *published test
                   cases*, and internal consistency is not external
                   confirmation"}
-  P2_6:  {done: 0.0, name: "SWPM multi-curve CSA-aware discounting"}
+  P2_6:  {done: 0.5, name: "SWPM multi-curve CSA-aware discounting",
+          basis: "the criterion's named requirement — multi-curve CSA-aware
+                  discounting — ships and is validated. A forecast curve is
+                  bootstrapped against an exogenous discount curve (never
+                  itself), tenor basis curves connect index tenors, a
+                  cross-currency-basis CSA discount curve is built off the
+                  overnight curve, and the CSA resolves to a named discount
+                  curve or refuses. The vanilla swap prices with PV, par
+                  rate, annuity, cash flows, amortising notionals, and DV01
+                  and bucketed DV01 computed by rebuilding the curves from
+                  bumped market quotes. Validation: a trade written to match
+                  a curve input reprices to its quote to under 0.01bp
+                  through a code path independent of the bootstrap residual,
+                  and 6/6 targeted mutations of the pricer are killed.
+                  Outstanding, and why this is not higher: (a) the SWPM
+                  *screen* is not built, because no free source in the store
+                  supplies USD swap or OIS term quotes — FRED carries
+                  overnight SOFR and the Treasury CMT curve and nothing at
+                  swap tenors, so a screen would have to be fed fabricated
+                  quotes or the Treasury curve mislabelled as a swap curve;
+                  the spec's own answer is the DTCC SDR public feed plus
+                  exchange futures settlements (§11.1) and neither has an
+                  adapter. (b) spec §12.1 lists a product set this does not
+                  yet cover: OIS legs (daily compounding), cross-currency
+                  with notional exchange and MtM resets, inflation,
+                  swaptions/caps/floors, CMS, asset swaps, cancellable and
+                  extendible, total return"}
   P2_7:  {done: 0.0, name: "Canvas with FDC3 context propagation"}
   P2_8:  {done: 0.0, name: "gRPC + Arrow Flight transports"}
