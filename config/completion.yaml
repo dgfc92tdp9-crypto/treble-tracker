@@ -169,30 +169,39 @@ phase_2:
                   rating and seniority. (b) no TVAL screen. (c) §15.4's ML
                   residual layer and §15.5's multi-time bid/mid/ask
                   snapshots are untouched"}
-  P2_5:  {done: 0.8, name: "CDSW against ISDA published test cases",
+  P2_5:  {done: 0.85, name: "CDSW against ISDA published test cases",
           basis: "the criterion is met: validated against ISDA's own
-                  published RFR test grid (USD/SOFR, trade date 2022-06-22,
-                  from cdsmodel.com under the ISDA CDS Standard Model Public
-                  Licence v1.0, which permits reproduction and derivative
-                  works with attribution retained). 2,388 published cases,
-                  hazard calibrated so our par spread equals ISDA's quoted
-                  spread and then priced at the trade's own coupon — the
-                  ISDA workflow, so this tests conventions rather than a
-                  curve fit. Result: median error 0.33bp of notional, worst
-                  1.42bp, unbiased in sign. Getting there required the model
-                  to accept a bootstrapped discount curve rather than a flat
-                  rate; the flat-rate version left a 0.49bp median and a
-                  4.68bp worst. Outstanding, and why this is not 1.0: the
-                  residual is measured and attributed rather than removed —
-                  it grows monotonically with maturity (0.11bp at 1y to
-                  0.52bp at 10y) and with spread, which is the signature of
-                  the per-period midpoint approximations for accrued-on-
-                  default and protection discounting. Removing it needs real
-                  IMM payment schedules and a finer protection integral. A
-                  test asserts the attribution rather than leaving the
-                  tolerance as a hiding place. Only the USD/SOFR grid is
-                  wired; ISDA publishes EUR, GBP, JPY, CHF, AUD and the
-                  older IBOR grids too"}
+                  published RFR test grids (from cdsmodel.com under the ISDA
+                  CDS Standard Model Public Licence v1.0, which permits
+                  reproduction and derivative works with attribution
+                  retained). Six currencies now, not one — USD/SOFR at trade
+                  date 2022-06-22 plus AUD, CHF, EUR, GBP and JPY at
+                  2021-04-30 — 2,388 published cases each, 10,344 evaluated
+                  per run after striding the five added grids. Hazard
+                  calibrated so our par spread equals ISDA's quoted spread
+                  and then priced at the trade's own coupon: the ISDA
+                  workflow, so this tests conventions rather than a curve
+                  fit. Result, full grids: median error 0.0424bp (JPY) to
+                  0.3259bp (USD), worst 0.4659bp (JPY) to 6.5125bp (AUD),
+                  mildly negative bias of -0.04 to -0.26bp in every currency.
+                  Two trade dates is the point of the breadth — one date
+                  cannot separate a front-stub error from a curve-level one.
+                  Outstanding, and why this is not 1.0: the residual is
+                  measured and bounded but NOT attributed. The previous
+                  attribution recorded here was wrong and has been retracted.
+                  Two causes were tested and refuted: sub-dividing the
+                  protection integral 2/4/8/16x moves the worst AUD case from
+                  6.5125bp to 6.5127bp (no effect at any resolution), and
+                  replacing the uniform schedule with the real IMM roll
+                  schedule made every grid worse (AUD median 0.060 to
+                  1.087bp). The surviving lead is front-stub handling: the
+                  five grids traded 41 days into a coupon period carry the
+                  larger maxima and USD on a 2-day stub does not, despite
+                  having the highest rates. Recorded in the test as a lead,
+                  not a conclusion. The wide worst-case tolerance is fenced
+                  by an assertion that the maximum sits at the longest
+                  maturity, so it cannot double as a hiding place. Also
+                  outstanding: the older IBOR grids are not wired"}
   P2_6:  {done: 0.85, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
