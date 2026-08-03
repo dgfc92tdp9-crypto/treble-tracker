@@ -46,10 +46,23 @@ subjects, ~8.1M facts**, a Tauri desktop app that opens from the Dock, thirteen 
 identically on two surfaces from one definition, and bond analytics that reproduce the US
 Treasury's own auction yields to **0.07bp** worst case across 46 auctions.
 
-**Next action:** the `SWPM` screen needs a forecast curve (see Phase 2). Then the untouched
-Phase 2 criteria: `PORT`/TFM3, `TVAL`, Canvas + FDC3, gRPC + Arrow Flight. Deferred deliberately,
-not forgotten: EDGAR Exhibit 21 / OpenCorporates (spec §9.5 breadth), and `CDSW` against ISDA's
-published test cases.
+**Next action: gRPC + Arrow Flight transports (spec §8.3).** Chosen because it is the only thing
+keeping `ALLQ` at 0.95 — the contribution service is in-process, so a remote participant cannot
+contribute — and it has no data dependency. Arrow Flight fits a store that is already
+DuckDB/Parquet/Arrow: TQL result sets and bulk universe pulls are the natural payloads.
+
+Then, in rough order of what is unblocked:
+
+- **`TVAL` Prong 2** — the relative value algorithm. Needs an issuer curve fitted across an
+  issuer's outstanding debt and a similarity metric over sector, rating and seniority.
+- **Canvas + FDC3** — UI work, no data dependency.
+- **`PORT` / TFM3** — *check the data first.* A factor model needs a cross-section of equity
+  returns, and this store has index levels (`fred:SP500` and friends) but no per-name price
+  history. Expect this to be data-blocked like `SWPM` was, and establish that before building.
+- **`CDSW` to 1.0** — needs ISDA's published test cases.
+- **Ticker plant to 1.0** — venue adapters, TGN/TCMP composites, Redpanda and NATS transports.
+
+Deferred deliberately, not forgotten: EDGAR Exhibit 21 / OpenCorporates (spec §9.5 breadth).
 
 **Standing directives (Jack):** accuracy above all; stress tests + real data always; API
 choices delegated (pick accuracy-maximising, report after); launch = full spec through
