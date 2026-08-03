@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 42.50%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 44.06%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -117,11 +117,11 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 |---|---|---|
 | Ticker plant (conflated / TPIPE) | 0.45 | venue adapters, security master enrichment, Redpanda + NATS transports |
 | `ALLQ` correct-when-empty | **1.00** | complete for this phase — the only limitation left is the loopback binding, which is §22.1 and out of scope until Phase 5 |
-| `PORT` with TFM3 v1 | 0.00 | not started |
+| `PORT` with TFM3 v1 | 0.00 | **hard-blocked on data** — no per-name equity price history exists; see below |
 | `TVAL` v1 | 0.50 | Prong 2 (comparables / relative value) — half the methodology; plus the screen, the ML layer and snapshots |
 | `CDSW` vs ISDA test cases | 0.40 | the published cases themselves — the model is internally consistent, not externally confirmed |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
-| Canvas with FDC3 | 0.00 | not started |
+| Canvas with FDC3 | 0.50 | layout model, persistence, renderer wiring — and whether the TUI can participate at all |
 | gRPC + Arrow Flight | 0.80 | streaming and the real-time services (mktdata, mktbar, mktvwap, ems, docs) — all need venue adapters that do not exist |
 
 **The swap curves exist, and the whole chain is verified on them.** The DTCC SDR adapter
@@ -160,6 +160,15 @@ ordinary.
 > The source is marked `redistribution_restricted` and throttled to one request per five
 > seconds. If the terms are later read and prohibit automated access,
 > `treble/ingest/dtcc.py` is the thing to delete.
+
+> **`PORT`/TFM3 is blocked on data, and Phase 2 cannot gate without resolving it.** Measured
+> 2026-08-03: TFM3 needs a return panel to estimate its factor covariance (§16.3), and this
+> store has *no per-name equity price history*. `PX_LAST` covers 36 FRED series (index levels,
+> not constituents), 3 crypto and 3 FX pairs. N-PORT implied marks give 1,861 names across
+> **three** report dates — two return observations per name. A covariance matrix cannot be
+> estimated from two observations at any number of factors, so this is a hard block rather than
+> a partial. The one free candidate for daily per-name equity prices identified so far is a
+> Tiingo registration. **Decide this before attempting PORT**, not during.
 
 **The `SWPM` screen ships** (2026-08-02): three tabs — valuation, curve environment, cash flow
 schedule — rendering on both surfaces from one definition, with a conformance case per tab. It

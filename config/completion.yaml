@@ -127,7 +127,23 @@ phase_2:
                   version of this basis said the service was 'in-process',
                   which was wrong — POST /contribute is a real network
                   endpoint, just not a routable one"}
-  P2_3:  {done: 0.0, name: "PORT with TFM3 v1; factor model validation"}
+  P2_3:  {done: 0.0, name: "PORT with TFM3 v1; factor model validation",
+          basis: "zero, and hard-blocked on data rather than effort —
+                  measured 2026-08-03 rather than assumed. TFM3 is 1,500+
+                  factors recalculated daily (§16.2) and its mathematics
+                  (§16.3) needs a K x K factor covariance estimated from a
+                  return panel. The store has no per-name equity price
+                  history at all: PX_LAST covers 36 FRED series (index
+                  levels, not constituents), 3 crypto and 3 FX pairs.
+                  N-PORT implied marks give 1,861 names across *three*
+                  report dates — two return observations per name, which
+                  cannot estimate a covariance matrix at any number of
+                  factors. No modelling recovers a panel that does not
+                  exist, so this is not a partial. Unblocking it needs a
+                  daily per-name equity price source; the one free candidate
+                  identified so far is a Tiingo registration. Recorded here
+                  so that the Phase 2 gate cannot be approached without
+                  someone deciding that question first"}
   P2_4:  {done: 0.5, name: "TVAL v1 with transparency drill-down",
           basis: "the criterion's two named requirements ship. Score: 1-10
                   from four published components — corroboration, timeliness,
@@ -200,7 +216,33 @@ phase_2:
                   rather than 1.0 because the trade is a template rather
                   than a bookable position, and because the §12.1 product
                   set above is genuinely part of what SWPM means"}
-  P2_7:  {done: 0.0, name: "Canvas with FDC3 context propagation"}
+  P2_7:  {done: 0.5, name: "Canvas with FDC3 context propagation",
+          basis: "the criterion's named semantic ships and is
+                  mutation-verified 6/6. Colour-group context propagation
+                  (§5.3): a broadcast reaches every component on the
+                  sender's channel and no other — not another colour, not an
+                  unlinked component, and not the sender itself, per FDC3.
+                  Joining a channel syncs immediately, because a component
+                  that joined red and kept its previous instrument would
+                  look linked and be stale, which on screen is
+                  indistinguishable from being in sync. Leaving keeps the
+                  last context and stops tracking. FDC3 interop is the
+                  standard's own `fdc3.instrument`, so a third-party
+                  application can broadcast one; since FDC3 carries no asset
+                  class, the assumed yellow key is a named parameter rather
+                  than a buried constant. One mutation found a latent bug
+                  rather than a weak test: without the unlinked-sender
+                  check, two unlinked components form an implicit shared
+                  group and overwrite each other. Outstanding, and why this
+                  is 0.5: no layout model (position, size, multi-display),
+                  no persistence — §5.3 says layouts are saved per user and
+                  follow them via Treble Anywhere — and no renderer wiring,
+                  so the semantics are enforced but nothing on screen yet
+                  consumes them. The TUI's participation is also undecided:
+                  FDC3 is a browser interop standard, and Canvas may be
+                  web/desktop only, which would be the first place I6's
+                  one-definition-many-renderers stops holding and must be
+                  said rather than implied"}
   P2_8:  {done: 0.8, name: "gRPC + Arrow Flight transports",
           basis: "Arrow Flight ships: a FlightServerBase serving guarded
                   fact exports as Arrow tables with a fixed schema, reading
