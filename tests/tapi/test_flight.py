@@ -8,6 +8,7 @@ that a client can tell when something was held back.
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -160,3 +161,39 @@ class TestNoNetworkSurfaceByDefault:
         """Enumerating namespaces would be a catalogue of what this node
         holds, served without authentication."""
         assert list(server.list_flights(None, b"")) == []
+
+
+class TestAMixedNamespace:
+    """One namespace, two sources — the case that actually occurs.
+
+    Every other guard test uses a single-source namespace, which is the
+    easy case: the export is either whole or empty, and either is obvious.
+    A *partial* export is the dangerous one, because it is the only outcome
+    a warehouse could mistake for a complete one.
+    """
+
+    @pytest.fixture
+    def mixed(self, tmp_path: Path) -> FactExportServer:
+        store = DuckStore(tmp_path / "mixed.db")
+        _write(store, "fred", ["mix:OPEN_A", "mix:OPEN_B"])
+        _write(store, "dtcc-sdr", ["mix:RESTRICTED_A"])
+        return FactExportServer(store, location="grpc://127.0.0.1:0")
+
+    def test_open_facts_still_export(self, mixed: FactExportServer) -> None:
+        """The guard must not become a blanket refusal on contact with one
+        restricted row. Bulk export is a headline capability (§8.5)."""
+        table = mixed.export_table("mix", as_of=AS_OF)
+        assert sorted(table.column("subject").to_pylist()) == ["mix:OPEN_A", "mix:OPEN_B"]
+
+    def test_the_restricted_fact_is_absent(self, mixed: FactExportServer) -> None:
+        table = mixed.export_table("mix", as_of=AS_OF)
+        assert "mix:RESTRICTED_A" not in table.column("subject").to_pylist()
+
+    def test_a_partial_export_does_not_claim_to_be_complete(self, mixed: FactExportServer) -> None:
+        """The whole point. Two of three rows arrived; a consumer that read
+        `complete=true` here would compute coverage, index weights and risk
+        aggregates against a hole it could not see, and every one of those
+        numbers would look ordinary."""
+        table = mixed.export_table("mix", as_of=AS_OF)
+        assert table.schema.metadata[b"treble.complete"] == b"false"
+        assert json.loads(table.schema.metadata[b"treble.withheld"]) == {"dtcc-sdr": 1}

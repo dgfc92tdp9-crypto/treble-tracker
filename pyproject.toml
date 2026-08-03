@@ -43,6 +43,8 @@ dependencies = [
   # cli
   "typer>=0.12",
   "rich>=13.8",
+  "grpcio>=1.83.0",
+  "grpcio-tools>=1.83.0",
 ]
 
 [project.optional-dependencies]

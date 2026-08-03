@@ -18,6 +18,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 import duckdb
+import pyarrow as pa
 
 from treble.core.facts import Fact, FactValue
 from treble.core.identifiers import TUID
@@ -54,6 +55,44 @@ CREATE TABLE IF NOT EXISTS facts (
 CREATE INDEX IF NOT EXISTS facts_read_idx
     ON facts (subject, field, effective_from, knowledge_from);
 """
+
+#: Fact columns, in table order. Named explicitly in the bulk INSERT rather
+#: than relying on `SELECT *`, so a column added to the table in a later
+#: migration cannot silently shift every value one place to the left.
+_FACT_COLUMNS = (
+    "subject",
+    "field",
+    "value_kind",
+    "value_num",
+    "value_int",
+    "value_text",
+    "value_bool",
+    "value_date",
+    "effective_from",
+    "effective_to",
+    "knowledge_from",
+    "provenance_id",
+)
+
+#: Arrow types matching the `facts` DDL above. Kept adjacent to it because
+#: the two must agree and nothing but proximity and the round-trip tests
+#: enforces that.
+_FACT_ARROW_SCHEMA = pa.schema(
+    [
+        pa.field("subject", pa.string()),
+        pa.field("field", pa.string()),
+        pa.field("value_kind", pa.string()),
+        pa.field("value_num", pa.float64()),
+        pa.field("value_int", pa.int64()),
+        pa.field("value_text", pa.string()),
+        pa.field("value_bool", pa.bool_()),
+        pa.field("value_date", pa.date32()),
+        pa.field("effective_from", pa.date32()),
+        pa.field("effective_to", pa.date32()),
+        pa.field("knowledge_from", pa.timestamp("us", tz="UTC")),
+        pa.field("provenance_id", pa.string()),
+    ]
+)
 
 # Latest knowledge wins per effective period, visible as of the knowledge date.
 _VISIBLE = """
@@ -123,6 +162,19 @@ class DuckStore:
     # -- writes (insert-only) -------------------------------------------------
 
     def write_provenance(self, records: list[Provenance]) -> None:
+        # Deliberately row-at-a-time, unlike `write_facts` below.
+        #
+        # That method was rewritten to a single Arrow batch after its loop
+        # was measured at 11.2s for one EDGAR payload. The obvious next move
+        # is to do the same here, and the measurement says not to: the live
+        # store holds 8,107,326 facts against 277 provenance records, a
+        # ratio of 29,268:1. The loop costs 277 statements across the whole
+        # history of the install.
+        #
+        # A bulk version would also have to reproduce the dedup below as an
+        # anti-join, which is more to get wrong than the microseconds are
+        # worth. Optimising this would be optimising on the shape of the
+        # neighbouring bug rather than on a measurement.
         for record in records:
             # Content-addressed id: re-inserting an identical record is a no-op.
             self._conn.execute(
@@ -159,25 +211,57 @@ class DuckStore:
             raise MissingProvenanceError(
                 f"facts reference unknown provenance ids: {sorted(missing)[:3]}"
             )
+        if not facts:
+            return
+
+        # One Arrow batch, one INSERT. The row-at-a-time loop this replaced
+        # cost 11.2s for a single EDGAR companyfacts payload (37,540 facts)
+        # against 0.5s here — a 21x difference, measured. Each `execute` was
+        # a full round trip through DuckDB's parser, and the cost fell on
+        # every `treble populate` as much as on the test suite.
+        #
+        # The table's ART index accounts for 0.10s of that and is left in
+        # place: dropping and recreating it around each write saves less
+        # than it risks, since a crash mid-load would leave the store
+        # without the index every read depends on.
+        columns: dict[str, list[object]] = {name: [] for name in _FACT_COLUMNS}
         for fact in facts:
             kind, num, intv, text, boolean, day = _decompose(fact.value)
+            columns["subject"].append(fact.subject)
+            columns["field"].append(fact.field)
+            columns["value_kind"].append(kind)
+            columns["value_num"].append(num)
+            columns["value_int"].append(intv)
+            columns["value_text"].append(text)
+            columns["value_bool"].append(boolean)
+            columns["value_date"].append(day)
+            columns["effective_from"].append(fact.effective_from)
+            columns["effective_to"].append(fact.effective_to)
+            columns["knowledge_from"].append(fact.knowledge_from)
+            columns["provenance_id"].append(fact.provenance_id)
+
+        # The schema is explicit rather than inferred. A batch whose values
+        # are all numeric leaves `value_text` entirely null, and Arrow would
+        # infer the null type for it — which then fails or silently coerces
+        # on insert depending on the column. Stating the types means a batch
+        # of one kind of value writes exactly like a batch of many.
+        batch = pa.table(
+            {
+                name: pa.array(values, type=_FACT_ARROW_SCHEMA.field(name).type)
+                for name, values in columns.items()
+            },
+            schema=_FACT_ARROW_SCHEMA,
+        )
+        self._conn.register("_incoming_facts", batch)
+        try:
             self._conn.execute(
-                "INSERT INTO facts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                [
-                    fact.subject,
-                    fact.field,
-                    kind,
-                    num,
-                    intv,
-                    text,
-                    boolean,
-                    day,
-                    fact.effective_from,
-                    fact.effective_to,
-                    fact.knowledge_from,
-                    fact.provenance_id,
-                ],
+                f"INSERT INTO facts ({', '.join(_FACT_COLUMNS)}) "  # noqa: S608
+                f"SELECT {', '.join(_FACT_COLUMNS)} FROM _incoming_facts"
             )
+        finally:
+            # Unregister even on failure: a leftover view would shadow the
+            # next write's batch and silently insert the previous one again.
+            self._conn.unregister("_incoming_facts")
 
     # -- reads (as_of is required; I2) ---------------------------------------
 

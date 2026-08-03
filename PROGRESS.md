@@ -442,6 +442,37 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
 
+### 2026-08-03 (last) — the suite was slow because *ingest* was slow
+
+`make gate` went from **1003s to 52s** — same command, clean runs both sides. The cause was not
+the test suite.
+
+`DuckStore.write_facts` inserted one row at a time in a Python loop: 37,540 separate `execute()`
+calls for a single EDGAR companyfacts payload, each a full round trip through DuckDB's parser.
+Rewritten to build one Arrow batch and issue one `INSERT`: **11.20s -> 0.17s, 65x**.
+
+The investigation is worth keeping because the first two hypotheses were both wrong:
+
+| hypothesis | measurement | verdict |
+|---|---|---|
+| coverage instrumentation | no-coverage run equally slow | wrong |
+| ~900 individually slow tests | every slow entry was `setup`, not `call` | wrong |
+| an un-scoped fixture | true, but the *symptom* | incomplete |
+| the fixture's write path | parse 0.24s, write 12.20s | **cause** |
+
+Session-scoping the fixture — the fix the symptom pointed at — would have made the suite fast,
+left **every `treble populate` exactly as slow**, and made the tests share mutable state. The
+8.1M-fact store was built through that loop.
+
+Two traps in the rewrite, both guarded: the Arrow schema is **explicit**, because that EDGAR
+payload is 100% numeric and Arrow would infer the null type for `value_text` and then fail or
+coerce; and the INSERT **names its columns**, so a later migration adding one cannot shift every
+value a place to the left. All five value kinds verified to round-trip with exact types.
+
+`write_provenance` has the same shape and was **left alone on the measurement**: 277 records
+against 8,107,326 facts, 29,268:1. The reason is now a comment there, so it is not "fixed" later
+on the shape of its neighbour's bug.
+
 ### 2026-08-03 (later) — the bulk-export guard, and Arrow Flight on top of it
 
 **A flag declared thirteen times and read by nothing.** `SourceMeta.redistribution_restricted`
