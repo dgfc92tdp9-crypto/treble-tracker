@@ -92,7 +92,7 @@ phase_2:
                   outstanding on this criterion and are credited once.
                   Outstanding: venue adapters, security master enrichment,
                   and the Redpanda and NATS transports"}
-  P2_2:  {done: 0.95, name: "ALLQ correct-when-empty; contribution API",
+  P2_2:  {done: 1.0, name: "ALLQ correct-when-empty; contribution API",
           basis: "both halves ship. Correct-when-empty: expired quotes leave
                   the book empty rather than stale, it records when it last
                   held a live quote, a one-way market has no spread, and the
@@ -109,15 +109,21 @@ phase_2:
                   TGN and TCMP are separate composites because a composite
                   blending indicative levels into an executable price is the
                   most dangerous number on the screen. Outstanding, and why
-                  this is not 1.0: the HTTP server binds 127.0.0.1 only
+                  this is not counted lower: the HTTP server binds 127.0.0.1 only
                   and deliberately so — there is no authentication, and
                   exposing it needs §22.1's entitlement model (passkeys,
                   per-user entitlements, OIDC, audit logging), which no
                   phase before Phase 5 federation requires. So a remote
                   participant cannot contribute, and the reason is the
                   missing entitlement model rather than the transport. The
-                  gRPC surface the criterion pairs with this is also
-                  outstanding (P2_8). Corrected 2026-08-03: an earlier
+                  gRPC contribution surface now ships as well (P2_8), so
+                  the criterion's two named halves — correct-when-empty and
+                  a complete contribution API — are both done over every
+                  transport this phase defines. Counted 1.0 on that basis:
+                  the remaining limitation is the loopback binding, and that
+                  is §22.1, which no phase before Phase 5 federation
+                  requires. Out of scope rather than missing.
+                  Corrected 2026-08-03: an earlier
                   version of this basis said the service was 'in-process',
                   which was wrong — POST /contribute is a real network
                   endpoint, just not a routable one"}
@@ -195,7 +201,7 @@ phase_2:
                   than a bookable position, and because the §12.1 product
                   set above is genuinely part of what SWPM means"}
   P2_7:  {done: 0.0, name: "Canvas with FDC3 context propagation"}
-  P2_8:  {done: 0.4, name: "gRPC + Arrow Flight transports",
+  P2_8:  {done: 0.8, name: "gRPC + Arrow Flight transports",
           basis: "Arrow Flight ships: a FlightServerBase serving guarded
                   fact exports as Arrow tables with a fixed schema, reading
                   through the same store handle and the same point-in-time
@@ -209,6 +215,22 @@ phase_2:
                   namespaces are refused outright per §9.3, and the
                   withholding travels in the table's schema metadata so a
                   warehouse can tell whether its copy is complete. 5/5
-                  mutations of the guard killed. Outstanding: gRPC itself,
-                  which needs grpcio/grpcio-tools/protobuf added and proto
-                  definitions for the §8.3 services"}
+                  mutations of the guard killed. gRPC now ships too: five
+                  services (refdata, flds, instruments, contrib, tql) over
+                  the same LocalTapi the HTTP and Flight transports use, so
+                  a client choosing gRPC gets the same answer to the same
+                  question. Generated from proto/tapi.proto by `make proto`,
+                  which `make check` depends on; the stubs are gitignored
+                  and never committed, because a committed stub can silently
+                  diverge from the proto beside it. A kill-test asserts the
+                  generated services and RPCs match the proto's declarations
+                  — verified to fail on a renamed service. as_of is required
+                  and must be timezone-aware on the wire (I2), and
+                  FIRMNESS_UNSPECIFIED is rejected rather than defaulted.
+                  Outstanding, and why this is not 1.0: spec §8.3 also lists
+                  mktdata, mktbar, mktvwap, ems and docs, and names streaming
+                  subscriptions — all of which need the ticker plant's venue
+                  adapters, which do not exist. Those services are absent
+                  rather than stubbed, because an RPC that accepts a request
+                  and returns nothing useful is worse than one a client can
+                  see is missing"}

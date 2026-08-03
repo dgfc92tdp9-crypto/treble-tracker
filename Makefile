@@ -48,7 +48,10 @@ completion:            ## print the completion figure (computed, never hand-writ
 web:                   ## compile the shared TS renderer (a renderer under conformance)
 	./scripts/build_web.sh
 
-check: lint types imports web test   ## everything CI runs
+proto:                 ## regenerate the gRPC stubs from proto/tapi.proto
+	./scripts/gen_proto.sh
+
+check: proto lint types imports web test   ## everything CI runs
 
 tui:
 	uv run treble tui

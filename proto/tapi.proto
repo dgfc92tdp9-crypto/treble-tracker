@@ -1,0 +1,210 @@
+// TAPI over gRPC — the schema every client is generated from (spec §8.3).
+//
+//     Clients in Python, Rust, Java, C++, JavaScript/TypeScript, R, and Go,
+//     generated from a single Protobuf schema so they never drift apart.
+//
+// This file is the contract. The generated Python lives in
+// `treble/tapi/_generated/` and is **not committed** — it is produced by
+// `make proto`, which `make check` depends on, so a clean checkout always
+// regenerates from this file.
+//
+// That choice is deliberate. Committed stubs can silently diverge from the
+// proto beside them: they keep compiling and keep serving a schema nobody
+// declared, while this file reads as the contract. That is the same failure
+// this project has now found four times — a mechanism whose existence is
+// verified and whose effect is not — and `tests/tapi/test_grpc.py` closes
+// it by asserting the generated services match the services declared here.
+//
+// Scope note: the services below mirror the surface `LocalTapi` already
+// serves over HTTP. `mktdata`, `mktbar`, `mktvwap`, `ems` and `docs` from
+// the §8.3 table are absent rather than stubbed, because an RPC that
+// accepts a request and returns nothing useful is worse than one a client
+// can see is missing.
+
+syntax = "proto3";
+
+package treble.tapi.v1;
+
+// ---------------------------------------------------------------------
+// Common types
+// ---------------------------------------------------------------------
+
+// A point-in-time cut. Required on every read (invariant I2): a request
+// without one would be answered "as of now" by the server's clock, and two
+// clients would silently get different answers to the same question.
+message AsOf {
+  // RFC 3339, timezone-aware. A naive timestamp is rejected rather than
+  // assumed to be UTC.
+  string timestamp = 1;
+}
+
+// A security reference as a user would type it: "IBM US Equity".
+message SecurityQuery {
+  string ticker = 1;
+  string key = 2;    // yellow key: Equity, Corp, Govt, Index, Curncy...
+  string venue = 3;  // optional
+}
+
+// One resolved field value with its provenance (invariant I1).
+message FieldValue {
+  string mnemonic = 1;
+  bool has_value = 2;      // false means "not reported", never zero
+  double number = 3;
+  string text = 4;
+  string provenance_id = 5;
+  string effective_from = 6;
+  string effective_to = 7;
+  bool stale = 8;
+}
+
+// ---------------------------------------------------------------------
+// //trb/refdata — current and historical values
+// ---------------------------------------------------------------------
+
+message ReferenceDataRequest {
+  SecurityQuery security = 1;
+  repeated string mnemonics = 2;
+  map<string, string> overrides = 3;
+  AsOf as_of = 4;
+}
+
+message ReferenceDataResponse {
+  repeated FieldValue values = 1;
+}
+
+message SeriesRequest {
+  SecurityQuery security = 1;
+  string binding = 2;
+  AsOf as_of = 3;
+}
+
+// A row of a series pane. Cells are strings on the wire because a series
+// mixes labels, dates and numbers in one row, and a typed union per cell
+// would be a schema for the renderer's convenience rather than the data's.
+message SeriesRow {
+  repeated string cells = 1;
+}
+
+message SeriesResponse {
+  repeated SeriesRow rows = 1;
+}
+
+service RefData {
+  rpc GetReferenceData(ReferenceDataRequest) returns (ReferenceDataResponse);
+  rpc GetSeries(SeriesRequest) returns (SeriesResponse);
+}
+
+// ---------------------------------------------------------------------
+// //trb/flds — the field dictionary
+// ---------------------------------------------------------------------
+
+message FieldSearchRequest {
+  string query = 1;
+  int32 limit = 2;
+}
+
+message FieldDescription {
+  string mnemonic = 1;
+  string description = 2;
+  string field_type = 3;
+  repeated string sources = 4;
+}
+
+message FieldSearchResponse {
+  repeated FieldDescription fields = 1;
+}
+
+service Flds {
+  rpc SearchFields(FieldSearchRequest) returns (FieldSearchResponse);
+}
+
+// ---------------------------------------------------------------------
+// //trb/instruments — identifier resolution
+// ---------------------------------------------------------------------
+
+message ResolveRequest {
+  SecurityQuery security = 1;
+}
+
+message ResolveResponse {
+  string subject = 1;  // the storage key, e.g. "cusip:912810UT3"
+}
+
+service Instruments {
+  rpc Resolve(ResolveRequest) returns (ResolveResponse);
+}
+
+// ---------------------------------------------------------------------
+// //trb/contrib — contributed data submission (spec §2.2)
+// ---------------------------------------------------------------------
+
+enum Firmness {
+  // Unspecified is present because proto3 requires a zero value, and it is
+  // *rejected* by the server rather than defaulting. A quote whose firmness
+  // is unstated would be an opinion presented as a commitment or the
+  // reverse — wrong half the time either way.
+  FIRMNESS_UNSPECIFIED = 0;
+  FIRMNESS_INDICATIVE = 1;
+  FIRMNESS_EXECUTABLE = 2;
+}
+
+message ContributeRequest {
+  string subject = 1;
+  string contributor = 2;
+  Firmness firmness = 3;
+  // Optional sides. `has_bid`/`has_ask` distinguish "no bid" from "a bid of
+  // zero", which proto3 scalar defaults cannot.
+  bool has_bid = 4;
+  double bid = 5;
+  bool has_ask = 6;
+  double ask = 7;
+  bool has_bid_size = 8;
+  double bid_size = 9;
+  bool has_ask_size = 10;
+  double ask_size = 11;
+  string quoted_at = 12;  // RFC 3339; empty means "stamp on arrival"
+}
+
+message ContributeResponse {
+  bool accepted = 1;
+  string subject = 2;
+  string contributor = 3;
+  string quoted_at = 4;
+  int32 contributors = 5;
+  // The composites, echoed back. This is the "distribution reach" a
+  // contributor is paid in (§2.2) and the only signal that their level
+  // reached anyone.
+  bool has_tcmp_bid = 6;
+  double tcmp_bid = 7;
+  bool has_tcmp_ask = 8;
+  double tcmp_ask = 9;
+  bool has_tgn_bid = 10;
+  double tgn_bid = 11;
+  bool has_tgn_ask = 12;
+  double tgn_ask = 13;
+}
+
+service Contrib {
+  rpc Contribute(ContributeRequest) returns (ContributeResponse);
+}
+
+// ---------------------------------------------------------------------
+// //trb/tql — query execution
+// ---------------------------------------------------------------------
+
+message TqlRequest {
+  string query = 1;
+  AsOf as_of = 2;
+}
+
+message TqlResponse {
+  repeated string columns = 1;
+  repeated SeriesRow rows = 2;
+  // A query that could not run says so here rather than returning no rows:
+  // "no matches" and "the query was invalid" must not look the same.
+  string error = 3;
+}
+
+service Tql {
+  rpc Execute(TqlRequest) returns (TqlResponse);
+}
