@@ -29,6 +29,7 @@ from treble.core.facts import Fact
 from treble.core.identifiers import TUID, SecurityQuery, YellowKey
 from treble.core.provenance import ProvenanceId
 from treble.store.duck import DuckStore
+from treble.tapi.contribution import ContributionService
 from treble.tapi.fields import FIELDS, FieldDef, FieldDictionary
 from treble.tapi.swap_market import SwapMarket
 from treble.tapi.types import FieldResult
@@ -158,11 +159,17 @@ class LocalTapi:
         tickers: TickerIndex | None = None,
         fields: FieldDictionary | None = None,
         stale_after: timedelta = DEFAULT_STALE_AFTER,
+        contributions: ContributionService | None = None,
     ) -> None:
         self._store = store
         self._tickers = tickers
         self._fields = fields or FIELDS
         self._stale_after = stale_after
+        # An empty contribution service by default, which is the honest
+        # state: nobody is contributing to this install. `ALLQ` then renders
+        # its correct-when-empty case, which is the Phase 2 criterion rather
+        # than a placeholder for it.
+        self._contributions = contributions or ContributionService()
 
     # -- resolution ----------------------------------------------------
 
@@ -254,6 +261,8 @@ class LocalTapi:
         "sys:swap_curves",
         "sys:swpm_valuation",
         "sys:swpm_cashflows",
+        "sys:allq",
+        "sys:allq_composites",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -476,6 +485,8 @@ class LocalTapi:
             return self._treasury_curve(as_of=as_of)
         if binding in ("sys:swap_curves", "sys:swpm_valuation", "sys:swpm_cashflows"):
             return self._swpm(binding, as_of=as_of)
+        if binding in ("sys:allq", "sys:allq_composites"):
+            return self._allq(security, binding, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -506,6 +517,66 @@ class LocalTapi:
             # Rounded here rather than in a renderer: 1/12 rendered as
             # 0.08333333333333333 is noise in every surface that shows it.
             rows.append((label, round(years, 2), latest.value, latest.effective_from.isoformat()))
+        return tuple(rows)
+
+    # -- ALLQ (spec §2.2, §23.3) ----------------------------------------
+
+    @property
+    def contributions(self) -> ContributionService:
+        """The contribution API surface — the only write path in TAPI."""
+        return self._contributions
+
+    def _allq(
+        self, security: SecurityQuery | None, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """Every contributor's quote on one instrument, and the composites.
+
+        Returns rows for a book that may well be empty, because on this
+        install it always is — nobody contributes to a network of one. An
+        empty book is the answer, not a missing answer, and the screen
+        renders it as such (the Phase 2 criterion is `ALLQ`
+        *correct-when-empty*).
+        """
+        if security is None:
+            return ()
+        book = self._contributions.book(str(self.resolve(security)), as_of=as_of)
+
+        if binding == "sys:allq":
+            return tuple(
+                (
+                    quote.contributor,
+                    quote.firmness.value,
+                    quote.bid,
+                    quote.bid_size,
+                    quote.ask,
+                    quote.ask_size,
+                    quote.quoted_at.isoformat(timespec="seconds"),
+                )
+                for quote in book.quotes
+            )
+
+        tcmp_bid, tcmp_ask = book.tcmp
+        tgn_bid, tgn_ask = book.tgn
+        spread = book.spread
+        rows: list[tuple[str | float | int | None, ...]] = [
+            ("TCMP (executable)", tcmp_bid, tcmp_ask),
+            ("TGN (indicative)", tgn_bid, tgn_ask),
+            # Rounded here rather than in a renderer: a spread of
+            # 0.19999999999998863 is float noise in every surface that
+            # shows it, and rounding once keeps the two renderers agreeing.
+            ("Spread", round(spread, 6) if spread is not None else None, None),
+            ("Contributors", float(len(book.quotes)), None),
+        ]
+        if book.is_empty:
+            # An empty screen that cannot say how long it has been empty is
+            # indistinguishable from one that failed to load.
+            rows.append(
+                (
+                    "Last live",
+                    book.last_live.isoformat(timespec="seconds") if book.last_live else "never",
+                    None,
+                )
+            )
         return tuple(rows)
 
     # -- SWPM (spec §12.1) ----------------------------------------------

@@ -35,6 +35,20 @@ class Side(enum.Enum):
     ASK = "ask"
 
 
+class Firmness(enum.Enum):
+    """Whether a quote can be traded on (spec §2.2, §23.3).
+
+    Required on every quote, with no default. An indicative level is a
+    dealer's opinion; an executable one is a commitment. Either default
+    would be a lie half the time — defaulting to executable presents
+    opinions as tradeable, defaulting to indicative discards the one thing
+    that makes a quote actionable — so the contributor must say which.
+    """
+
+    INDICATIVE = "indicative"
+    EXECUTABLE = "executable"
+
+
 class Quote(BaseModel):
     """One contributor's two-sided price, with the time it was given.
 
@@ -46,8 +60,14 @@ class Quote(BaseModel):
 
     subject: TUID
     contributor: str
+    firmness: Firmness
     bid: float | None = None
     ask: float | None = None
+    #: Size behind each side, in notional. `None` means the contributor
+    #: published no size, which is information — a level without size is a
+    #: weaker level — and is not the same as a size of zero.
+    bid_size: float | None = None
+    ask_size: float | None = None
     #: When the contributor published it. Expiry is measured from here, not
     #: from arrival: a quote delayed in transit is already partly spent.
     quoted_at: datetime
@@ -89,6 +109,42 @@ class Book(BaseModel):
         if self.best_bid is None or self.best_ask is None:
             return None
         return self.best_ask - self.best_bid
+
+    # -- composites (spec §7 `TGN`, `TCMP`) -----------------------------
+
+    def _prices(self, side: Side, firmness: Firmness | None) -> list[float]:
+        return [
+            price
+            for quote in self.quotes
+            if firmness is None or quote.firmness is firmness
+            for price in ((quote.bid if side is Side.BID else quote.ask),)
+            if price is not None
+        ]
+
+    @property
+    def tcmp(self) -> tuple[float | None, float | None]:
+        """`TCMP` — the composite *executable* price.
+
+        Executable quotes only. A composite that blended indicative levels
+        into a price labelled executable would be the most dangerous number
+        on the screen: it reads as something a user can trade on, and the
+        one thing distinguishing it from TGN would have been discarded.
+        """
+        bids = self._prices(Side.BID, Firmness.EXECUTABLE)
+        asks = self._prices(Side.ASK, Firmness.EXECUTABLE)
+        return (max(bids) if bids else None, min(asks) if asks else None)
+
+    @property
+    def tgn(self) -> tuple[float | None, float | None]:
+        """`TGN` — the composite *indicative* price, over every live quote.
+
+        A separate property rather than the same number under another
+        label. When every contributor is firm the two agree, and that is a
+        fact about the market rather than an artefact of the code.
+        """
+        bids = self._prices(Side.BID, None)
+        asks = self._prices(Side.ASK, None)
+        return (max(bids) if bids else None, min(asks) if asks else None)
 
 
 class QuoteBook:

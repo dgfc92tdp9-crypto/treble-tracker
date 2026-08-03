@@ -35,6 +35,11 @@ from treble.cmd.grammar import CommandKind, parse_command
 from treble.render.contract.buffer import CellBuffer, layout_tree
 from treble.render.contract.registry import UnknownScreenError, available, get_screen
 from treble.render.contract.resolver import ScreenContext, TapiView, resolve
+from treble.tapi.contribution import (
+    ContributionRejectedError,
+    ContributionRequest,
+    ContributionService,
+)
 
 #: Loopback only — see the module docstring.
 DEFAULT_HOST = "127.0.0.1"
@@ -76,8 +81,38 @@ class CommandResponse(BaseModel):
     buffer: dict[str, object] | None = None
 
 
-def create_app(tapi: TapiView) -> FastAPI:
-    """Build the local TAPI service around a data path."""
+class ContributionResponse(BaseModel):
+    """What the network says back when a quote is accepted.
+
+    Echoes the composites so a contributor can see immediately whether
+    their level moved the market — which is the "distribution reach" the
+    contribution model is paid in (spec §2.2), and the only feedback a
+    participant gets that their price is live.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    accepted: bool
+    subject: str
+    contributor: str
+    quoted_at: datetime
+    contributors: int
+    tcmp_bid: float | None = None
+    tcmp_ask: float | None = None
+    tgn_bid: float | None = None
+    tgn_ask: float | None = None
+
+
+def create_app(tapi: TapiView, *, contributions: ContributionService | None = None) -> FastAPI:
+    """Build the local TAPI service around a data path.
+
+    `contributions` is a separate parameter rather than a widening of
+    :class:`TapiView`: that protocol is the *read* path screens resolve
+    through (I7), and adding a write method to it would let a resolver
+    publish a quote. Supplying nothing gives an empty in-process book,
+    which is this install's honest state.
+    """
+    contribution_service = contributions or ContributionService()
     api = FastAPI(
         title="Treble Tracker TAPI (local)",
         version="0.1.0",
@@ -90,6 +125,34 @@ def create_app(tapi: TapiView) -> FastAPI:
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
     )
+
+    @api.post("/contribute", response_model=ContributionResponse)
+    def contribute(request: ContributionRequest) -> ContributionResponse:
+        """Publish one quote to the contributed network (spec §2.2).
+
+        The only write path this server exposes. A refusal comes back as a
+        400 carrying the reason, because a contributor whose quote silently
+        vanished would keep sending it — and would believe their price was
+        on every reader's screen when it was not.
+        """
+        try:
+            quote = contribution_service.contribute(request, received_at=datetime.now(UTC))
+        except ContributionRejectedError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        book = contribution_service.book(request.subject, as_of=quote.quoted_at)
+        tcmp_bid, tcmp_ask = book.tcmp
+        tgn_bid, tgn_ask = book.tgn
+        return ContributionResponse(
+            accepted=True,
+            subject=str(quote.subject),
+            contributor=quote.contributor,
+            quoted_at=quote.quoted_at,
+            contributors=len(book.quotes),
+            tcmp_bid=tcmp_bid,
+            tcmp_ask=tcmp_ask,
+            tgn_bid=tgn_bid,
+            tgn_ask=tgn_ask,
+        )
 
     @api.get("/health")
     def health() -> dict[str, object]:

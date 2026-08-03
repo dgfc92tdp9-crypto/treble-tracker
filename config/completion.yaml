@@ -84,11 +84,26 @@ phase_2:
                   mutation-verified. Outstanding: venue adapters, security
                   master enrichment, TGN/TCMP composites, and the Redpanda and
                   NATS transports"}
-  P2_2:  {done: 0.5, name: "ALLQ correct-when-empty; contribution API",
-          basis: "the quote book is correct when empty — expired quotes leave
-                  it empty rather than stale, it records when it last held a
-                  live quote, and a one-way market has no spread. Outstanding:
-                  the ALLQ screen definition and the contribution API surface"}
+  P2_2:  {done: 0.95, name: "ALLQ correct-when-empty; contribution API",
+          basis: "both halves ship. Correct-when-empty: expired quotes leave
+                  the book empty rather than stale, it records when it last
+                  held a live quote, a one-way market has no spread, and the
+                  ALLQ screen renders the empty case with a contributor count
+                  and a last-live stamp so 'nobody is quoting' and 'the screen
+                  broke' cannot look the same — with a conformance case for
+                  the empty state and one for a quoted state. Contribution
+                  API: a validating service plus POST /contribute, which
+                  refuses anonymous, one-sided, crossed, non-positive,
+                  zero-size and future-dated quotes with the reason in a 400,
+                  and echoes the composites so a contributor can see their
+                  level reached the network. Quotes carry firmness
+                  (indicative/executable, required with no default) and size;
+                  TGN and TCMP are separate composites because a composite
+                  blending indicative levels into an executable price is the
+                  most dangerous number on the screen. Outstanding, and why
+                  this is not 1.0: the service is in-process, so a
+                  participant on another machine cannot yet contribute —
+                  that needs the shared transport of P2_8"}
   P2_3:  {done: 0.0, name: "PORT with TFM3 v1; factor model validation"}
   P2_4:  {done: 0.0, name: "TVAL v1 with transparency drill-down"}
   P2_5:  {done: 0.4, name: "CDSW against ISDA published test cases",

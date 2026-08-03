@@ -1,0 +1,56 @@
+{
+  "fields": {},
+  "series": {
+    "sys:allq": [
+      [
+        "Dealer A",
+        "executable",
+        98.25,
+        5000000.0,
+        98.75,
+        5000000.0,
+        "2026-08-02T15:00:00+00:00"
+      ],
+      [
+        "Dealer B",
+        "indicative",
+        98.4,
+        null,
+        98.6,
+        null,
+        "2026-08-02T15:00:00+00:00"
+      ],
+      [
+        "Dealer C",
+        "executable",
+        98.3,
+        2000000.0,
+        null,
+        null,
+        "2026-08-02T15:00:00+00:00"
+      ]
+    ],
+    "sys:allq_composites": [
+      [
+        "TCMP (executable)",
+        98.3,
+        98.75
+      ],
+      [
+        "TGN (indicative)",
+        98.4,
+        98.6
+      ],
+      [
+        "Spread",
+        0.2,
+        null
+      ],
+      [
+        "Contributors",
+        3.0,
+        null
+      ]
+    ]
+  }
+}

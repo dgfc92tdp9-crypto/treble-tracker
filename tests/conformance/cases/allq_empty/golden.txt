@@ -1,0 +1,22 @@
+ALL QUOTES · CONTRIBUTED NETWORK
+────────────────────────────────────────────────────────────────────────────
+CONTRIBUTOR      FIRM        BID     SIZE       ASK     SIZE   QUOTED
++------------------------------------------------------------------------------+
+|[table_scroll:sys:allq]                                                       |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+COMPOSITES                        BID       ASK
++------------------------------------------------------------------------------+
+|[table_scroll:sys:allq_composites]                                            |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+TCMP is executable only. Quotes expire; an empty book is a fact.
+No session prints: TRACE is subscription-gated and forbids automation.

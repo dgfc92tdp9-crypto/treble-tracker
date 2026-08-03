@@ -1,0 +1,143 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "ALL QUOTES · CONTRIBUTED NETWORK"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "CONTRIBUTOR      FIRM        BID     SIZE       ASK     SIZE   QUOTED"
+    },
+    {
+      "at": [
+        14,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "COMPOSITES                        BID       ASK"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TCMP is executable only. Quotes expire; an empty book is a fact."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "No session prints: TRACE is subscription-gated and forbids automation."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "ALLQ",
+  "panes": [
+    {
+      "binding": "sys:allq",
+      "data": [],
+      "region": [
+        3,
+        0,
+        10,
+        80
+      ],
+      "type": "table_scroll"
+    },
+    {
+      "binding": "sys:allq_composites",
+      "data": [
+        [
+          "TCMP (executable)",
+          null,
+          null
+        ],
+        [
+          "TGN (indicative)",
+          null,
+          null
+        ],
+        [
+          "Spread",
+          null,
+          null
+        ],
+        [
+          "Contributors",
+          0.0,
+          null
+        ],
+        [
+          "Last live",
+          "never",
+          null
+        ]
+      ],
+      "region": [
+        15,
+        0,
+        5,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

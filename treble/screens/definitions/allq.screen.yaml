@@ -1,0 +1,75 @@
+# ALLQ — All Quotes (spec §7, §2.2, §23.3).
+#
+# Every contributor's current bid/ask on one instrument, side by side,
+# timestamped and attributed, with firmness flags — and the TGN and TCMP
+# composites computed from them.
+#
+# **This screen is designed for the empty case first**, because that is the
+# Phase 2 gate criterion (`ALLQ` correct-when-empty) and because every wrong
+# answer to it looks reasonable:
+#
+#   - showing the last quote received, which nobody will honour any more,
+#     presented as though it were live;
+#   - showing a composite computed from expired contributions, which looks
+#     freshest of all because it carries a timestamp of now;
+#   - showing nothing at all, which is indistinguishable from a screen that
+#     failed to load.
+#
+# So the composites pane always renders — with a contributor count and, when
+# the book is empty, when it was last live. "No contributors" and "screen
+# broken" must never look the same.
+#
+# **TGN and TCMP are separate rows, always.** TCMP is the composite of
+# *executable* quotes only. A composite that blended indicative levels into
+# a price labelled executable would be the most dangerous number here: it
+# reads as something a user can trade on.
+#
+# **Last-session prints are absent, and the screen says why.** Spec §23.3
+# puts TRACE prints beside the quotes. TRACE is subscription-gated and its
+# User Agreement forbids automated access, so there are none to show — see
+# the data access findings in PROGRESS. An empty prints section with no
+# explanation would read as "this bond did not trade".
+mnemonic: ALLQ
+title: All Quotes
+rows: 22
+cols: 80
+namespaces: [Corp, Govt, Equity]
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "ALL QUOTES · CONTRIBUTED NETWORK"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "CONTRIBUTOR      FIRM        BID     SIZE       ASK     SIZE   QUOTED"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 3, col: 0, height: 10, width: 80}
+        pane_type: table_scroll
+        binding: "sys:allq"
+
+      - kind: static
+        at: {row: 14, col: 0}
+        text: "COMPOSITES                        BID       ASK"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 15, col: 0, height: 5, width: 80}
+        pane_type: table_scroll
+        binding: "sys:allq_composites"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "TCMP is executable only. Quotes expire; an empty book is a fact."
+        attrs: [label]
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "No session prints: TRACE is subscription-gated and forbids automation."
+        attrs: [label]

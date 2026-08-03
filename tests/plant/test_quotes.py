@@ -8,14 +8,27 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from treble.plant.quotes import Quote, QuoteBook
+from treble.plant.quotes import Firmness, Quote, QuoteBook
 
 T0 = datetime(2026, 8, 1, 14, 30, tzinfo=UTC)
 IBM = "equity:IBM"
 
 
-def quote(contributor: str, bid: float | None, ask: float | None, at: datetime = T0) -> Quote:
-    return Quote(subject=IBM, contributor=contributor, bid=bid, ask=ask, quoted_at=at)
+def quote(
+    contributor: str,
+    bid: float | None,
+    ask: float | None,
+    at: datetime = T0,
+    firmness: Firmness = Firmness.EXECUTABLE,
+) -> Quote:
+    return Quote(
+        subject=IBM,
+        contributor=contributor,
+        firmness=firmness,
+        bid=bid,
+        ask=ask,
+        quoted_at=at,
+    )
 
 
 class TestCorrectWhenEmpty:
@@ -128,3 +141,94 @@ def pytest_approx(value: float) -> object:
     import pytest
 
     return pytest.approx(value)
+
+
+class TestFirmness:
+    """Indicative and executable are different claims (spec §2.2)."""
+
+    def test_firmness_must_be_stated(self) -> None:
+        """No default. Defaulting to executable presents an opinion as a
+        commitment; defaulting to indicative throws away the one thing that
+        makes a quote actionable. Either is wrong half the time, so the
+        contributor has to say."""
+        import pytest
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            Quote(subject=IBM, contributor="A", bid=99.0, quoted_at=T0)  # type: ignore[call-arg]
+
+    def test_the_executable_composite_ignores_indicative_levels(self) -> None:
+        """`TCMP` is the composite *executable* price. Letting an indicative
+        level set it would produce the most dangerous number on the screen —
+        one that reads as tradeable and is not."""
+        book = QuoteBook()
+        book.contribute(quote("firm", 99.0, 101.0, firmness=Firmness.EXECUTABLE))
+        book.contribute(quote("soft", 99.9, 100.1, firmness=Firmness.INDICATIVE))
+        rendered = book.book(IBM, as_of=T0)
+        assert rendered.tcmp == (99.0, 101.0)
+
+    def test_the_indicative_composite_uses_every_live_quote(self) -> None:
+        book = QuoteBook()
+        book.contribute(quote("firm", 99.0, 101.0, firmness=Firmness.EXECUTABLE))
+        book.contribute(quote("soft", 99.9, 100.1, firmness=Firmness.INDICATIVE))
+        assert book.book(IBM, as_of=T0).tgn == (99.9, 100.1)
+
+    def test_the_two_composites_are_not_the_same_property(self) -> None:
+        """When a tighter indicative level exists they must differ, or the
+        distinction has been lost somewhere between the book and the
+        screen."""
+        book = QuoteBook()
+        book.contribute(quote("firm", 99.0, 101.0, firmness=Firmness.EXECUTABLE))
+        book.contribute(quote("soft", 99.9, 100.1, firmness=Firmness.INDICATIVE))
+        rendered = book.book(IBM, as_of=T0)
+        assert rendered.tgn != rendered.tcmp
+
+    def test_they_agree_when_every_contributor_is_firm(self) -> None:
+        """A fact about the market, not an artefact of the code."""
+        book = QuoteBook()
+        book.contribute(quote("a", 99.0, 101.0))
+        book.contribute(quote("b", 99.5, 100.5))
+        rendered = book.book(IBM, as_of=T0)
+        assert rendered.tgn == rendered.tcmp == (99.5, 100.5)
+
+    def test_an_all_indicative_book_has_no_executable_composite(self) -> None:
+        """Not the indicative number under an executable label. Nobody has
+        committed to anything, and the screen must be able to say so."""
+        book = QuoteBook()
+        book.contribute(quote("soft", 99.0, 101.0, firmness=Firmness.INDICATIVE))
+        rendered = book.book(IBM, as_of=T0)
+        assert rendered.tcmp == (None, None)
+        assert rendered.tgn == (99.0, 101.0)
+
+    def test_an_empty_book_has_neither_composite(self) -> None:
+        book = QuoteBook().book(IBM, as_of=T0)
+        assert book.tcmp == (None, None)
+        assert book.tgn == (None, None)
+
+
+class TestSize:
+    def test_size_travels_with_the_quote(self) -> None:
+        book = QuoteBook()
+        book.contribute(
+            Quote(
+                subject=IBM,
+                contributor="A",
+                firmness=Firmness.EXECUTABLE,
+                bid=99.0,
+                ask=101.0,
+                bid_size=5_000_000.0,
+                ask_size=2_000_000.0,
+                quoted_at=T0,
+            )
+        )
+        held = book.book(IBM, as_of=T0).quotes[0]
+        assert (held.bid_size, held.ask_size) == (5_000_000.0, 2_000_000.0)
+
+    def test_absent_size_is_none_not_zero(self) -> None:
+        """A level published without size is a weaker level, not a level in
+        zero size — and the two must not render the same."""
+        held = QuoteBook()
+        held.contribute(quote("A", 99.0, 101.0))
+        rendered = held.book(IBM, as_of=T0).quotes[0]
+        assert rendered.bid_size is None
+        assert rendered.ask_size is None

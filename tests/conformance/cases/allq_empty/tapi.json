@@ -1,0 +1,33 @@
+{
+  "fields": {},
+  "series": {
+    "sys:allq": [],
+    "sys:allq_composites": [
+      [
+        "TCMP (executable)",
+        null,
+        null
+      ],
+      [
+        "TGN (indicative)",
+        null,
+        null
+      ],
+      [
+        "Spread",
+        null,
+        null
+      ],
+      [
+        "Contributors",
+        0.0,
+        null
+      ],
+      [
+        "Last live",
+        "never",
+        null
+      ]
+    ]
+  }
+}

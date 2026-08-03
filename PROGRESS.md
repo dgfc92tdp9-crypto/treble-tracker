@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 36.56%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 37.97%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -42,7 +42,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 clean checkout. Phase 2 is in progress; see the table below for per-criterion state.
 
 Phase 1 left a workstation that is real rather than demonstrative: **8 namespaces, ~10,000
-subjects, ~8.1M facts**, a Tauri desktop app that opens from the Dock, twelve screens rendering
+subjects, ~8.1M facts**, a Tauri desktop app that opens from the Dock, thirteen screens rendering
 identically on two surfaces from one definition, and bond analytics that reproduce the US
 Treasury's own auction yields to **0.07bp** worst case across 46 auctions.
 
@@ -103,7 +103,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 | Criterion | State | What is outstanding |
 |---|---|---|
 | Ticker plant (conflated / TPIPE) | 0.35 | venue adapters, security master enrichment, TGN/TCMP composites, Redpanda + NATS transports |
-| `ALLQ` correct-when-empty | 0.50 | the screen definition and the contribution API surface |
+| `ALLQ` correct-when-empty | 0.95 | only the shared transport — the service is in-process, so a remote participant cannot contribute (needs P2_8) |
 | `PORT` with TFM3 v1 | 0.00 | not started |
 | `TVAL` v1 | 0.00 | not started |
 | `CDSW` vs ISDA test cases | 0.40 | the published cases themselves — the model is internally consistent, not externally confirmed |
@@ -428,6 +428,33 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-08-02 (last) — `ALLQ` and the contribution API
+
+Thirteen screens. `allq.screen.yaml`, `treble/tapi/contribution.py`, `POST /contribute`, and two
+conformance cases — one for a quoted book, one for the empty book that is this install's actual
+state.
+
+**Firmness became required, with no default.** A quote is either indicative (an opinion) or
+executable (a commitment), and either default would be a lie half the time. Making it required
+broke eight existing tests, which is the mechanism working: every construction site now has to
+say which. **`TGN` and `TCMP` are separate composites** — TCMP over executable quotes only,
+because a composite that blended indicative levels into a price labelled executable would be the
+most dangerous number on the screen.
+
+**The contribution API is the only write path in this system.** Everything else reads public
+filings; this is where a human asserts a price. So it refuses anonymous, one-sided, crossed,
+non-positive, zero-size and future-dated quotes, each with the reason in a 400 — a contributor
+whose quote silently vanished would keep sending it and believe it was live. A locked market
+(bid == ask) is explicitly *accepted*, with a test, so the crossed-quote refusal cannot swallow
+a real one.
+
+**Quotes are deliberately not facts.** They live in memory and expire. A fact stays true of the
+moment it described; a quote is an offer that dies in minutes, and writing them to the store
+would make the fact table a place where things stop being true — exactly what I2 forbids.
+
+`TapiView` stays read-only: the contribution service is a separate parameter to `create_app`
+rather than a method on the protocol, so no resolver can publish a quote (I7).
 
 ### 2026-08-02 (later still) — the `SWPM` screen
 
