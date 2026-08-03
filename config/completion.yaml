@@ -216,7 +216,7 @@ phase_2:
                   rather than 1.0 because the trade is a template rather
                   than a bookable position, and because the §12.1 product
                   set above is genuinely part of what SWPM means"}
-  P2_7:  {done: 0.8, name: "Canvas with FDC3 context propagation",
+  P2_7:  {done: 0.9, name: "Canvas with FDC3 context propagation",
           basis: "the criterion's named semantic ships and is
                   mutation-verified 6/6. Colour-group context propagation
                   (§5.3): a broadcast reaches every component on the
@@ -262,11 +262,22 @@ phase_2:
                   empty pane, because a blank rectangle on a canvas is
                   indistinguishable from a component whose instrument has
                   nothing to report. Verified to fail when the context
-                  hand-off is broken. Outstanding, and why this is not 1.0:
-                  no surface renders a canvas yet — the desktop shell and
-                  the TUI both still show one screen at a time, and there is
-                  no CNVS command. The Python side is complete; the
-                  presentation is not"}
+                  hand-off is broken. `CNVS <GO>` now serves a whole
+                  workspace: every component with its buffer, placement and
+                  colour group, resolved at one as_of through the same
+                  resolver the single-screen path uses. The single-screen
+                  `buffer` field stays empty for a canvas, because a client
+                  falling back to it would show one screen where a workspace
+                  was asked for. Three states that would each render as an
+                  empty rectangle are distinguished in the status line — no
+                  canvas configured, a configured canvas with no components,
+                  and a component that failed to resolve — since an empty
+                  workspace and a lost layout look identical otherwise.
+                  Disabling the CNVS branch fails 6 of 10 tests. Outstanding,
+                  and why this is not 1.0: no *client* draws it. The server
+                  returns the workspace; the Tauri shell and the TUI both
+                  still render a single buffer, so multi-component layout is
+                  unimplemented on both surfaces"}
   P2_8:  {done: 0.8, name: "gRPC + Arrow Flight transports",
           basis: "Arrow Flight ships: a FlightServerBase serving guarded
                   fact exports as Arrow tables with a fixed schema, reading

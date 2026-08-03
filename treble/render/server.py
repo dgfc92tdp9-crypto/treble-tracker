@@ -32,6 +32,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
 
 from treble.cmd.grammar import CommandKind, parse_command
+from treble.render.canvas import Canvas, resolve_canvas
 from treble.render.contract.buffer import CellBuffer, layout_tree
 from treble.render.contract.registry import UnknownScreenError, available, get_screen
 from treble.render.contract.resolver import ScreenContext, TapiView, resolve
@@ -79,6 +80,22 @@ class CommandResponse(BaseModel):
     kind: str
     status: str
     buffer: dict[str, object] | None = None
+    #: Set only for `CNVS`. A canvas is many screens at once, so it cannot
+    #: travel in `buffer` — and a client that fell back to rendering one of
+    #: them would show a single screen where a workspace was asked for.
+    canvas: list[CanvasComponentPayload] | None = None
+
+
+class CanvasComponentPayload(BaseModel):
+    """One component of a resolved canvas, with where it sits."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    screen: str
+    channel: str | None = None
+    placement: dict[str, int] | None = None
+    buffer: dict[str, object] | None = None
 
 
 class ContributionResponse(BaseModel):
@@ -103,7 +120,12 @@ class ContributionResponse(BaseModel):
     tgn_ask: float | None = None
 
 
-def create_app(tapi: TapiView, *, contributions: ContributionService | None = None) -> FastAPI:
+def create_app(
+    tapi: TapiView,
+    *,
+    contributions: ContributionService | None = None,
+    canvas: Canvas | None = None,
+) -> FastAPI:
     """Build the local TAPI service around a data path.
 
     `contributions` is a separate parameter rather than a widening of
@@ -113,6 +135,10 @@ def create_app(tapi: TapiView, *, contributions: ContributionService | None = No
     which is this install's honest state.
     """
     contribution_service = contributions or ContributionService()
+    #: No default canvas. An empty workspace and an unconfigured one look
+    #: identical on screen, so `CNVS` says which rather than rendering
+    #: nothing and letting the user conclude their layout was lost.
+    workspace = canvas
     api = FastAPI(
         title="Treble Tracker TAPI (local)",
         version="0.1.0",
@@ -185,6 +211,9 @@ def create_app(tapi: TapiView, *, contributions: ContributionService | None = No
         if parsed.function is None:
             return CommandResponse(kind=parsed.kind.value, status="no function given")
 
+        if parsed.function == "CNVS":
+            return _canvas_response(workspace, tapi=tapi, as_of=as_of, kind=parsed.kind.value)
+
         try:
             definition = get_screen(parsed.function)
         except UnknownScreenError:
@@ -226,6 +255,50 @@ def create_app(tapi: TapiView, *, contributions: ContributionService | None = No
         return definition.model_dump(mode="json")
 
     return api
+
+
+def _canvas_response(
+    workspace: Canvas | None, *, tapi: TapiView, as_of: datetime, kind: str
+) -> CommandResponse:
+    """Resolve the whole workspace (spec §5.3).
+
+    Every component at one `as_of`, through the same resolver the single-
+    screen path uses — a canvas must not become a second rendering path, or
+    the two would eventually disagree about the same screen.
+    """
+    if workspace is None:
+        return CommandResponse(
+            kind=kind,
+            status="CNVS: no canvas configured on this server. An empty workspace and an "
+            "unconfigured one look the same on screen, so this says which.",
+        )
+    if not workspace.component_ids:
+        return CommandResponse(kind=kind, status="CNVS: the canvas has no components yet.")
+
+    try:
+        buffers = resolve_canvas(workspace, tapi=tapi, as_of=as_of)
+    except Exception as exc:
+        return CommandResponse(kind=kind, status=f"CNVS: {type(exc).__name__}: {exc}")
+
+    components = []
+    for component_id in workspace.component_ids:
+        component = workspace.component(component_id)
+        components.append(
+            CanvasComponentPayload(
+                id=component.id,
+                screen=component.screen,
+                channel=component.channel.value if component.channel else None,
+                placement=component.placement.model_dump() if component.placement else None,
+                buffer=_buffer_payload(buffers[component_id]),
+            )
+        )
+
+    linked = sum(1 for c in components if c.channel)
+    return CommandResponse(
+        kind=kind,
+        status=f"CNVS  ·  {len(components)} components, {linked} linked",
+        canvas=components,
+    )
 
 
 def _buffer_payload(buffer: CellBuffer) -> dict[str, object]:
