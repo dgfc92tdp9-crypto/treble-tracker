@@ -148,3 +148,10 @@ markers = [
 # involved — that is the version worth retrying with a different tool.
 paths_to_mutate = ["treble/analytics/curves/hagan_west.py"]
 tests_dir = ["tests/analytics/curves/"]
+
+[tool.coverage.run]
+# Generated protobuf output is not code this project wrote and not code its
+# tests should be measured against. Left in, it dilutes the denominator: the
+# stubs added ~170 statements at 19% and 74%, which makes the coverage floor
+# guard less of the real codebase than the number suggests.
+omit = ["treble/tapi/_generated/*"]

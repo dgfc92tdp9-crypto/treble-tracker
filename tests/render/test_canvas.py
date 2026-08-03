@@ -12,6 +12,8 @@ from a component that is right.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from treble.core.identifiers import SecurityQuery, YellowKey
@@ -20,6 +22,7 @@ from treble.render.canvas import (
     CanvasComponent,
     Channel,
     Fdc3Instrument,
+    Placement,
     UnknownComponentError,
 )
 
@@ -243,3 +246,116 @@ class TestRefusals:
             "orange",
             "purple",
         }
+
+
+class TestLayout:
+    """Placement in grid cells, not pixels (spec §5.3, §4.2)."""
+
+    def test_a_layout_survives_a_round_trip(self) -> None:
+        board = Canvas(
+            [
+                CanvasComponent(
+                    id="des",
+                    screen="DES",
+                    channel=Channel.RED,
+                    placement=Placement(x=0, y=0, width=40, height=20),
+                ),
+                CanvasComponent(
+                    id="yas",
+                    screen="YAS",
+                    channel=Channel.RED,
+                    placement=Placement(x=40, y=0, width=40, height=20, display=1),
+                ),
+            ]
+        )
+        restored = Canvas.from_json(board.to_json())
+        assert restored.component("yas").placement == board.component("yas").placement
+        assert restored.component("des").channel is Channel.RED
+
+    def test_context_is_not_saved_with_the_layout(self) -> None:
+        """Reopening a workspace tomorrow and finding yesterday's instrument
+        on every screen, with nothing saying it is a day old, is the
+        stale-display failure this project refuses everywhere else — and a
+        layout file is a quiet place for it to happen."""
+        board = canvas()
+        board.broadcast("des", IBM)
+        restored = Canvas.from_json(board.to_json())
+        assert restored.context_of("des") is None
+        assert restored.channel_context(Channel.RED) is None
+
+    def test_links_are_saved_with_the_layout(self) -> None:
+        """The links are structure, unlike the context. A restored canvas
+        whose components had forgotten their colour groups would look
+        arranged and behave unlinked."""
+        restored = Canvas.from_json(canvas().to_json())
+        assert restored.members(Channel.RED) == ("des", "yas")
+        assert restored.component("pinned").channel is None
+
+    def test_overlaps_are_reported_not_prevented(self) -> None:
+        """§4.2's arbitrary window mode allows floating windows over one
+        another, so this informs a renderer rather than refusing."""
+        board = Canvas(
+            [
+                CanvasComponent(
+                    id="a", screen="DES", placement=Placement(x=0, y=0, width=10, height=10)
+                ),
+                CanvasComponent(
+                    id="b", screen="YAS", placement=Placement(x=5, y=5, width=10, height=10)
+                ),
+                CanvasComponent(
+                    id="c", screen="GP", placement=Placement(x=50, y=50, width=10, height=10)
+                ),
+            ]
+        )
+        assert board.overlapping() == (("a", "b"),)
+
+    def test_the_same_cells_on_different_displays_do_not_overlap(self) -> None:
+        board = Canvas(
+            [
+                CanvasComponent(
+                    id="a", screen="DES", placement=Placement(x=0, y=0, width=10, height=10)
+                ),
+                CanvasComponent(
+                    id="b",
+                    screen="YAS",
+                    placement=Placement(x=0, y=0, width=10, height=10, display=1),
+                ),
+            ]
+        )
+        assert board.overlapping() == ()
+
+    def test_restoring_onto_fewer_displays_is_refused(self, tmp_path: Path) -> None:
+        """A layout built across three monitors, restored onto one, would
+        place components off-screen. Silently reflowing would lose an
+        arrangement the user built; that is the renderer's offer to make
+        with the user watching, not the loader's to make quietly."""
+        board = Canvas(
+            [
+                CanvasComponent(
+                    id="a", screen="DES", placement=Placement(x=0, y=0, width=10, height=10)
+                ),
+                CanvasComponent(
+                    id="b",
+                    screen="YAS",
+                    placement=Placement(x=0, y=0, width=10, height=10, display=2),
+                ),
+            ]
+        )
+        path = tmp_path / "layout.json"
+        board.save(path)
+        with pytest.raises(ValueError, match="only 1 are available"):
+            Canvas.load(path, displays=1)
+        assert Canvas.load(path, displays=3).displays() == (0, 2)
+
+    def test_an_unversioned_layout_is_refused(self) -> None:
+        """A layout half-understood places components wrongly and links them
+        into the wrong groups, which reads as a working canvas."""
+        with pytest.raises(ValueError, match="not supported"):
+            Canvas.from_json('{"version": 99, "components": []}')
+
+    def test_a_component_without_a_placement_is_valid(self) -> None:
+        """Context propagation is meaningful without a layout — the TUI has
+        no free-form placement and still participates in link groups."""
+        board = Canvas([CanvasComponent(id="tui", screen="DES", channel=Channel.RED)])
+        assert board.component("tui").placement is None
+        assert board.displays() == ()

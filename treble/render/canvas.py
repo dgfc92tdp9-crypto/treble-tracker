@@ -33,11 +33,31 @@ this module has to handle honestly: an `fdc3.instrument` context carries
 identifiers and *no asset class*. A third-party app broadcasting "IBM" does
 not say whether it means the equity or a bond. See
 :meth:`Fdc3Instrument.to_security_query`.
+
+**Does the TUI participate?** The question was open while this was designed,
+because FDC3 is a browser interop standard and an answer of "no" would have
+been I6's first exception — one definition, many renderers, except this one.
+The answer is that it splits, and the split is visible in the types rather
+than in a caveat:
+
+- *Context propagation is renderer-agnostic.* Everything above is ordinary
+  Python with no browser dependency, so a TUI pane joins a colour group and
+  receives selections exactly like a desktop component. I6 holds.
+- *Free-form placement is not.* :class:`Placement` describes floating
+  windows across displays (§4.2), and a terminal has one grid and no
+  windows. So `CanvasComponent.placement` is **optional**, and a component
+  without one is fully functional — linked, receiving context, simply not
+  positioned.
+
+That is why the layout is stored in grid cells rather than pixels: cells are
+something both surfaces can mean.
 """
 
 from __future__ import annotations
 
 import enum
+import json
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -106,8 +126,40 @@ class Fdc3Instrument(BaseModel):
         return cls(ticker=security.ticker)
 
 
+class Placement(BaseModel):
+    """Where a component sits (spec §5.3, §4.2 arbitrary window mode).
+
+    Grid cells, not pixels. A layout saved in pixels is a layout that only
+    reconstructs on the display it was saved from — and §5.3 says layouts
+    follow a user via Treble Anywhere, which means onto a different machine
+    with different screens. Cells survive that; pixels do not.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    x: int = Field(ge=0)
+    y: int = Field(ge=0)
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    #: Which display, for the multi-monitor case (§4.2). Zero-based, and
+    #: kept even when a layout is restored onto a machine with fewer
+    #: screens — see `Canvas.load`, which does not silently reflow.
+    display: int = Field(default=0, ge=0)
+
+    def overlaps(self, other: Placement) -> bool:
+        """Whether two placements collide on the same display."""
+        if self.display != other.display:
+            return False
+        return (
+            self.x < other.x + other.width
+            and other.x < self.x + self.width
+            and self.y < other.y + other.height
+            and other.y < self.y + self.height
+        )
+
+
 class CanvasComponent(BaseModel):
-    """One placed component: a screen, and the group it follows."""
+    """One placed component: a screen, where it sits, and the group it follows."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -118,6 +170,10 @@ class CanvasComponent(BaseModel):
     #: real state, not a default to be filled in: a component the user has
     #: deliberately pinned to one instrument must not follow selections.
     channel: Channel | None = None
+    #: Where it sits. Optional because context propagation is meaningful
+    #: without a layout — the TUI has no free-form placement and still
+    #: participates in link groups (see the module docstring).
+    placement: Placement | None = None
 
 
 class UnknownComponentError(KeyError):
@@ -238,6 +294,102 @@ class Canvas:
 
     def channel_context(self, channel: Channel) -> Fdc3Instrument | None:
         return self._channel_context.get(channel)
+
+    # -- layout ---------------------------------------------------------
+
+    def overlapping(self) -> tuple[tuple[str, str], ...]:
+        """Pairs of components whose placements collide.
+
+        Reported rather than prevented. Overlapping windows are a legitimate
+        arrangement — §4.2's arbitrary window mode explicitly allows floating
+        windows over one another — so this exists for a renderer that wants
+        to warn or auto-arrange, not as a refusal.
+        """
+        placed = [(cid, c) for cid, c in sorted(self._components.items()) if c.placement]
+        return tuple(
+            (a_id, b_id)
+            for i, (a_id, a) in enumerate(placed)
+            for b_id, b in placed[i + 1 :]
+            if a.placement is not None
+            and b.placement is not None
+            and a.placement.overlaps(b.placement)
+        )
+
+    def displays(self) -> tuple[int, ...]:
+        """Displays this layout expects, in order."""
+        return tuple(
+            sorted({c.placement.display for c in self._components.values() if c.placement})
+        )
+
+    # -- persistence (spec §5.3: layouts follow a user) -----------------
+
+    def to_json(self) -> str:
+        """Serialise the layout. Context is deliberately not saved.
+
+        A saved canvas restores *where things are and how they are linked*,
+        not what they were showing. Reopening a workspace tomorrow and
+        finding yesterday's instrument on every screen — with no indication
+        it is a day old — is the stale-display failure this project refuses
+        everywhere else, and a layout file is a particularly quiet place for
+        it to happen.
+        """
+        return json.dumps(
+            {
+                "version": 1,
+                "components": [
+                    c.model_dump(mode="json") for _, c in sorted(self._components.items())
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+
+    @classmethod
+    def from_json(cls, payload: str) -> Canvas:
+        """Restore a layout, or refuse.
+
+        A version mismatch is an error rather than a best-effort read: a
+        layout half-understood puts components in the wrong places and links
+        them into the wrong groups, which looks like a working canvas.
+        """
+        try:
+            document = json.loads(payload)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"not a canvas layout: {error}") from error
+        version = document.get("version")
+        if version != 1:
+            raise ValueError(
+                f"canvas layout version {version!r} is not supported by this build; "
+                "restoring it partially would place components wrongly and link them "
+                "into the wrong groups, which reads as a working canvas"
+            )
+        return cls([CanvasComponent.model_validate(c) for c in document.get("components", [])])
+
+    def save(self, path: Path) -> None:
+        path.write_text(self.to_json() + "\n")
+
+    @classmethod
+    def load(cls, path: Path, *, displays: int | None = None) -> Canvas:
+        """Restore from disk, optionally checking the display count.
+
+        `displays` is the number of screens actually available. A layout
+        saved across three monitors and restored onto one would put
+        components on displays that do not exist; rather than silently
+        reflowing them — which loses an arrangement the user built — this
+        refuses and says what is missing. Reflowing is a decision for the
+        renderer, with the user watching.
+        """
+        canvas = cls.from_json(path.read_text())
+        if displays is not None:
+            expected = canvas.displays()
+            missing = [d for d in expected if d >= displays]
+            if missing:
+                raise ValueError(
+                    f"layout expects display(s) {missing} but only {displays} are "
+                    "available; components would be placed off-screen. Reflowing is the "
+                    "renderer's decision to offer, not this loader's to make silently"
+                )
+        return canvas
 
 
 __all__ = [

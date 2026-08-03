@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 44.06%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 44.69%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -121,7 +121,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 | `TVAL` v1 | 0.50 | Prong 2 (comparables / relative value) — half the methodology; plus the screen, the ML layer and snapshots |
 | `CDSW` vs ISDA test cases | 0.40 | the published cases themselves — the model is internally consistent, not externally confirmed |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
-| Canvas with FDC3 | 0.50 | layout model, persistence, renderer wiring — and whether the TUI can participate at all |
+| Canvas with FDC3 | 0.70 | renderer wiring. Layout, persistence and the TUI question are done |
 | gRPC + Arrow Flight | 0.80 | streaming and the real-time services (mktdata, mktbar, mktvwap, ems, docs) — all need venue adapters that do not exist |
 
 **The swap curves exist, and the whole chain is verified on them.** The DTCC SDR adapter
