@@ -57,11 +57,15 @@ from __future__ import annotations
 
 import enum
 import json
+from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from treble.core.identifiers import SecurityQuery, YellowKey
+from treble.render.contract.buffer import CellBuffer
+from treble.render.contract.registry import get_screen
+from treble.render.contract.resolver import ScreenContext, TapiView, resolve
 
 
 class Channel(enum.Enum):
@@ -392,10 +396,48 @@ class Canvas:
         return canvas
 
 
+def resolve_canvas(
+    canvas: Canvas,
+    *,
+    tapi: TapiView,
+    as_of: datetime,
+    key: YellowKey = YellowKey.EQUITY,
+) -> dict[str, CellBuffer]:
+    """Render every component of a canvas at one instant.
+
+    One `as_of` for the whole workspace, deliberately. Resolving each
+    component against its own clock would let two linked screens show the
+    same instrument as of different moments — a discrepancy that reads as a
+    data disagreement rather than a timing artefact, and that nothing on
+    screen would explain.
+
+    A component with no context yet resolves with no security, which is what
+    "nothing selected" looks like. That is a different state from a screen
+    whose security has no data, and the screens already distinguish the two.
+
+    An unknown screen mnemonic raises rather than yielding an empty pane: a
+    blank rectangle on a canvas is indistinguishable from a component whose
+    instrument has nothing to report.
+    """
+    buffers: dict[str, CellBuffer] = {}
+    for component_id in canvas.component_ids:
+        component = canvas.component(component_id)
+        context = canvas.context_of(component_id)
+        buffers[component_id] = resolve(
+            get_screen(component.screen),
+            ScreenContext(security=context.to_security_query(key=key) if context else None),
+            as_of=as_of,
+            tapi=tapi,
+        )
+    return buffers
+
+
 __all__ = [
     "Canvas",
     "CanvasComponent",
     "Channel",
     "Fdc3Instrument",
+    "Placement",
     "UnknownComponentError",
+    "resolve_canvas",
 ]

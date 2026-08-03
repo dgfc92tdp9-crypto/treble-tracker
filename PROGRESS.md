@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 44.69%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 45.00%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -121,7 +121,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 | `TVAL` v1 | 0.50 | Prong 2 (comparables / relative value) — half the methodology; plus the screen, the ML layer and snapshots |
 | `CDSW` vs ISDA test cases | 0.40 | the published cases themselves — the model is internally consistent, not externally confirmed |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
-| Canvas with FDC3 | 0.70 | renderer wiring. Layout, persistence and the TUI question are done |
+| Canvas with FDC3 | 0.80 | no surface renders a canvas yet — no CNVS command, both clients still show one screen at a time |
 | gRPC + Arrow Flight | 0.80 | streaming and the real-time services (mktdata, mktbar, mktvwap, ems, docs) — all need venue adapters that do not exist |
 
 **The swap curves exist, and the whole chain is verified on them.** The DTCC SDR adapter
@@ -160,6 +160,25 @@ ordinary.
 > The source is marked `redistribution_restricted` and throttled to one request per five
 > seconds. If the terms are later read and prohibit automated access,
 > `treble/ingest/dtcc.py` is the thing to delete.
+
+> **Phase 2's remaining criteria are mostly blocked on market data, not effort.** Audited
+> 2026-08-03 against the live store. The recurring shape: free public filings give *positions and
+> fundamentals*; Phase 2's risk and real-time criteria need *market price series*, which is
+> exactly the data that is not free.
+>
+> | criterion | blocker |
+> |---|---|
+> | `PORT` / TFM3 | **hard** — no per-name equity price history (below) |
+> | `TVAL` Prong 2 | **partial** — §15.1 needs sector/rating/seniority to build a comparable set; the store has issuer (LEI), currency and maturity, and **no rating and no seniority**. `nport:issuerCat` is an N-PORT category, not a sector classification |
+> | Ticker plant | **hard** — no trade or tick data. (`TRADE_COUNT` in the store is the DTCC adapter's own metadata about how many prints backed a curve node, not prints) |
+> | `SWPM` breadth | **hard** — swaptions/CMS need a `VCUB` vol surface; no swaption vol data |
+> | `CDSW` | external — ISDA's published test cases |
+> | **Canvas** | **none** — renderer wiring only |
+>
+> A method note, because the first attempt at this audit was wrong and would have concluded the
+> opposite: substring-matching field names hit XBRL *concept* names, so "sector" matched
+> `...PerBasicShare` and "rating" matched `OperatingIncomeLoss`. Every hit was a false positive.
+> The table above is from fields actually present on `cusip:`/`isin:` subjects.
 
 > **`PORT`/TFM3 is blocked on data, and Phase 2 cannot gate without resolving it.** Measured
 > 2026-08-03: TFM3 needs a return panel to estimate its factor covariance (§16.3), and this

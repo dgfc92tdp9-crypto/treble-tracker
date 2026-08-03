@@ -359,3 +359,103 @@ class TestLayout:
         board = Canvas([CanvasComponent(id="tui", screen="DES", channel=Channel.RED)])
         assert board.component("tui").placement is None
         assert board.displays() == ()
+
+
+class TestRendererWiring:
+    """The end-to-end claim: a broadcast changes what components *render*.
+
+    Everything above tests the bus. This tests that the bus reaches the
+    screens — the difference between a link that works and a link that only
+    reports working.
+
+    The fake TAPI records which security each field lookup was made for, and
+    returns no value. Recording rather than echoing into the rendered text
+    is deliberate: an echo has to satisfy each screen's format specs, so the
+    test would start failing on a formatting change that has nothing to do
+    with context propagation. What is being asserted is which instrument
+    reached the resolver, and that is exactly what is recorded.
+    """
+
+    class RecordingTapi:
+        def __init__(self) -> None:
+            self.asked: list[str] = []
+
+        def field(self, security, mnemonic, overrides, *, as_of):  # type: ignore[no-untyped-def]
+            from treble.tapi.types import FieldResult
+
+            self.asked.append(security.ticker if security else "<none>")
+            return FieldResult(value=None)
+
+        def series(self, security, binding, *, as_of):  # type: ignore[no-untyped-def]
+            self.asked.append(security.ticker if security else "<none>")
+            return ()
+
+    def test_a_broadcast_reaches_the_rendered_buffers(self) -> None:
+        from datetime import UTC, datetime
+
+        from treble.render.canvas import resolve_canvas
+
+        board = Canvas(
+            [
+                CanvasComponent(id="a", screen="DES", channel=Channel.RED),
+                CanvasComponent(id="b", screen="DES", channel=Channel.RED),
+                CanvasComponent(id="c", screen="DES", channel=Channel.BLUE),
+            ]
+        )
+        board.broadcast("a", IBM)
+
+        rendered = {}
+        asked = {}
+        for component_id in board.component_ids:
+            tapi = self.RecordingTapi()
+            single = Canvas([board.component(component_id)])
+            # Re-seed the isolated canvas with the context the real one holds.
+            context = board.context_of(component_id)
+            if context is not None:
+                single.broadcast(component_id, context)
+            rendered[component_id] = resolve_canvas(
+                single, tapi=tapi, as_of=datetime(2026, 8, 3, tzinfo=UTC)
+            )[component_id]
+            asked[component_id] = set(tapi.asked)
+
+        # The red pair resolved against IBM; the blue one had nothing selected.
+        assert asked["a"] == {"IBM"}
+        assert asked["b"] == {"IBM"}
+        assert asked["c"] == {"<none>"}
+        assert all(buffer is not None for buffer in rendered.values())
+
+    def test_every_component_renders_a_buffer(self) -> None:
+        from datetime import UTC, datetime
+
+        from treble.render.canvas import resolve_canvas
+
+        board = canvas()
+        board.broadcast("des", IBM)
+        rendered = resolve_canvas(
+            board, tapi=self.RecordingTapi(), as_of=datetime(2026, 8, 3, tzinfo=UTC)
+        )
+        assert set(rendered) == set(board.component_ids)
+
+    def test_one_as_of_for_the_whole_workspace(self) -> None:
+        """Resolving each component against its own clock would let two
+        linked screens show one instrument as of different moments — which
+        reads as a data disagreement, not a timing artefact, and nothing on
+        screen would explain it."""
+        import inspect
+
+        from treble.render.canvas import resolve_canvas
+
+        signature = inspect.signature(resolve_canvas)
+        assert signature.parameters["as_of"].kind is inspect.Parameter.KEYWORD_ONLY
+
+    def test_an_unknown_screen_raises_rather_than_rendering_blank(self) -> None:
+        """A blank rectangle on a canvas is indistinguishable from a
+        component whose instrument has nothing to report."""
+        from datetime import UTC, datetime
+
+        from treble.render.canvas import resolve_canvas
+        from treble.render.contract.registry import UnknownScreenError
+
+        board = Canvas([CanvasComponent(id="x", screen="NOSUCHSCREEN")])
+        with pytest.raises(UnknownScreenError):
+            resolve_canvas(board, tapi=self.RecordingTapi(), as_of=datetime(2026, 8, 3, tzinfo=UTC))

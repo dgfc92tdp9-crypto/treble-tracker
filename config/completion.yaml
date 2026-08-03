@@ -216,7 +216,7 @@ phase_2:
                   rather than 1.0 because the trade is a template rather
                   than a bookable position, and because the §12.1 product
                   set above is genuinely part of what SWPM means"}
-  P2_7:  {done: 0.7, name: "Canvas with FDC3 context propagation",
+  P2_7:  {done: 0.8, name: "Canvas with FDC3 context propagation",
           basis: "the criterion's named semantic ships and is
                   mutation-verified 6/6. Colour-group context propagation
                   (§5.3): a broadcast reaches every component on the
@@ -251,9 +251,22 @@ phase_2:
                   propagation is renderer-agnostic so a TUI pane joins a
                   colour group like any other component and I6 holds, while
                   free-form placement is not, so `placement` is optional and
-                  a component without one is fully functional. Outstanding:
-                  renderer wiring, so the semantics are enforced and tested
-                  but nothing on screen consumes them yet"}
+                  a component without one is fully functional. `resolve_canvas`
+                  now wires the bus to the renderers: every component
+                  resolves through the same `resolve()` the screens use, at
+                  one `as_of` for the whole workspace — resolving each
+                  against its own clock would let two linked screens show
+                  one instrument as of different moments, which reads as a
+                  data disagreement rather than a timing artefact. An
+                  unknown screen mnemonic raises rather than yielding an
+                  empty pane, because a blank rectangle on a canvas is
+                  indistinguishable from a component whose instrument has
+                  nothing to report. Verified to fail when the context
+                  hand-off is broken. Outstanding, and why this is not 1.0:
+                  no surface renders a canvas yet — the desktop shell and
+                  the TUI both still show one screen at a time, and there is
+                  no CNVS command. The Python side is complete; the
+                  presentation is not"}
   P2_8:  {done: 0.8, name: "gRPC + Arrow Flight transports",
           basis: "Arrow Flight ships: a FlightServerBase serving guarded
                   fact exports as Arrow tables with a fixed schema, reading
