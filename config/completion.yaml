@@ -78,12 +78,20 @@ phase_1:
 # separate work-package plan to track against, and inventing one would put a
 # second set of numbers beside the gate's own.
 phase_2:
-  P2_1:  {done: 0.35, name: "ticker plant — conflated display, unconflated TPIPE",
+  P2_1:  {done: 0.45, name: "ticker plant — conflated display, unconflated TPIPE",
           basis: "the conflation split, current-state cache, sequence-gap
                   detection and bounded TPIPE buffer ship and are
-                  mutation-verified. Outstanding: venue adapters, security
-                  master enrichment, TGN/TCMP composites, and the Redpanda and
-                  NATS transports"}
+                  mutation-verified. TGN and TCMP composites now ship too
+                  (treble/plant/quotes.py): TCMP over executable quotes
+                  only, TGN over every live quote, as separate properties
+                  because a composite blending indicative levels into a
+                  price labelled executable is the most dangerous number a
+                  quote screen can show. Counted here rather than under
+                  P2_2, whose 0.95 rests on the ALLQ screen and the
+                  contribution API — the composites were listed as
+                  outstanding on this criterion and are credited once.
+                  Outstanding: venue adapters, security master enrichment,
+                  and the Redpanda and NATS transports"}
   P2_2:  {done: 0.95, name: "ALLQ correct-when-empty; contribution API",
           basis: "both halves ship. Correct-when-empty: expired quotes leave
                   the book empty rather than stale, it records when it last
@@ -101,9 +109,18 @@ phase_2:
                   TGN and TCMP are separate composites because a composite
                   blending indicative levels into an executable price is the
                   most dangerous number on the screen. Outstanding, and why
-                  this is not 1.0: the service is in-process, so a
-                  participant on another machine cannot yet contribute —
-                  that needs the shared transport of P2_8"}
+                  this is not 1.0: the HTTP server binds 127.0.0.1 only
+                  and deliberately so — there is no authentication, and
+                  exposing it needs §22.1's entitlement model (passkeys,
+                  per-user entitlements, OIDC, audit logging), which no
+                  phase before Phase 5 federation requires. So a remote
+                  participant cannot contribute, and the reason is the
+                  missing entitlement model rather than the transport. The
+                  gRPC surface the criterion pairs with this is also
+                  outstanding (P2_8). Corrected 2026-08-03: an earlier
+                  version of this basis said the service was 'in-process',
+                  which was wrong — POST /contribute is a real network
+                  endpoint, just not a routable one"}
   P2_3:  {done: 0.0, name: "PORT with TFM3 v1; factor model validation"}
   P2_4:  {done: 0.5, name: "TVAL v1 with transparency drill-down",
           basis: "the criterion's two named requirements ship. Score: 1-10
@@ -178,4 +195,20 @@ phase_2:
                   than a bookable position, and because the §12.1 product
                   set above is genuinely part of what SWPM means"}
   P2_7:  {done: 0.0, name: "Canvas with FDC3 context propagation"}
-  P2_8:  {done: 0.0, name: "gRPC + Arrow Flight transports"}
+  P2_8:  {done: 0.4, name: "gRPC + Arrow Flight transports",
+          basis: "Arrow Flight ships: a FlightServerBase serving guarded
+                  fact exports as Arrow tables with a fixed schema, reading
+                  through the same store handle and the same point-in-time
+                  as_of as every other TAPI path. Built on a bulk-export
+                  guard that did not previously exist —
+                  SourceMeta.redistribution_restricted had been declared on
+                  13 adapters since Phase 1 and read by nothing, its own
+                  docstring naming a guard that was never built. Now
+                  restricted-source facts are withheld and counted (3,164
+                  DTCC facts on the live store), licensed identifier
+                  namespaces are refused outright per §9.3, and the
+                  withholding travels in the table's schema metadata so a
+                  warehouse can tell whether its copy is complete. 5/5
+                  mutations of the guard killed. Outstanding: gRPC itself,
+                  which needs grpcio/grpcio-tools/protobuf added and proto
+                  definitions for the §8.3 services"}

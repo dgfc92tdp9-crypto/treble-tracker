@@ -283,6 +283,34 @@ class DuckStore:
         rows = self._conn.execute(query + " ORDER BY effective_from", params).fetchall()
         return [self._fact(r) for r in rows]
 
+    def subject_facts(self, subject: TUID, *, as_of: datetime) -> list[Fact]:
+        """Every visible fact for a subject, across all fields.
+
+        Backs bulk export (spec §8.5), where the caller wants a whole
+        namespace rather than one field. Same latest-knowledge-wins window
+        as :meth:`history` and the same required ``as_of`` (I2) — a bulk
+        transport that could see facts the screen path could not would be a
+        second source of truth wearing a protocol as a disguise.
+        """
+        if as_of.tzinfo is None:
+            raise ValueError("as_of must be timezone-aware")
+        rows = self._conn.execute(
+            """
+            SELECT * EXCLUDE (rn) FROM (
+                SELECT *, row_number() OVER (
+                    PARTITION BY subject, field, effective_from,
+                                 coalesce(effective_to, DATE '9999-12-31')
+                    ORDER BY knowledge_from DESC
+                ) AS rn
+                FROM facts
+                WHERE subject = ? AND knowledge_from <= ?
+            ) WHERE rn = 1
+            ORDER BY field, effective_from
+            """,
+            [subject, as_of],
+        ).fetchall()
+        return [self._fact(r) for r in rows]
+
     def provenance(self, provenance_id: ProvenanceId) -> Provenance:
         row = self._conn.execute(
             "SELECT * FROM provenance WHERE id = ?", [provenance_id]

@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 39.53%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 41.09%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -115,14 +115,14 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 
 | Criterion | State | What is outstanding |
 |---|---|---|
-| Ticker plant (conflated / TPIPE) | 0.35 | venue adapters, security master enrichment, TGN/TCMP composites, Redpanda + NATS transports |
-| `ALLQ` correct-when-empty | 0.95 | only the shared transport — the service is in-process, so a remote participant cannot contribute (needs P2_8) |
+| Ticker plant (conflated / TPIPE) | 0.45 | venue adapters, security master enrichment, Redpanda + NATS transports |
+| `ALLQ` correct-when-empty | 0.95 | the gRPC surface (P2_8), and remote contribution needs §22.1 entitlements — the HTTP server is loopback-only by design |
 | `PORT` with TFM3 v1 | 0.00 | not started |
 | `TVAL` v1 | 0.50 | Prong 2 (comparables / relative value) — half the methodology; plus the screen, the ML layer and snapshots |
 | `CDSW` vs ISDA test cases | 0.40 | the published cases themselves — the model is internally consistent, not externally confirmed |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
 | Canvas with FDC3 | 0.00 | not started |
-| gRPC + Arrow Flight | 0.00 | not started |
+| gRPC + Arrow Flight | 0.40 | gRPC itself — needs grpcio + protos. Arrow Flight ships, on a new bulk-export guard |
 
 **The swap curves exist, and the whole chain is verified on them.** The DTCC SDR adapter
 (2026-08-02) ingests CFTC Part 43 public price dissemination — ~20,000 interest-rate prints a
@@ -441,6 +441,48 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-08-03 (later) — the bulk-export guard, and Arrow Flight on top of it
+
+**A flag declared thirteen times and read by nothing.** `SourceMeta.redistribution_restricted`
+had been set on every adapter since Phase 1, its own docstring saying it "drives the bulk-export
+guard". There was no bulk-export guard. The only read anywhere in the repo was a test written the
+day before, asserting DTCC's flag was `True` — which tests a declaration, not a behaviour.
+
+**That is the fourth mechanism found declared and switched off**, after three adapters that had
+never run, an import contract with no test protecting its own config, and a drift check whose
+failing cases I deleted rather than fixed. The pattern is consistent enough to be worth naming:
+every one was a mechanism whose *existence* was verified by something, and whose *effect* was
+verified by nothing.
+
+So the guard was built before the transport, not after. `treble/ingest/registry.py` discovers
+sources by walking the package — a hand-maintained list of restricted sources would be the same
+defect in a new place, since an adapter added without an entry would export freely and nothing
+would say so. `treble/tapi/export.py` withholds restricted-source facts, refuses licensed
+identifier namespaces per §9.3 (*"resolution and display work; bulk export of a CUSIP master does
+not"*), and **reports what it withheld** — a warehouse that received 90% of a universe and
+believed it had all of it would compute coverage and risk aggregates against a hole it could not
+see. 5/5 mutations killed, including one that stops the guard consulting the registry at all.
+
+**And the guard's own arrival tripped a check — correctly.** `treble/ingest/registry.py` failed
+`test_adapter_fixture_coverage`, which required every module under `treble/ingest/` to have a
+recorded-fixture test. The registry defines no adapter and parses no payload, so it has no
+fixture to read. The convenient fix was a fourth name in the check's hand-maintained
+`_NOT_ADAPTERS` set — and that is the same move that once "fixed" a drift check by deleting the
+two adapters it was failing on. Instead the check now decides adapter-hood by whether a module
+*defines a `SourceAdapter` subclass*, so the list maintains itself. Verified both ways: the same
+eleven adapters are still checked, and a probe adapter added without a fixture test still fails
+it.
+
+On the live store: `fred` exports 7,341 rows complete; `swap` exports **0 rows with 3,164 DTCC
+facts withheld**; `cusip` and `isin` are refused outright. The withholding travels in the Arrow
+table's schema metadata, so it is still there after the client persists the table.
+
+**Arrow Flight** (`treble/tapi/flight.py`) then serves guarded exports with a fixed schema — one
+inferred from whatever rows happened to be present would change shape between two pulls and a
+warehouse would see a column appear as a data event. Loopback-only, like the HTTP server and for
+the same reason: §22.1's entitlement model does not exist, so a routable Flight server would be
+an unauthenticated bulk data tap.
 
 ### 2026-08-03 — `TVAL` v1: an evaluated price you can argue with
 

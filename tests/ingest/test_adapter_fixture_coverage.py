@@ -14,24 +14,46 @@ live install.
 
 from __future__ import annotations
 
+import importlib
+import inspect
+import pkgutil
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
-ADAPTERS = ROOT / "treble" / "ingest"
-TESTS = Path(__file__).parent
+import treble.ingest
+from treble.ingest.base import SourceAdapter
 
-#: Modules in `treble/ingest` that are not adapters.
-_NOT_ADAPTERS = {"__init__", "base", "populate"}
+TESTS = Path(__file__).parent
 
 
 def shipped_adapters() -> list[str]:
-    return sorted(
-        path.stem
-        for path in ADAPTERS.glob("*.py")
-        if path.stem not in _NOT_ADAPTERS and not path.stem.startswith("_")
-    )
+    """Modules that define a `SourceAdapter`, discovered rather than listed.
+
+    The first version excluded non-adapters by a hand-maintained filename
+    set — `{"__init__", "base", "populate"}` — and `treble/ingest/registry.py`
+    duly failed the check the day it was added, for defining no adapter and
+    parsing no payload.
+
+    Adding a fourth name to that set would have been the convenient fix and
+    the wrong one: it is the same move that once "fixed" a drift check by
+    deleting the two adapters it was failing on. So the rule now tests the
+    property it cares about — a module is an adapter module when it defines
+    a `SourceAdapter` subclass — and the list maintains itself. A real
+    adapter added tomorrow is checked because it is an adapter, not because
+    somebody remembered to leave its name out of an exclusion set.
+    """
+    found: list[str] = []
+    for info in pkgutil.walk_packages(treble.ingest.__path__, prefix="treble.ingest."):
+        module = importlib.import_module(info.name)
+        defines_adapter = any(
+            issubclass(obj, SourceAdapter) and obj is not SourceAdapter
+            for _, obj in inspect.getmembers(module, inspect.isclass)
+            if obj.__module__ == info.name
+        )
+        if defines_adapter:
+            found.append(info.name.rsplit(".", 1)[-1])
+    return sorted(found)
 
 
 def test_there_are_adapters_to_check() -> None:

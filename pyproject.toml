@@ -103,7 +103,7 @@ disallow_any_explicit = false
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["QuantLib.*", "xlwings.*", "lightgbm.*", "scipy.*"]
+module = ["QuantLib.*", "xlwings.*", "lightgbm.*", "scipy.*", "pyarrow.*"]
 ignore_missing_imports = true
 # xlwings re-exports its decorators (`func`, `arg`, `ret`) implicitly, which
 # strict mode rejects. Relaxed for this dependency only rather than
