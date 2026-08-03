@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 37.97%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 39.53%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -105,7 +105,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 | Ticker plant (conflated / TPIPE) | 0.35 | venue adapters, security master enrichment, TGN/TCMP composites, Redpanda + NATS transports |
 | `ALLQ` correct-when-empty | 0.95 | only the shared transport — the service is in-process, so a remote participant cannot contribute (needs P2_8) |
 | `PORT` with TFM3 v1 | 0.00 | not started |
-| `TVAL` v1 | 0.00 | not started |
+| `TVAL` v1 | 0.50 | Prong 2 (comparables / relative value) — half the methodology; plus the screen, the ML layer and snapshots |
 | `CDSW` vs ISDA test cases | 0.40 | the published cases themselves — the model is internally consistent, not externally confirmed |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
 | Canvas with FDC3 | 0.00 | not started |
@@ -428,6 +428,41 @@ Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 ## Session log
 
 *Newest first. Two or three lines each: what was done, what broke, what is next.*
+
+### 2026-08-03 — `TVAL` v1: an evaluated price you can argue with
+
+`treble/analytics/tval/evaluate.py`, 31 tests. Prong 1 of spec §15: direct observations weighted
+by recency, firmness, size and corroboration, producing a price, a 1–10 score, an ASC 820 level,
+and the derivation that made it.
+
+**The weighting function is a parameter, not a constant.** §15.3 requires a user to be able to
+run the same machinery with their own weights and get their own valuation; baked-in weights
+would make independent price verification impossible by construction. `Weighting` is a frozen
+model with a content hash, stamped into the I3 envelope, so two prices computed under different
+weights are never indistinguishable after the fact.
+
+**The score's four drivers are published separately** — corroboration, timeliness, firmness,
+agreement — because "why is this a 4" is the question a valuation committee asks. A test asserts
+the headline price is *reproducible from the drill-down rows*, which is the strongest form of
+transparency available: a reader can recompute the number from what is shown beneath it.
+
+**Two judgement calls, both recorded as tunable policy rather than hidden constants.** Stale
+marks are Level 3 however well they agree — the first cut classified three funds agreeing to the
+cent at a quarter end as Level 2 on a timeliness of 0.01, and past a freshness floor the price
+rests on the assumption that nothing has changed, which is what Level 3 means. And **Level 1 is
+absent from the enum** rather than an unreachable branch: it means an unadjusted quoted price in
+an active market for the identical asset, and if one existed there would be nothing to evaluate.
+
+**A mistake worth recording.** The first validation run against real N-PORT data printed prices
+of 8371.0 and 16966.0. Those were equities, and the throwaway query had applied the ×100 par
+convention to share prices — exactly what `AssetCategory` exists to prevent, as its docstring
+says in as many words. Re-run through the real `implied_price` model: 182.18, 169.66, 250.73,
+three independent filers, **0.000bp** range. The error was in the query, not the code, and it is
+a live demonstration that the guard is load-bearing.
+
+**One honest fact about the data:** only *equities* have three-or-more-filer corroboration in
+this store. No bond does. N-PORT corroboration for bonds is thinner than the Phase 1 finding
+suggests, and the score reflects that rather than papering over it.
 
 ### 2026-08-02 (last) — `ALLQ` and the contribution API
 

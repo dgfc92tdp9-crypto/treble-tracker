@@ -105,7 +105,31 @@ phase_2:
                   participant on another machine cannot yet contribute —
                   that needs the shared transport of P2_8"}
   P2_3:  {done: 0.0, name: "PORT with TFM3 v1; factor model validation"}
-  P2_4:  {done: 0.0, name: "TVAL v1 with transparency drill-down"}
+  P2_4:  {done: 0.5, name: "TVAL v1 with transparency drill-down",
+          basis: "the criterion's two named requirements ship. Score: 1-10
+                  from four published components — corroboration, timeliness,
+                  firmness, agreement — each exposed rather than rolled into
+                  one number, plus the ASC 820 level with a documented and
+                  tunable score-to-level mapping. Drill-down: every
+                  observation comes back with its kind, recency and size
+                  weights and its share of the price, and a test asserts the
+                  headline price is reproducible from those rows. The
+                  weighting function is a parameter with a content hash
+                  stamped into the I3 envelope, because §15.3 requires a user
+                  to be able to run the same machinery with their own weights
+                  — baked-in weights would make independent price
+                  verification impossible by construction. Refuses rather
+                  than guesses: no observations, only-stale observations,
+                  future-dated observations, and a weighting that values
+                  nothing. Outstanding, and why this is 0.5 rather than
+                  higher: (a) Prong 2 — the relative value algorithm that
+                  prices a bond from comparables when it has no activity of
+                  its own — is not built, and it is half the methodology;
+                  it needs an issuer curve fitted across the issuer's
+                  outstanding debt and a similarity metric over sector,
+                  rating and seniority. (b) no TVAL screen. (c) §15.4's ML
+                  residual layer and §15.5's multi-time bid/mid/ask
+                  snapshots are untouched"}
   P2_5:  {done: 0.4, name: "CDSW against ISDA published test cases",
           basis: "the ISDA-convention model ships — both legs, upfront, risky
                   PV01, par-spread solver, ACT/360, accrued-on-default and
