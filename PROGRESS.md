@@ -314,7 +314,7 @@ checked that the mechanism was still switched on.**
 > these don't come up as often if not at all. Also adjust for code errors that keep coming up
 > and the general way they come up so that you learn from your mistakes."
 
-Every mistake made on this project so far falls into four classes. They are recorded by
+Every mistake made on this project so far falls into five classes. They are recorded by
 *class* rather than as a list of incidents, because the same shape keeps recurring in new
 material — a note about one incident would not have prevented the next one. Each class names
 the mechanism that now catches it, and says honestly whether that mechanism is enforced by
@@ -379,12 +379,40 @@ app unopenable offline. An icon set with the `.icns` but no `.png`. An HTTP serv
 - **Rule:** paths anchored absolutely, never relative to the caller's cwd; assume no network at
   startup; a build that has only ever run on this machine has not been shown to be portable.
 
+### E. An explanation recorded as fact, never tested — 1 occurrence
+
+`tests/analytics/credit/test_isda_grid.py` asserted that its residual against ISDA's published
+grid "is discretisation", and named the remedy: "real IMM payment schedules and a finer
+protection integral". Both halves were false. Sub-dividing the protection integral 2, 4, 8 and
+16 times moved the worst AUD case from 6.5125bp to 6.5127bp — no effect at any resolution.
+Replacing the uniform schedule with the real IMM roll schedule made every grid roughly twenty
+times worse. `config/completion.yaml` had copied the same explanation, so the wrong cause was
+recorded in two places and gated in neither.
+
+What makes this its own class: every *assertion* in that test passed, before and after. The
+error was entirely in prose, which no mechanism reads. A wrong explanation is worse than none,
+because it is load-bearing for every later decision that trusts it, and a green suite actively
+vouches for it — the next person does not re-derive an attribution that appears settled.
+
+- **Enforced:** the test now records both refutations with their measurements, so neither is
+  re-attempted, and states the surviving candidate as an open lead rather than a conclusion.
+- **Enforced:** `test_the_worst_case_is_the_known_shape` fences the widened tolerance, so the
+  room left for an unexplained residual cannot be spent by an unrelated regression.
+- **Rule:** an attribution written in a docstring, a commit message or the ledger is a claim,
+  and claims get tested or get labelled as untested. Write "ruled out X and Y; Z is a lead"
+  rather than "the cause is Z" unless Z has been measured. When a cause is asserted in more
+  than one place, the second copy is where it rots.
+
 ### The distinction that matters
 
-Classes A and C are the dangerous ones, because their failure mode is *looking correct*. B and
-D announce themselves eventually. So the ordering rule is: **prove the check can fail before
-believing what it says.** That is the only one of these that generalises to mistakes not yet
-made.
+Classes A, C and E are the dangerous ones, because their failure mode is *looking correct*. B
+and D announce themselves eventually. So the ordering rule is: **prove the check can fail
+before believing what it says.** That is the only one of these that generalises to mistakes
+not yet made.
+
+E is the worst of the three and the most recently learned. A and C produce a check that cannot
+fail; E produces a *belief* that cannot fail, because nothing in the repository is capable of
+disagreeing with a sentence.
 
 ## Continuous verification (standing requirement, Jack 2026-07-26)
 
