@@ -169,14 +169,30 @@ phase_2:
                   rating and seniority. (b) no TVAL screen. (c) §15.4's ML
                   residual layer and §15.5's multi-time bid/mid/ask
                   snapshots are untouched"}
-  P2_5:  {done: 0.4, name: "CDSW against ISDA published test cases",
-          basis: "the ISDA-convention model ships — both legs, upfront, risky
-                  PV01, par-spread solver, ACT/360, accrued-on-default and
-                  continuous protection — and is internally consistent (a par
-                  coupon settles at zero). Deliberately NOT counted higher:
-                  the criterion is validation against ISDA's *published test
-                  cases*, and internal consistency is not external
-                  confirmation"}
+  P2_5:  {done: 0.8, name: "CDSW against ISDA published test cases",
+          basis: "the criterion is met: validated against ISDA's own
+                  published RFR test grid (USD/SOFR, trade date 2022-06-22,
+                  from cdsmodel.com under the ISDA CDS Standard Model Public
+                  Licence v1.0, which permits reproduction and derivative
+                  works with attribution retained). 2,388 published cases,
+                  hazard calibrated so our par spread equals ISDA's quoted
+                  spread and then priced at the trade's own coupon — the
+                  ISDA workflow, so this tests conventions rather than a
+                  curve fit. Result: median error 0.33bp of notional, worst
+                  1.42bp, unbiased in sign. Getting there required the model
+                  to accept a bootstrapped discount curve rather than a flat
+                  rate; the flat-rate version left a 0.49bp median and a
+                  4.68bp worst. Outstanding, and why this is not 1.0: the
+                  residual is measured and attributed rather than removed —
+                  it grows monotonically with maturity (0.11bp at 1y to
+                  0.52bp at 10y) and with spread, which is the signature of
+                  the per-period midpoint approximations for accrued-on-
+                  default and protection discounting. Removing it needs real
+                  IMM payment schedules and a finer protection integral. A
+                  test asserts the attribution rather than leaving the
+                  tolerance as a hiding place. Only the USD/SOFR grid is
+                  wired; ISDA publishes EUR, GBP, JPY, CHF, AUD and the
+                  older IBOR grids too"}
   P2_6:  {done: 0.85, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
