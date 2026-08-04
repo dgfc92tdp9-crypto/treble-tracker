@@ -5,7 +5,16 @@ import os
 
 import pytest
 
-from tests.conformance.framework import RENDERERS, Case, discover_cases, reference_renderer
+from tests.conformance.framework import (
+    CANVAS_RENDERERS,
+    RENDERERS,
+    CanvasCase,
+    Case,
+    canvas_reference_renderer,
+    discover_canvas_cases,
+    discover_cases,
+    reference_renderer,
+)
 
 CASES = discover_cases()
 
@@ -51,6 +60,51 @@ class TestConformance:
 @pytest.mark.conformance
 def test_at_least_one_case_exists() -> None:
     assert CASES, "conformance suite must not be empty"
+
+
+CANVAS_CASES = discover_canvas_cases()
+
+
+@pytest.mark.conformance
+@pytest.mark.parametrize("case", CANVAS_CASES, ids=[c.name for c in CANVAS_CASES])
+class TestCanvasConformance:
+    """I6 for a whole workspace (§5.3).
+
+    The single-screen suite above proves each component renders identically
+    everywhere. This proves they are *placed* identically — which is a
+    separate failure: a renderer that composed the same correct screens into
+    the wrong arrangement, or dropped one, would pass every test above.
+    """
+
+    def test_goldens_exist(self, case: CanvasCase) -> None:
+        if _regen_enabled():
+            layout, text = canvas_reference_renderer(case)
+            case.golden_layout.write_text(layout)
+            case.golden_text.write_text(text)
+        assert case.golden_layout.exists(), (
+            f"{case.name}: golden missing — run with TREBLE_REGEN_GOLDEN=1 and review the diff"
+        )
+        assert case.golden_text.exists()
+
+    @pytest.mark.parametrize("renderer_name", list(CANVAS_RENDERERS))
+    def test_renderer_matches_goldens(self, case: CanvasCase, renderer_name: str) -> None:
+        if not case.golden_layout.exists():
+            pytest.skip("goldens not generated yet")
+        layout, text = CANVAS_RENDERERS[renderer_name](case)
+        if json.loads(layout) != json.loads(case.golden_layout.read_text()):
+            assert layout == case.golden_layout.read_text(), (
+                f"{case.name}/{renderer_name}: canvas layout tree diverges from golden"
+            )
+        assert text == case.golden_text.read_text(), (
+            f"{case.name}/{renderer_name}: canvas text snapshot diverges from golden"
+        )
+
+
+@pytest.mark.conformance
+def test_a_canvas_case_exists() -> None:
+    """`CNVS` is a shipped screen, so it needs a case like any other — and
+    it is the only one whose renderer draws more than one buffer."""
+    assert CANVAS_CASES, "the canvas has no conformance case; CNVS is untested across renderers"
 
 
 @pytest.mark.conformance

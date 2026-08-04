@@ -110,6 +110,145 @@ function escapeHtml(text: string): string {
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
 }
 
+// ---------------------------------------------------------------------
+// CNVS — a whole workspace (spec §5.3)
+// ---------------------------------------------------------------------
+
+export interface CanvasPlacement {
+  x: number; y: number; width: number; height: number; display: number;
+}
+
+export interface CanvasComponentTree {
+  id: string;
+  screen: string;
+  channel: string | null;
+  placement: CanvasPlacement | null;
+  tree: LayoutTree;
+}
+
+/** Smallest placement with a visible interior. Mirrors MIN_PLACEMENT in
+ *  treble/render/canvas.py; a component drawn with no room inside its frame
+ *  is indistinguishable from one that failed to resolve. */
+export const MIN_PLACEMENT = 3;
+
+/** §6.3 tokens are for cells; a colour group is the *component's* channel and
+ *  is drawn on its frame, because a link the user cannot see is a link they
+ *  cannot verify. */
+const CHANNEL_COLOURS: Record<string, string> = {
+  red: "#d70000", blue: "#0087d7", green: "#00af5f",
+  yellow: "#d7d700", orange: "#d78700", purple: "#af5fd7",
+};
+
+function onDisplay(components: CanvasComponentTree[], display: number): CanvasComponentTree[] {
+  return components
+    .filter((c) => c.placement !== null && c.placement.display === display)
+    .sort((a, b) =>
+      a.placement!.y - b.placement!.y
+      || a.placement!.x - b.placement!.x
+      || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+function padEnd(text: string, length: number, fill: string): string {
+  let out = text;
+  while (out.length < length) out += fill;
+  return out;
+}
+
+/** The plain-text projection of a workspace, character-identical to
+ *  `canvas_text_snapshot` in treble/render/canvas.py. This is what the
+ *  conformance suite compares (I6). */
+export function canvasTextSnapshot(
+  components: CanvasComponentTree[], display = 0,
+): string {
+  const placed = onDisplay(components, display);
+  const height = placed.reduce((m, c) => Math.max(m, c.placement!.y + c.placement!.height), 0);
+  const width = placed.reduce((m, c) => Math.max(m, c.placement!.x + c.placement!.width), 0);
+  const grid: string[][] = Array.from({ length: height }, () => Array<string>(width).fill(" "));
+
+  const write = (row: number, col: number, text: string): void => {
+    for (let i = 0; i < text.length; i += 1) {
+      if (row >= 0 && row < height && col + i >= 0 && col + i < width) grid[row][col + i] = text[i];
+    }
+  };
+
+  for (const component of placed) {
+    const p = component.placement!;
+    if (p.width < MIN_PLACEMENT || p.height < MIN_PLACEMENT) {
+      throw new Error(
+        `component ${JSON.stringify(component.id)} is placed ${p.width}x${p.height}, which is `
+        + `too small to draw anything inside a frame (minimum ${MIN_PLACEMENT}x${MIN_PLACEMENT}). `
+        + "A component with no visible interior is indistinguishable from one that failed to resolve",
+      );
+    }
+    const innerWidth = p.width - 2;
+    const innerHeight = p.height - 2;
+    const lines = textSnapshot(component.tree).replace(/\n+$/, "").split("\n");
+    const clipped = lines.length > innerHeight || lines.some((l) => l.length > innerWidth);
+
+    let title = ` ${component.screen}`;
+    if (component.channel !== null) title += ` ${component.channel}`;
+    if (clipped) title += " CLIP";
+    title += " ";
+    write(p.y, p.x, `+${padEnd(title.slice(0, innerWidth), innerWidth, "-")}+`);
+    write(p.y + p.height - 1, p.x, `+${"-".repeat(innerWidth)}+`);
+    for (let i = 0; i < innerHeight; i += 1) {
+      const body = i < lines.length ? lines[i] : "";
+      write(p.y + 1 + i, p.x, `|${padEnd(body.slice(0, innerWidth), innerWidth, " ")}|`);
+    }
+  }
+
+  const rendered = grid.map((line) => line.join("").replace(/\s+$/, ""));
+  const trailer: string[] = [];
+  for (const component of [...components].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+    if (component.placement === null) {
+      trailer.push(
+        `unplaced ${component.screen} ${component.channel ?? "unlinked"} id=${component.id}`);
+    }
+  }
+  const elsewhere = components.filter(
+    (c) => c.placement !== null && c.placement.display !== display).length;
+  if (elsewhere > 0) {
+    trailer.push(`display ${display} shown; ${elsewhere} component(s) on other displays`);
+  }
+  return [...rendered, ...trailer].join("\n").replace(/\n+$/, "") + "\n";
+}
+
+/** The styled workspace the desktop window displays: every component's own
+ *  `renderHtml` output, absolutely positioned in workspace cells. */
+export function renderCanvasHtml(components: CanvasComponentTree[], display = 0): string {
+  const placed = onDisplay(components, display);
+  const height = placed.reduce((m, c) => Math.max(m, c.placement!.y + c.placement!.height), 0);
+  const width = placed.reduce((m, c) => Math.max(m, c.placement!.x + c.placement!.width), 0);
+
+  const frames = placed.map((component) => {
+    const p = component.placement!;
+    const colour = component.channel ? CHANNEL_COLOURS[component.channel] ?? "#767676" : "#3a3a3a";
+    const label = component.channel
+      ? `${component.screen} · ${component.channel}` : component.screen;
+    return (
+      `<div class="canvas-component" data-component="${escapeHtml(component.id)}"`
+      + ` style="grid-row:${p.y + 1}/span ${p.height};grid-column:${p.x + 1}/span ${p.width};`
+      + `border:1px solid ${colour}">`
+      + `<div class="canvas-title" style="color:${colour}">${escapeHtml(label)}</div>`
+      + renderHtml(component.tree)
+      + "</div>"
+    );
+  }).join("");
+
+  // Unplaced components are listed, never dropped: a workspace that rendered
+  // four of its six components would look like a working layout.
+  const unplaced = components.filter((c) => c.placement === null);
+  const note = unplaced.length === 0 ? "" : (
+    `<div class="canvas-unplaced">${unplaced.length} component(s) with no placement: `
+    + escapeHtml(unplaced.map((c) => `${c.screen} (${c.id})`).join(", "))
+    + "</div>"
+  );
+  return (
+    `<div class="canvas" style="display:grid;grid-template-columns:repeat(${width},1ch);`
+    + `grid-template-rows:repeat(${height},1.2em)">${frames}</div>${note}`
+  );
+}
+
 /** The plain-text projection, character-identical to every other renderer.
  *  This is what the conformance suite compares. */
 export function textSnapshot(tree: LayoutTree): string {

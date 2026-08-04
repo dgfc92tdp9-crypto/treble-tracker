@@ -95,7 +95,12 @@ class CanvasComponentPayload(BaseModel):
     screen: str
     channel: str | None = None
     placement: dict[str, int] | None = None
-    buffer: dict[str, object] | None = None
+    #: The component's layout tree. Named `tree` rather than `buffer` so this
+    #: payload is the *same shape* the canvas conformance suite compares
+    #: (`canvas_layout_tree`). A wire format that differed from the tested one
+    #: by a field name would leave the desktop client drawing nothing while
+    #: every renderer test stayed green.
+    tree: dict[str, object] | None = None
 
 
 class ContributionResponse(BaseModel):
@@ -289,7 +294,7 @@ def _canvas_response(
                 screen=component.screen,
                 channel=component.channel.value if component.channel else None,
                 placement=component.placement.model_dump() if component.placement else None,
-                buffer=_buffer_payload(buffers[component_id]),
+                tree=_buffer_payload(buffers[component_id]),
             )
         )
 

@@ -1,0 +1,17 @@
+          + DES red CLIP ----------------------------+
+          |SECURITY DESCRIPTION                      |
+          |──────────────────────────────────────────|
+          |Shares out    942,134,390                 |
+          |Public float  274,500,000,000             |
++ YAS blue CLIP ---------------------------+         |
+|YIELD AND SPREAD ANALYSIS                 | at 2026-|
+|──────────────────────────────────────────|         |
+|TERMS (as published)                      |         |
+|Coupon                       4.625        |         |
+|Maturity                2046-02-15        |         |
+|Dated (accrual from)    2026-02-15        |---------+
+|Auction price            96.735962        |
+|Auction yield                4.883        |
+|Inflation-indexed               No        |
+|                                          |
++------------------------------------------+

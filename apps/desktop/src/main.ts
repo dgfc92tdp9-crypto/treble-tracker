@@ -4,7 +4,12 @@
 // buffer comes back, the shared renderer draws it. Every piece of screen
 // semantics lives behind that boundary, which is why this file knows no
 // mnemonics and has no data logic to get wrong.
-import { renderHtml, type LayoutTree } from "../../../treble/render/web/src/renderer";
+import {
+  renderHtml,
+  renderCanvasHtml,
+  type CanvasComponentTree,
+  type LayoutTree,
+} from "../../../treble/render/web/src/renderer";
 
 const TAPI = "http://127.0.0.1:8756";
 
@@ -12,6 +17,9 @@ interface CommandResponse {
   kind: string;
   status: string;
   buffer: LayoutTree | null;
+  // Set only for CNVS. A workspace cannot travel in `buffer`, and a client
+  // that fell back to it would show one screen where many were asked for.
+  canvas: CanvasComponentTree[] | null;
 }
 
 const screen = document.getElementById("screen") as HTMLElement;
@@ -54,10 +62,17 @@ async function execute(line: string): Promise<void> {
       return;
     }
     const result: CommandResponse = await response.json();
+    const drewNothing = result.buffer === null && !result.canvas?.length;
     // §5.2/§20.2: a command that resolves nothing still gets an explanation,
     // and the previous screen stays up rather than being blanked.
-    setStatus(result.status, result.buffer === null && result.status !== "");
-    if (result.buffer !== null) {
+    setStatus(result.status, drewNothing && result.status !== "");
+    if (result.canvas?.length) {
+      // A workspace, not a screen (§5.3). Checked before `buffer` because
+      // the two are mutually exclusive and drawing one screen where a canvas
+      // was asked for is the failure this branch exists to prevent.
+      screen.innerHTML = renderCanvasHtml(result.canvas);
+      bindLinks();
+    } else if (result.buffer !== null) {
       screen.innerHTML = renderHtml(result.buffer);
       bindLinks();
     }

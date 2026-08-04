@@ -25,6 +25,15 @@ class Theme(BaseModel):
 
     name: str
     styles: dict[str, str]
+    #: Canvas colour-group styles, keyed by channel name (§5.3). Separate
+    #: from `styles` because these are not semantic tokens: an FDC3 user
+    #: channel *is* a colour, named by the standard and by the user, so the
+    #: theme renders it rather than interpreting it.
+    channels: dict[str, str] = {}
+    #: How an unlinked component's frame is drawn. Never blank — a component
+    #: that follows nothing must look deliberately unlinked, not accidentally
+    #: unstyled.
+    unlinked: str = "#585858"
 
     def style_for(self, attrs: tuple[Attr, ...]) -> str:
         """Combine the styles for a cell's attributes.
@@ -36,6 +45,18 @@ class Theme(BaseModel):
         ordered = sorted(attrs, key=lambda a: a is Attr.STALE)
         parts = [self.styles[a.value] for a in ordered if a.value in self.styles]
         return " ".join(parts)
+
+    def style_for_channel(self, channel: str | None) -> str:
+        """A canvas frame's style for its colour group.
+
+        The channel's *name* is drawn in the frame title regardless, which is
+        what makes this survive the high-contrast theme and colour blindness:
+        §5.3 links are identified by colour, and a link a user cannot verify
+        is a link they cannot trust.
+        """
+        if channel is None:
+            return self.unlinked
+        return self.channels.get(channel, self.unlinked)
 
 
 #: §6.3's palette. Amber labels, white inputs, green/red direction, cyan
@@ -53,6 +74,14 @@ DEFAULT_THEME = Theme(
         Attr.MODEL_DERIVED.value: "underline",  # dotted underline (§5.4)
         Attr.BLINK.value: "blink",
         Attr.EMPHASIS.value: "bold",
+    },
+    channels={
+        "red": "#d70000",
+        "blue": "#0087d7",
+        "green": "#00af5f",
+        "yellow": "#d7d700",
+        "orange": "#d78700",
+        "purple": "#af5fd7",
     },
 )
 
@@ -73,6 +102,12 @@ HIGH_CONTRAST_THEME = Theme(
         Attr.BLINK.value: "reverse",
         Attr.EMPHASIS.value: "bold",
     },
+    # Bold rather than hue-separated. Six colour groups cannot be made
+    # distinguishable to a user who cannot separate them by hue, so this
+    # theme does not pretend to: the frame title names the channel, and that
+    # is the identification that actually works.
+    channels=dict.fromkeys(("red", "blue", "green", "yellow", "orange", "purple"), "bold white"),
+    unlinked="dim",
 )
 
 THEMES: dict[str, Theme] = {t.name: t for t in (DEFAULT_THEME, HIGH_CONTRAST_THEME)}

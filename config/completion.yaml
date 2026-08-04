@@ -241,7 +241,7 @@ phase_2:
                   rather than 1.0 because the trade is a template rather
                   than a bookable position, and because the §12.1 product
                   set above is genuinely part of what SWPM means"}
-  P2_7:  {done: 0.9, name: "Canvas with FDC3 context propagation",
+  P2_7:  {done: 0.95, name: "Canvas with FDC3 context propagation",
           basis: "the criterion's named semantic ships and is
                   mutation-verified 6/6. Colour-group context propagation
                   (§5.3): a broadcast reaches every component on the
@@ -258,9 +258,8 @@ phase_2:
                   than a buried constant. One mutation found a latent bug
                   rather than a weak test: without the unlinked-sender
                   check, two unlinked components form an implicit shared
-                  group and overwrite each other. Outstanding, and why this
-                  is 0.7: the layout model and per-user persistence now
-                  ship — placement in grid cells rather than pixels, because
+                  group and overwrite each other. The layout model and
+                  per-user persistence ship — placement in grid cells rather than pixels, because
                   a layout saved in pixels only reconstructs on the display
                   it was saved from and §5.3 says layouts follow a user
                   across machines; overlap reported rather than prevented,
@@ -298,11 +297,39 @@ phase_2:
                   canvas configured, a configured canvas with no components,
                   and a component that failed to resolve — since an empty
                   workspace and a lost layout look identical otherwise.
-                  Disabling the CNVS branch fails 6 of 10 tests. Outstanding,
-                  and why this is not 1.0: no *client* draws it. The server
-                  returns the workspace; the Tauri shell and the TUI both
-                  still render a single buffer, so multi-component layout is
-                  unimplemented on both surfaces"}
+                  Disabling the CNVS branch fails 6 of 10 tests.
+                  Both clients now draw it, which was the last gap. The
+                  shared TypeScript renderer gained `canvasTextSnapshot` and
+                  `renderCanvasHtml`, the TUI gained a compositor, and the
+                  Tauri shell and the terminal both branch on a canvas
+                  response before the single-screen one — checked before
+                  `buffer` precisely because drawing one screen where a
+                  workspace was asked for is the failure that branch exists
+                  to prevent. Frames name their screen and colour group, so
+                  a link is visible rather than merely configured, and
+                  content that does not fit its placement is marked CLIP
+                  rather than silently truncated: a screen missing figures
+                  that looks complete is worse than one that says it is cut.
+                  Canvas conformance runs the whole workspace across all
+                  three renderers — I6 for a layout, not just a screen —
+                  from cases assembled out of screen cases already under
+                  test, so the only thing it can fail on is compositing.
+                  Two cases: a six-component desk, and an overlapping pair
+                  that exists because a z-order mutation survived without
+                  it. Sort order is unobservable until two components
+                  collide, and §4.2 permits exactly that. Mutation-verified:
+                  dropping the CLIP marker, dropping unplaced components and
+                  reversing z-order are each caught, in the TypeScript and
+                  the Python compositors independently. The server's
+                  per-component field was renamed `buffer` to `tree` so the
+                  wire shape *is* the conformance shape; the two differing
+                  by a field name would have left the desktop client drawing
+                  nothing while every renderer test stayed green.
+                  Outstanding, and why this is not 1.0: layouts are
+                  configured rather than authored — no in-app drag, resize
+                  or save — and FDC3 interop is modelled against the
+                  standard's context shape without a real desktop agent to
+                  federate with"}
   P2_8:  {done: 0.8, name: "gRPC + Arrow Flight transports",
           basis: "Arrow Flight ships: a FlightServerBase serving guarded
                   fact exports as Arrow tables with a fixed schema, reading

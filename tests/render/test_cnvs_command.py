@@ -44,7 +44,7 @@ class TestServingACanvas:
         body = _client(_workspace(), tmp_path).post("/command", json={"line": "CNVS"}).json()
         assert body["canvas"] is not None
         assert [c["id"] for c in body["canvas"]] == ["left", "right"]
-        assert all(c["buffer"] for c in body["canvas"])
+        assert all(c["tree"] for c in body["canvas"])
 
     def test_placement_and_link_travel_with_each_component(self, tmp_path: Path) -> None:
         """A client that received buffers without placements would have to

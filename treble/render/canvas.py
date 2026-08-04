@@ -63,9 +63,16 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from treble.core.identifiers import SecurityQuery, YellowKey
-from treble.render.contract.buffer import CellBuffer
+from treble.render.contract.buffer import CellBuffer, canonical_json, layout_tree, text_snapshot
 from treble.render.contract.registry import get_screen
 from treble.render.contract.resolver import ScreenContext, TapiView, resolve
+
+#: Smallest placement that can show anything: two cells of border plus one of
+#: content in each direction. Enforced rather than clipped to nothing, because
+#: a component drawn as a 2x2 box with no interior is the blank rectangle this
+#: module refuses everywhere else — indistinguishable from a screen with no
+#: data, and from a component that failed to resolve.
+MIN_PLACEMENT = 3
 
 
 class Channel(enum.Enum):
@@ -432,12 +439,178 @@ def resolve_canvas(
     return buffers
 
 
+def components_on_display(
+    canvas: Canvas, buffers: dict[str, CellBuffer], display: int
+) -> list[tuple[CanvasComponent, Placement, CellBuffer]]:
+    """Components on one display, in the order they are drawn.
+
+    Sorted by (y, x, id) rather than by insertion, so the z-order of
+    overlapping components is a property of the layout and not of the order
+    the workspace happened to be assembled in. §4.2 permits floating windows
+    over one another, so overlap is legal; a z-order that changed between
+    runs would not be.
+    """
+    out = []
+    for component_id in sorted(canvas.component_ids):
+        component = canvas.component(component_id)
+        placement = component.placement
+        if placement is None or placement.display != display:
+            continue
+        out.append((component, placement, buffers[component_id]))
+    return sorted(out, key=lambda item: (item[1].y, item[1].x, item[0].id))
+
+
+def canvas_layout_tree(canvas: Canvas, buffers: dict[str, CellBuffer]) -> str:
+    """Canonical JSON for a whole workspace — the canvas analogue of
+    :func:`~treble.render.contract.buffer.layout_tree`.
+
+    Every component carries its own layout tree unchanged, so a canvas is
+    composed of exactly the artefacts the single-screen path already
+    produces. A renderer that draws a screen correctly alone and wrongly on
+    a canvas is then a compositing bug and nothing else, which is the only
+    reason to have a second projection at all.
+    """
+    payload = [
+        {
+            "id": component.id,
+            "screen": component.screen,
+            "channel": component.channel.value if component.channel else None,
+            "placement": (
+                None
+                if component.placement is None
+                else {
+                    "x": component.placement.x,
+                    "y": component.placement.y,
+                    "width": component.placement.width,
+                    "height": component.placement.height,
+                    "display": component.placement.display,
+                }
+            ),
+            "tree": json.loads(layout_tree(buffers[component.id])),
+        }
+        for component in (canvas.component(cid) for cid in sorted(canvas.component_ids))
+    ]
+    return canonical_json(payload)
+
+
+def normalise_content(lines: list[str]) -> list[str]:
+    """Trailing blank lines dropped, exactly as `text_snapshot` drops them.
+
+    Shared because a renderer that kept a screen's empty tail rows would
+    compute a different `clipped` verdict from one that dropped them, and
+    the two would then disagree on a frame title — a conformance failure
+    caused entirely by blank space.
+    """
+    out = [line.rstrip() for line in lines]
+    while len(out) > 1 and not out[-1]:
+        out.pop()
+    return out
+
+
+def content_lines(buffer: CellBuffer) -> list[str]:
+    """A component's own screen render, as the lines a frame will hold."""
+    return normalise_content(text_snapshot(buffer).rstrip("\n").split("\n"))
+
+
+def frame_lines(component: CanvasComponent, placement: Placement, content: list[str]) -> list[str]:
+    """One framed component: exactly `placement.height` lines of
+    `placement.width` characters.
+
+    The single source of this geometry. Both the text projection here and the
+    TUI's styled compositor draw from it, because a frame implemented twice
+    is a frame that eventually differs in one of them — and the difference
+    would show up as a conformance failure whose cause is chrome rather than
+    data.
+    """
+    if placement.width < MIN_PLACEMENT or placement.height < MIN_PLACEMENT:
+        raise ValueError(
+            f"component {component.id!r} is placed {placement.width}x{placement.height}, "
+            f"which is too small to draw anything inside a frame (minimum "
+            f"{MIN_PLACEMENT}x{MIN_PLACEMENT}). A component with no visible interior is "
+            "indistinguishable from one that failed to resolve"
+        )
+    inner_width = placement.width - 2
+    inner_height = placement.height - 2
+    clipped = len(content) > inner_height or any(len(line) > inner_width for line in content)
+
+    title = f" {component.screen}"
+    if component.channel is not None:
+        title += f" {component.channel.value}"
+    if clipped:
+        title += " CLIP"
+    title += " "
+
+    lines = ["+" + title[:inner_width].ljust(inner_width, "-") + "+"]
+    for index in range(inner_height):
+        body = content[index] if index < len(content) else ""
+        lines.append("|" + body[:inner_width].ljust(inner_width) + "|")
+    lines.append("+" + "-" * inner_width + "+")
+    return lines
+
+
+def canvas_text_snapshot(
+    canvas: Canvas, buffers: dict[str, CellBuffer], *, display: int = 0
+) -> str:
+    """Character-grid projection of a workspace, framed component by component.
+
+    Each frame's title names the screen and its colour group, because a link
+    the user cannot see on screen is a link they cannot verify — the same
+    reason :class:`Channel` is colours rather than numbers.
+
+    **Content that does not fit says so.** A component whose buffer is wider
+    or taller than its placement is drawn clipped and its title carries
+    `CLIP`. Silently truncating would leave a screen that is missing figures
+    and looks complete, which on a trading workspace is the difference
+    between a blank field and a wrong one.
+
+    Components with no placement, and components on other displays, are
+    reported in a trailer rather than dropped. A workspace that quietly
+    rendered four of its six components would look like a working layout.
+    """
+    on_display = components_on_display(canvas, buffers, display)
+    height = max((p.y + p.height for _, p, _ in on_display), default=0)
+    width = max((p.x + p.width for _, p, _ in on_display), default=0)
+    grid = [[" "] * width for _ in range(height)]
+
+    def write(row: int, col: int, text: str) -> None:
+        for offset, char in enumerate(text):
+            if 0 <= row < height and 0 <= col + offset < width:
+                grid[row][col + offset] = char
+
+    for component, placement, buffer in on_display:
+        lines = frame_lines(component, placement, content_lines(buffer))
+        for offset, line in enumerate(lines):
+            write(placement.y + offset, placement.x, line)
+
+    rendered = [("".join(row)).rstrip() for row in grid]
+    trailer = []
+    for component_id in sorted(canvas.component_ids):
+        component = canvas.component(component_id)
+        if component.placement is None:
+            channel = component.channel.value if component.channel else "unlinked"
+            trailer.append(f"unplaced {component.screen} {channel} id={component.id}")
+    elsewhere = sum(
+        1
+        for cid in canvas.component_ids
+        if (p := canvas.component(cid).placement) is not None and p.display != display
+    )
+    if elsewhere:
+        trailer.append(f"display {display} shown; {elsewhere} component(s) on other displays")
+    return "\n".join([*rendered, *trailer]).rstrip("\n") + "\n"
+
+
 __all__ = [
+    "MIN_PLACEMENT",
     "Canvas",
     "CanvasComponent",
     "Channel",
     "Fdc3Instrument",
     "Placement",
     "UnknownComponentError",
+    "canvas_layout_tree",
+    "canvas_text_snapshot",
+    "components_on_display",
+    "content_lines",
+    "frame_lines",
     "resolve_canvas",
 ]

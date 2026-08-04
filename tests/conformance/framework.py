@@ -24,6 +24,14 @@ from pathlib import Path
 
 from treble.core.identifiers import SecurityQuery
 from treble.core.provenance import ProvenanceId
+from treble.render.canvas import (
+    Canvas,
+    CanvasComponent,
+    Channel,
+    Placement,
+    canvas_layout_tree,
+    canvas_text_snapshot,
+)
 from treble.render.contract.buffer import (
     CellBuffer,
     canonical_json,
@@ -183,4 +191,120 @@ RENDERERS: dict[str, RendererUnderTest] = {
     "reference": reference_renderer,
     "tui": tui_renderer,
     "web": web_renderer,
+}
+
+
+# ---------------------------------------------------------------------
+# CNVS — whole-workspace conformance (spec §5.3)
+# ---------------------------------------------------------------------
+
+CANVAS_CASES_DIR = Path(__file__).parent / "canvas_cases"
+
+
+class CanvasCase:
+    """A workspace assembled from screen cases that are already under test.
+
+    Components reference existing case directories rather than carrying
+    their own definitions and frozen TAPI responses. That is deliberate: a
+    canvas case built from its own inputs would re-test resolution, and a
+    compositing bug would be indistinguishable from a resolver bug. Reusing
+    cases whose single-screen artefacts are already golden leaves exactly
+    one thing under test here — placing them.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.name = path.name
+        raw = json.loads((path / "canvas.json").read_text())
+        self.display: int = raw.get("display", 0)
+        self.sources: dict[str, Case] = {}
+        components = []
+        for entry in raw["components"]:
+            source = Case(CASES_DIR / entry["case"])
+            mnemonic = source.definition.mnemonic
+            if entry["screen"] != mnemonic:
+                raise ValueError(
+                    f"{self.name}: component {entry['id']!r} is labelled {entry['screen']!r} "
+                    f"but case {entry['case']!r} renders {mnemonic!r}. A frame naming one "
+                    "screen while showing another is the mislabelling this suite exists to stop"
+                )
+            self.sources[entry["id"]] = source
+            components.append(
+                CanvasComponent(
+                    id=entry["id"],
+                    screen=entry["screen"],
+                    channel=Channel(entry["channel"]) if entry.get("channel") else None,
+                    placement=(
+                        Placement.model_validate(entry["placement"])
+                        if entry.get("placement")
+                        else None
+                    ),
+                )
+            )
+        self.canvas = Canvas(components)
+
+    def buffers(self) -> dict[str, CellBuffer]:
+        return {cid: case.reference_buffer() for cid, case in self.sources.items()}
+
+    @property
+    def golden_layout(self) -> Path:
+        return self.path / "golden.layout.json"
+
+    @property
+    def golden_text(self) -> Path:
+        return self.path / "golden.txt"
+
+
+def discover_canvas_cases() -> list[CanvasCase]:
+    if not CANVAS_CASES_DIR.exists():
+        return []
+    return [CanvasCase(p) for p in sorted(CANVAS_CASES_DIR.iterdir()) if p.is_dir()]
+
+
+CanvasRendererUnderTest = Callable[[CanvasCase], tuple[str, str]]
+
+
+def canvas_reference_renderer(case: CanvasCase) -> tuple[str, str]:
+    buffers = case.buffers()
+    return (
+        canvas_layout_tree(case.canvas, buffers),
+        canvas_text_snapshot(case.canvas, buffers, display=case.display),
+    )
+
+
+def canvas_tui_renderer(case: CanvasCase) -> tuple[str, str]:
+    """The TUI's own compositor, styling stripped — not a second call to the
+    shared projection."""
+    from treble.render.tui.renderer import canvas_conformance_artifacts
+
+    return canvas_conformance_artifacts(case.canvas, case.buffers(), display=case.display)
+
+
+def canvas_web_renderer(case: CanvasCase) -> tuple[str, str]:
+    """The TypeScript compositor the desktop shell and browser client share,
+    driven with the canvas payload ``POST /command`` returns for `CNVS`."""
+    node = shutil.which("node")
+    if node is None:
+        raise RuntimeError("node is required to run the web renderer's conformance")
+    if not (WEB_DIR / "dist" / "renderer.js").exists():
+        raise RuntimeError(f"web renderer is not built; run `make web` ({WEB_DIR}/dist missing)")
+
+    proc = subprocess.run(  # noqa: S603
+        [node, str(WEB_DIR / "conformance.mjs"), "canvas"],
+        input=canvas_layout_tree(case.canvas, case.buffers()),
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"web canvas renderer failed: {proc.stderr.strip()}")
+    result = json.loads(proc.stdout)
+    return canonical_json(result["tree"]), result["text"]
+
+
+CANVAS_RENDERERS: dict[str, CanvasRendererUnderTest] = {
+    "reference": canvas_reference_renderer,
+    "tui": canvas_tui_renderer,
+    "web": canvas_web_renderer,
 }

@@ -36,8 +36,17 @@ def stated_in_progress() -> float:
 
 class TestProgressMatchesTheLedger:
     def test_stated_figure_equals_the_computed_one(self) -> None:
-        """The check that would have caught the original mistake."""
-        assert stated_in_progress() == pytest.approx(compute().overall, abs=0.005)
+        """The check that would have caught the original mistake.
+
+        Compared against the ledger's *own* two-decimal formatting rather
+        than against the raw float within a tolerance. The tolerance version
+        read `abs=0.005` and failed for any figure landing exactly on a
+        rounding tie: at 46.875 the correctly-rounded 46.88 sits
+        0.0050000000000026 away, which is outside a bound of 0.005. Deriving
+        one from the other removes the boundary instead of widening it, and
+        is stricter — it admits exactly one string.
+        """
+        assert stated_in_progress() == float(compute().format().rstrip("%"))
 
     def test_figure_is_quoted_to_two_decimals(self) -> None:
         # Jack asked for 2 dp specifically, so the format is part of the

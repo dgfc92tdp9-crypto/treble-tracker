@@ -1,0 +1,752 @@
+[
+  {
+    "channel": "blue",
+    "id": "lower-left",
+    "placement": {
+      "display": 0,
+      "height": 12,
+      "width": 44,
+      "x": 0,
+      "y": 5
+    },
+    "screen": "YAS",
+    "tree": {
+      "cells": [
+        {
+          "at": [
+            0,
+            0
+          ],
+          "attrs": [
+            "emphasis",
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "YIELD AND SPREAD ANALYSIS"
+        },
+        {
+          "at": [
+            1,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "────────────────────────────────────────────────────────────────────────────"
+        },
+        {
+          "at": [
+            2,
+            0
+          ],
+          "attrs": [
+            "emphasis",
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "TERMS (as published)"
+        },
+        {
+          "at": [
+            3,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Coupon"
+        },
+        {
+          "at": [
+            3,
+            22
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "       4.625"
+        },
+        {
+          "at": [
+            4,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Maturity"
+        },
+        {
+          "at": [
+            4,
+            22
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "  2046-02-15"
+        },
+        {
+          "at": [
+            5,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Dated (accrual from)"
+        },
+        {
+          "at": [
+            5,
+            22
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "  2026-02-15"
+        },
+        {
+          "at": [
+            6,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Auction price"
+        },
+        {
+          "at": [
+            6,
+            22
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "   96.735962"
+        },
+        {
+          "at": [
+            7,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Auction yield"
+        },
+        {
+          "at": [
+            7,
+            22
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "       4.883"
+        },
+        {
+          "at": [
+            8,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Inflation-indexed"
+        },
+        {
+          "at": [
+            8,
+            22
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "          No"
+        },
+        {
+          "at": [
+            10,
+            0
+          ],
+          "attrs": [
+            "emphasis",
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "ANALYTICS (computed from the terms above)"
+        },
+        {
+          "at": [
+            11,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Yield to maturity"
+        },
+        {
+          "at": [
+            11,
+            22
+          ],
+          "attrs": [
+            "model_derived"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "      4.8835"
+        },
+        {
+          "at": [
+            12,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Modified duration"
+        },
+        {
+          "at": [
+            12,
+            22
+          ],
+          "attrs": [
+            "model_derived"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "     12.6240"
+        },
+        {
+          "at": [
+            13,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Convexity"
+        },
+        {
+          "at": [
+            13,
+            22
+          ],
+          "attrs": [
+            "model_derived"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "    213.1215"
+        },
+        {
+          "at": [
+            14,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "DV01 (per 100 face)"
+        },
+        {
+          "at": [
+            14,
+            22
+          ],
+          "attrs": [
+            "model_derived"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "      0.1233"
+        },
+        {
+          "at": [
+            15,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Workout date"
+        },
+        {
+          "at": [
+            15,
+            22
+          ],
+          "attrs": [
+            "model_derived"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": "759f3d18cfe8b4b659f81d34f4dcc74c85b2612ded18cf54004fa93bc7913c12",
+          "text": "  2046-02-15"
+        },
+        {
+          "at": [
+            17,
+            0
+          ],
+          "attrs": [
+            "link"
+          ],
+          "input": null,
+          "link": "ICVS",
+          "provenance": null,
+          "text": "ICVS Curve viewer"
+        },
+        {
+          "at": [
+            18,
+            0
+          ],
+          "attrs": [
+            "link"
+          ],
+          "input": null,
+          "link": "912810UT3 Govt SPTR",
+          "provenance": null,
+          "text": "SPTR Source trace"
+        },
+        {
+          "at": [
+            20,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Priced off the last auction print, not a live quote; dotted = computed."
+        },
+        {
+          "at": [
+            21,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Inflation-indexed securities show dashes: nominal maths would mislead."
+        }
+      ],
+      "footnotes": [],
+      "grid": [
+        22,
+        80
+      ],
+      "mnemonic": "YAS",
+      "panes": [],
+      "stale": false,
+      "tab": "main"
+    }
+  },
+  {
+    "channel": "red",
+    "id": "upper-right",
+    "placement": {
+      "display": 0,
+      "height": 12,
+      "width": 44,
+      "x": 10,
+      "y": 0
+    },
+    "screen": "DES",
+    "tree": {
+      "cells": [
+        {
+          "at": [
+            0,
+            0
+          ],
+          "attrs": [
+            "emphasis",
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "SECURITY DESCRIPTION"
+        },
+        {
+          "at": [
+            1,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "────────────────────────────────────────────────────────────────────────────"
+        },
+        {
+          "at": [
+            2,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Shares out"
+        },
+        {
+          "at": [
+            2,
+            14
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+          "text": "942,134,390"
+        },
+        {
+          "at": [
+            3,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Public float"
+        },
+        {
+          "at": [
+            3,
+            14
+          ],
+          "attrs": [
+            "stale"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+          "text": "274,500,000,000"
+        },
+        {
+          "at": [
+            5,
+            0
+          ],
+          "attrs": [
+            "emphasis",
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "BALANCE SHEET (as reported, USD)"
+        },
+        {
+          "at": [
+            5,
+            34
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "at 2026-06-30"
+        },
+        {
+          "at": [
+            6,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Assets"
+        },
+        {
+          "at": [
+            6,
+            14
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+          "text": "152,099,000,000"
+        },
+        {
+          "at": [
+            7,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Liabilities"
+        },
+        {
+          "at": [
+            7,
+            14
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+          "text": "117,558,000,000"
+        },
+        {
+          "at": [
+            8,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Equity"
+        },
+        {
+          "at": [
+            8,
+            14
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+          "text": "34,452,000,000"
+        },
+        {
+          "at": [
+            10,
+            0
+          ],
+          "attrs": [
+            "emphasis",
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "INCOME (as reported, USD)"
+        },
+        {
+          "at": [
+            10,
+            34
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "3 months to 2026-06-30"
+        },
+        {
+          "at": [
+            11,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Revenue"
+        },
+        {
+          "at": [
+            11,
+            14
+          ],
+          "attrs": [],
+          "input": null,
+          "link": null,
+          "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+          "text": "17,162,000,000"
+        },
+        {
+          "at": [
+            12,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "Net income"
+        },
+        {
+          "at": [
+            12,
+            14
+          ],
+          "attrs": [
+            "positive"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
+          "text": "2,165,000,000"
+        },
+        {
+          "at": [
+            15,
+            0
+          ],
+          "attrs": [
+            "emphasis",
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "RELATED FUNCTIONS"
+        },
+        {
+          "at": [
+            16,
+            0
+          ],
+          "attrs": [
+            "link"
+          ],
+          "input": null,
+          "link": "IBM US Equity FA",
+          "provenance": null,
+          "text": "1) FA   Financial Analysis"
+        },
+        {
+          "at": [
+            17,
+            0
+          ],
+          "attrs": [
+            "link"
+          ],
+          "input": null,
+          "link": "IBM US Equity GP",
+          "provenance": null,
+          "text": "2) GP   Price Graph"
+        },
+        {
+          "at": [
+            18,
+            0
+          ],
+          "attrs": [
+            "link"
+          ],
+          "input": null,
+          "link": "IBM US Equity SPTR",
+          "provenance": null,
+          "text": "3) SPTR Source Trace"
+        },
+        {
+          "at": [
+            20,
+            0
+          ],
+          "attrs": [
+            "label"
+          ],
+          "input": null,
+          "link": null,
+          "provenance": null,
+          "text": "All figures as-reported XBRL; SPTR on any value for its filing."
+        }
+      ],
+      "footnotes": [],
+      "grid": [
+        22,
+        80
+      ],
+      "mnemonic": "DES",
+      "panes": [],
+      "stale": true,
+      "tab": "main"
+    }
+  }
+]

@@ -1,0 +1,44 @@
+{
+  "display": 0,
+  "components": [
+    {
+      "id": "desc",
+      "case": "des_ibm",
+      "screen": "DES",
+      "channel": "red",
+      "placement": {"x": 0, "y": 0, "width": 82, "height": 24}
+    },
+    {
+      "id": "yield",
+      "case": "yas_nominal_bond",
+      "screen": "YAS",
+      "channel": "red",
+      "placement": {"x": 82, "y": 0, "width": 82, "height": 24}
+    },
+    {
+      "id": "chart",
+      "case": "gp_sp500",
+      "screen": "GP",
+      "channel": "blue",
+      "placement": {"x": 0, "y": 24, "width": 84, "height": 24}
+    },
+    {
+      "id": "pinned",
+      "case": "sptr_ibm",
+      "screen": "SPTR",
+      "placement": {"x": 84, "y": 24, "width": 40, "height": 12}
+    },
+    {
+      "id": "dict",
+      "case": "flds_dict",
+      "screen": "FLDS",
+      "channel": "green"
+    },
+    {
+      "id": "models",
+      "case": "mdl_registry",
+      "screen": "MDL",
+      "placement": {"x": 0, "y": 0, "width": 82, "height": 24, "display": 1}
+    }
+  ]
+}

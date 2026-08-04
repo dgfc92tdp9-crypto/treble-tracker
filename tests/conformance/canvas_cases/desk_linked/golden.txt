@@ -1,0 +1,50 @@
++ DES red -----------------------------------------------------------------------++ YAS red -----------------------------------------------------------------------+
+|SECURITY DESCRIPTION                                                            ||YIELD AND SPREAD ANALYSIS                                                       |
+|────────────────────────────────────────────────────────────────────────────    ||────────────────────────────────────────────────────────────────────────────    |
+|Shares out    942,134,390                                                       ||TERMS (as published)                                                            |
+|Public float  274,500,000,000                                                   ||Coupon                       4.625                                              |
+|                                                                                ||Maturity                2046-02-15                                              |
+|BALANCE SHEET (as reported, USD)  at 2026-06-30                                 ||Dated (accrual from)    2026-02-15                                              |
+|Assets        152,099,000,000                                                   ||Auction price            96.735962                                              |
+|Liabilities   117,558,000,000                                                   ||Auction yield                4.883                                              |
+|Equity        34,452,000,000                                                    ||Inflation-indexed               No                                              |
+|                                                                                ||                                                                                |
+|INCOME (as reported, USD)         3 months to 2026-06-30                        ||ANALYTICS (computed from the terms above)                                       |
+|Revenue       17,162,000,000                                                    ||Yield to maturity           4.8835                                              |
+|Net income    2,165,000,000                                                     ||Modified duration          12.6240                                              |
+|                                                                                ||Convexity                 213.1215                                              |
+|                                                                                ||DV01 (per 100 face)         0.1233                                              |
+|RELATED FUNCTIONS                                                               ||Workout date            2046-02-15                                              |
+|1) FA   Financial Analysis                                                      ||                                                                                |
+|2) GP   Price Graph                                                             ||ICVS Curve viewer                                                               |
+|3) SPTR Source Trace                                                            ||SPTR Source trace                                                               |
+|                                                                                ||                                                                                |
+|All figures as-reported XBRL; SPTR on any value for its filing.                 ||Priced off the last auction print, not a live quote; dotted = computed.         |
+|                                                                                ||Inflation-indexed securities show dashes: nominal maths would mislead.          |
++--------------------------------------------------------------------------------++--------------------------------------------------------------------------------+
++ GP blue -------------------------------------------------------------------------++ SPTR CLIP ---------------------------+
+|PRICE GRAPH                                                                       ||SOURCE TRACE                          |
+|────────────────────────────────────────────────────────────────────────────      ||──────────────────────────────────────|
+|Last            7,316.15                                                          ||Every document behind the values shown|
+|                                                                                  ||                                      |
+|CLOSING LEVEL                                                                     ||SOURCE      METHOD     RETRIEVED     D|
+|+------------------------------------------------------------------------------+  ||+-------------------------------------|
+||[timeseries:PX_LAST]                                                          |  |||[table_scroll:sys:provenance]        |
+||                                                                              |  |||                                     |
+||                                                                              |  |||                                     |
+||                                                                              |  |||                                     |
+||                                                                              |  |+--------------------------------------+
+||                                                                              |  |
+||                                                                              |  |
+||                                                                              |  |
+||                                                                              |  |
+||                                                                              |  |
+||                                                                              |  |
+|+------------------------------------------------------------------------------+  |
+|                                                                                  |
+|HP  Historical price table                                                        |
+|End of day only; no intraday feed until Phase 2.                                  |
+|Index levels from FRED. Per-equity prices need a licensed feed.                   |
++----------------------------------------------------------------------------------+
+unplaced FLDS green id=dict
+display 0 shown; 1 component(s) on other displays

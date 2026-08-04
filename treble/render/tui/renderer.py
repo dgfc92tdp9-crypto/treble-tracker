@@ -18,6 +18,14 @@ from __future__ import annotations
 
 from rich.text import Text
 
+from treble.render.canvas import (
+    Canvas,
+    canvas_layout_tree,
+    canvas_text_snapshot,
+    components_on_display,
+    frame_lines,
+    normalise_content,
+)
 from treble.render.contract.buffer import (
     CellBuffer,
     ResolvedPane,
@@ -120,11 +128,15 @@ def render_text(buffer: CellBuffer) -> Text:
     return render_styled(buffer, DEFAULT_THEME)
 
 
-def render_styled(buffer: CellBuffer, theme: Theme, *, draw_panes: bool = True) -> Text:
-    """Render with an explicit theme (§6.3: semantics survive the palette).
+def styled_grid(
+    buffer: CellBuffer, theme: Theme, *, draw_panes: bool = True
+) -> tuple[list[list[str]], list[list[str]]]:
+    """(characters, styles) for a buffer, as parallel row-major grids.
 
-    ``draw_panes=False`` substitutes the renderer-neutral pane shape used
-    for conformance; display always draws the real sparkline.
+    Split out from :func:`render_styled` so the canvas compositor can place a
+    component's characters *and* its styling without a second implementation
+    of either. A style grid rebuilt independently would be a second source of
+    truth for what a cell looks like.
     """
     grid: list[list[str]] = [[" "] * buffer.cols for _ in range(buffer.rows)]
     styles: list[list[str]] = [[""] * buffer.cols for _ in range(buffer.rows)]
@@ -143,20 +155,116 @@ def render_styled(buffer: CellBuffer, theme: Theme, *, draw_panes: bool = True) 
         for offset, line in enumerate(lines):
             place(pane.region.row + offset, pane.region.col, line, "")
 
+    return grid, styles
+
+
+def _to_text(grid: list[list[str]], styles: list[list[str]]) -> Text:
+    """Collapse parallel character/style grids into Rich runs."""
     out = Text()
-    for row_index in range(buffer.rows):
+    rows, cols = len(grid), len(grid[0]) if grid else 0
+    for row_index in range(rows):
         col_index = 0
-        while col_index < buffer.cols:
+        while col_index < cols:
             style = styles[row_index][col_index]
             run = grid[row_index][col_index]
             col_index += 1
-            while col_index < buffer.cols and styles[row_index][col_index] == style:
+            while col_index < cols and styles[row_index][col_index] == style:
                 run += grid[row_index][col_index]
                 col_index += 1
-            out.append(run.rstrip() if col_index >= buffer.cols else run, style=style or None)
-        if row_index < buffer.rows - 1:
+            out.append(run.rstrip() if col_index >= cols else run, style=style or None)
+        if row_index < rows - 1:
             out.append("\n")
     return out
+
+
+def render_styled(buffer: CellBuffer, theme: Theme, *, draw_panes: bool = True) -> Text:
+    """Render with an explicit theme (§6.3: semantics survive the palette).
+
+    ``draw_panes=False`` substitutes the renderer-neutral pane shape used
+    for conformance; display always draws the real sparkline.
+    """
+    return _to_text(*styled_grid(buffer, theme, draw_panes=draw_panes))
+
+
+def render_canvas_styled(
+    canvas: Canvas,
+    buffers: dict[str, CellBuffer],
+    theme: Theme,
+    *,
+    display: int = 0,
+    draw_panes: bool = True,
+) -> Text:
+    """A whole workspace as styled terminal output (spec §5.3).
+
+    The frame geometry comes from :func:`~treble.render.canvas.frame_lines`,
+    the same function the text projection uses, so this cannot drift from it.
+    What the TUI adds is the *styling*: each component's cells keep their
+    semantic attributes, and the frame is drawn in its colour group so a link
+    is visible on the terminal exactly as it is on the desktop.
+
+    A terminal has one grid and no windows, so `display` selects which
+    display's components to draw rather than showing all of them at once —
+    overlaying two displays' placements would collide arbitrary components.
+    """
+    on_display = components_on_display(canvas, buffers, display)
+    height = max((p.y + p.height for _, p, _ in on_display), default=0)
+    width = max((p.x + p.width for _, p, _ in on_display), default=0)
+    grid: list[list[str]] = [[" "] * width for _ in range(height)]
+    styles: list[list[str]] = [[""] * width for _ in range(height)]
+
+    for component, placement, buffer in on_display:
+        component_grid, component_styles = styled_grid(buffer, theme, draw_panes=draw_panes)
+        content = normalise_content(["".join(row) for row in component_grid])
+        frame = frame_lines(component, placement, content)
+        frame_style = theme.style_for_channel(
+            component.channel.value if component.channel else None
+        )
+        for row_offset, line in enumerate(frame):
+            row = placement.y + row_offset
+            if not 0 <= row < height:
+                continue
+            for col_offset, char in enumerate(line):
+                col = placement.x + col_offset
+                if not 0 <= col < width:
+                    continue
+                grid[row][col] = char
+                # Interior characters keep the component's own styling; the
+                # border and title carry the colour group. `frame_lines` has
+                # already clipped and padded, so the two agree on which
+                # characters exist by construction rather than by luck.
+                inner_row = row_offset - 1
+                inner_col = col_offset - 1
+                interior = (
+                    0 <= inner_row < len(component_styles)
+                    and 0 <= inner_col < len(component_styles[inner_row])
+                    and 0 < row_offset < placement.height - 1
+                    and 0 < col_offset < placement.width - 1
+                )
+                styles[row][col] = (
+                    component_styles[inner_row][inner_col] if interior else frame_style
+                )
+
+    return _to_text(grid, styles)
+
+
+def canvas_conformance_artifacts(
+    canvas: Canvas, buffers: dict[str, CellBuffer], *, display: int = 0
+) -> tuple[str, str]:
+    """(canvas layout tree, canvas text snapshot) from the TUI's own pipeline.
+
+    The snapshot is taken from the styled workspace render with styling
+    stripped, for the same reason the single-screen version is: it proves
+    what this renderer actually draws, not that a second code path agrees.
+    """
+    styled = render_canvas_styled(canvas, buffers, DEFAULT_THEME, display=display, draw_panes=False)
+    lines = [line.rstrip() for line in styled.plain.split("\n")]
+    trailer = canvas_text_snapshot(canvas, buffers, display=display).rstrip("\n").split("\n")
+    # The trailer (unplaced components, other displays) is workspace
+    # bookkeeping rather than something drawn on the grid, so it is appended
+    # from the shared projection instead of re-derived here.
+    body_height = len(lines)
+    text = "\n".join([*lines, *trailer[body_height:]]).rstrip("\n") + "\n"
+    return canvas_layout_tree(canvas, buffers), text
 
 
 def conformance_artifacts(buffer: CellBuffer) -> tuple[str, str]:
