@@ -459,6 +459,13 @@ vouches for it — the next person does not re-derive an attribution that appear
   re-attempted, and states the surviving candidate as an open lead rather than a conclusion.
 - **Enforced:** `test_the_worst_case_is_the_known_shape` fences the widened tolerance, so the
   room left for an unexplained residual cannot be spent by an unrelated regression.
+- **Rule (added 2026-08-06):** a *measurement* is a claim too. An audit table of
+  "fields published versus fields read" was committed with the read count measuring facts
+  *written* — so `dtcc-sdr` appeared to ignore 106 columns it actually consults. Recounting
+  by string literals broke the other way, scoring adapters that iterate keys generically as
+  reading almost nothing. Neither number was wrong arithmetically; both were presented as
+  meaning something they did not measure. State what a count counts, and say when it cannot
+  distinguish the cases you are drawing a conclusion between.
 - **Rule:** an attribution written in a docstring, a commit message or the ledger is a claim,
   and claims get tested or get labelled as untested. Write "ruled out X and Y; Z is a lead"
   rather than "the cause is Z" unless Z has been measured. When a cause is asserted in more
@@ -478,34 +485,46 @@ disagreeing with a sentence.
 ## What each source publishes versus what we read (audited 2026-08-06)
 
 Auditing a parser against its *own output* cannot find a field it never
-looked at. Comparing the stored payload's keys against the fields actually
-written found derivative holdings being dropped from every N-PORT filing —
-and, through that, the `cusip:N/A` subject collapse. The inventory below is
-the same comparison across every source, kept so the gaps are a decision
-rather than an oversight.
+looked at. Comparing the stored payload's keys against what the adapter does
+found derivative holdings being dropped from every N-PORT filing — and,
+through that, the `cusip:N/A` subject collapse.
 
-| source | published | read | notes |
-| --- | ---: | ---: | --- |
-| `dtcc-sdr` | 110 | 4 | the whole CFTC Part 43 tape reduced to par rates: asset class, action type, block-trade election, notionals and option premiums all unread |
-| `treasury-auctions` | 128 | 16 | bid-to-cover, competitive/noncompetitive tendered and accepted, accrued interest per 100/1000 |
-| `sec-nport` | 137 | 33 | fund-level borrowings and the monthly return/flow series (`mon1..mon3`), which are the *fund's* numbers rather than per-holding |
-| `gleif` | 73 | 7 | address detail and relationship records beyond the Level 2 parent link |
-| `edgar-submissions` | 57 | 1 | `accessionNumber`, `acceptanceDateTime`, addresses, former names |
-| `edgar-companyfacts` | 816 | 2,498 | reads more fields than one payload publishes — the 816 is one filer's tags, the 2,498 the union across filers |
-| `ecb-fx` | 32 | 1 | SDMX metadata (collection, decimals, unit multiplier) around the observation |
-| `coinbase-products` | 18 | 8 | order-type flags: `limit_only`, `post_only`, `cancel_only`, `margin_enabled` |
-| `openfigi` | 15 | 9 | envelope keys rather than data |
-| `fred`, `coinbase`, `frenchdata` | — | — | read in full |
+**Two attempts at counting the gap were both wrong, and the correction
+matters more than the count.**
 
-**None of these are bugs.** They are unread fields, and the point of writing
-them down is that "we chose not to read this" and "nobody looked" are
-different states that look identical in a codebase. The two that would repay
-work first are `dtcc-sdr` — a real swap tape, currently used only to fit
-curves — and `treasury-auctions`, where bid-to-cover is a standard measure
-this system could compute and does not.
+- Counting *facts written* per source said `dtcc-sdr` read 4 of 110 columns.
+  It reads twenty: lifecycle filters, block-trade cap flags, day counts and
+  frequencies all inform the output without becoming facts of their own.
+- Counting *string literals naming keys* fixed that but broke the other way.
+  `edgar-companyfacts` scored 9 of 816 because it iterates XBRL concepts
+  generically rather than naming them; the same is true of `fred`.
 
-**Rule:** when adding an adapter, record what of the payload it ignores.
-Auditing what a parser produces cannot reveal what it never read.
+So a static count cannot distinguish "ignored" from "handled generically",
+and a table of such counts reads as an inventory of neglect when it is
+partly an artefact of the measurement. The numbers are not reproduced here
+for that reason. What follows is what was checked by reading the code.
+
+**`dtcc-sdr` — the swap tape is handled carefully, and is narrower than it
+looks.** It already filters to `NEWT`/`TRAD` so amendments and novations
+cannot double-count a trade, drops prints later flagged `EROR` by
+identifier, excludes forward-starting trades whose par rate is not a spot
+one, and flags CFTC block-trade and large-notional caps. What it genuinely
+does not read: option premiums and strike prices (swaptions), the `Cleared`
+and mandatory-clearing flags, package transactions, and the platform
+identifier. Those are products and attributes this system does not model
+yet, not oversights — but §12.1 lists swaptions, and this is where their
+market data would come from.
+
+**`sec-nport` — the fund-level block is unread.** Per-holding data is now
+covered including derivatives; the filing's own `mon1..mon3` monthly return
+and flow series, and the borrowings schedule, are not. Those are the fund's
+numbers rather than an instrument's, and nothing in this system yet has a
+fund as a subject.
+
+**Rule:** when adding an adapter, record what of the payload it ignores —
+auditing what a parser produces cannot reveal what it never read. And when
+quantifying that, say what the count measures: "fields not written" and
+"fields not read" differ by everything an adapter consults to decide.
 
 ## Continuous verification (standing requirement, Jack 2026-07-26)
 
