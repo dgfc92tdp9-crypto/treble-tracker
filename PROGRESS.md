@@ -332,7 +332,7 @@ material — a note about one incident would not have prevented the next one. Ea
 the mechanism that now catches it, and says honestly whether that mechanism is enforced by
 the gate or is a rule that depends on discipline.
 
-### A. Success read from output that could not report failure — 7 occurrences
+### A. Success read from output that could not report failure — 8 occurrences
 
 `ruff check . | tail`, `pytest | tail`, and most recently `npx tauri build > log 2>&1; echo
 "EXIT=$?"; tail -25 log`. In every case the exit status came from the last command in the
@@ -344,8 +344,18 @@ exit 0 while the compile had failed on a missing icon.
 - **Enforced:** multi-step builds live in `scripts/*.sh` with `set -euo pipefail` and an
   explicit post-condition — `install_desktop.sh` fails if a "successful" build produced no
   bundle, because a stale bundle copied after a failed build is indistinguishable from success.
+- **Enforced:** `tests/test_makefile.py` — every Makefile target must be declared `.PHONY`.
+  `make check` depends on `proto`, `proto` was not phony, and a directory called `proto/`
+  exists, so make treated the target as an up-to-date file and skipped the recipe on every
+  run since gRPC landed. `make proto` printed "`proto' is up to date." and generated nothing.
+  The stubs are gitignored, so **CI was red on a clean checkout the whole time** — verified
+  2026-08-06 by cloning to a fresh directory: at the parent commit `make proto` refused to run
+  and `tests/tapi/test_grpc.py` errored at collection; after the fix `make check` exits 0 with
+  1,317 passing. This is also a class D failure, and is counted in both.
 - **Rule:** never end a command with a pager or `tail` and read its status. Redirect to a
   file, capture `$?` into a variable or file *before* anything else runs, then read the log.
+- **Rule:** a build step that is *supposed* to run is not known to run. Check that it produced
+  something, on a checkout that has nothing lying around from a previous run.
 
 ### B. A recalled value preferred over the recorded one — 4 occurrences
 
@@ -379,7 +389,7 @@ satisfied by the static menu label `1) FA Financial Analysis`.
   test or a manual verification, confirm it fails against the broken state. Assert the precise
   property (no cell carries provenance), never a proxy for it (no text contains a digit).
 
-### D. An environment assumption never stated — 4 occurrences
+### D. An environment assumption never stated — 5 occurrences
 
 A relative `Path("data")` for the store. A network fetch on every launch, making the desktop
 app unopenable offline. An icon set with the `.icns` but no `.png`. An HTTP server placed in
@@ -390,6 +400,11 @@ app unopenable offline. An icon set with the `.icns` but no `.png`. An HTTP serv
   `tests/ingest/test_company_index_cache.py` pins the offline path.
 - **Rule:** paths anchored absolutely, never relative to the caller's cwd; assume no network at
   startup; a build that has only ever run on this machine has not been shown to be portable.
+- **Rule (added 2026-08-06):** *a green local run is not a green CI run.* The `proto` target
+  above passed locally for weeks because the generated directory happened to exist from a
+  manual run, and failed on every clean checkout. When a mechanism's effect is a generated or
+  downloaded artefact, verify it on a fresh clone, not on the working tree that already has
+  one.
 
 ### E. An explanation recorded as fact, never tested — 1 occurrence
 
