@@ -191,7 +191,7 @@ phase_2:
                   mutation-verified. Outstanding: the per-name equity panel,
                   which is the open question a registration-gated source
                   would answer, and §16.2's 1,500+ factors"}
-  P2_4:  {done: 0.5, name: "TVAL v1 with transparency drill-down",
+  P2_4:  {done: 0.65, name: "TVAL v1 with transparency drill-down",
           basis: "the criterion's two named requirements ship. Score: 1-10
                   from four published components — corroboration, timeliness,
                   firmness, agreement — each exposed rather than rolled into
@@ -208,14 +208,40 @@ phase_2:
                   than guesses: no observations, only-stale observations,
                   future-dated observations, and a weighting that values
                   nothing. Outstanding, and why this is 0.5 rather than
-                  higher: (a) Prong 2 — the relative value algorithm that
-                  prices a bond from comparables when it has no activity of
-                  its own — is not built, and it is half the methodology;
-                  it needs an issuer curve fitted across the issuer's
-                  outstanding debt and a similarity metric over sector,
-                  rating and seniority. (b) no TVAL screen. (c) §15.4's ML
-                  residual layer and §15.5's multi-time bid/mid/ask
-                  snapshots are untouched"}
+                  higher. Prong 2 now ships in part. It was recorded as
+                  blocked on sector, rating and seniority — all three are
+                  genuinely absent from the store, and the conclusion drawn
+                  was again wider than the measurement. §15.1's other half is
+                  an issuer curve fitted across an issuer's outstanding debt,
+                  which needs issuer, maturity and price. Measured
+                  2026-08-06: 328 bonds carry maturity, coupon, LEI and an
+                  implied N-PORT mark, and 36 (issuer, report date) groups
+                  hold three or more. treble/analytics/tval/relative.py fits
+                  a least-squares yield curve per issuer and returns a
+                  rich/cheap residual with the curve's own RMS attached, so a
+                  100bp call against 100bp of scatter cannot be read as a
+                  signal; treble/tapi/issuer_curves.py builds them from the
+                  store. Live: 35 issuer curves on 2026-03-31 and 23
+                  significant calls. The comparable set matches on currency,
+                  issuer category and maturity proximity and *reports* the
+                  three dimensions it could not match on, because a
+                  similarity metric that silently dropped two of three would
+                  compare a senior secured note with a subordinated one and
+                  look confident doing it. Two defects found by the tests
+                  rather than by review: a `variance == 0` guard that never
+                  fired because identical maturities give ~1e-32, so the fit
+                  divided one denormal by another; and a default of 'most
+                  recent report date' that returned a single US Treasury bill
+                  curve while 35 corporate curves sat a month back — N-PORT
+                  coverage of a recent month is thin until its funds file, so
+                  the default is now the date with the most fittable issuers,
+                  with the per-date coverage carried on the result.
+                  Outstanding, and why this is not higher: (a) rating and
+                  seniority remain absent, so the similarity metric is
+                  incomplete by construction and says so; (b) no TVAL screen,
+                  so neither prong is reachable from a command line; (c)
+                  §15.4's ML residual layer and §15.5's multi-time
+                  bid/mid/ask snapshots are untouched"}
   P2_5:  {done: 0.85, name: "CDSW against ISDA published test cases",
           basis: "the criterion is met: validated against ISDA's own
                   published RFR test grids (from cdsmodel.com under the ISDA

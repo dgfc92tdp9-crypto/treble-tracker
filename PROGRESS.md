@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 48.75%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 49.22%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -53,8 +53,8 @@ DuckDB/Parquet/Arrow: TQL result sets and bulk universe pulls are the natural pa
 
 Then, in rough order of what is unblocked:
 
-- **`TVAL` Prong 2** — the relative value algorithm. Needs an issuer curve fitted across an
-  issuer's outstanding debt and a similarity metric over sector, rating and seniority.
+- **`TVAL` Prong 2** — the issuer curve half ships. What remains is a screen for either
+  prong, and the rating/seniority dimensions the similarity metric declares missing.
 - **Canvas + FDC3** — UI work, no data dependency.
 - **`PORT` / TFM3** — model and screen both ship. What remains is per-name equity coverage
     (still absent), and the factor breadth §16.2 describes.
@@ -117,7 +117,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 | Ticker plant (conflated / TPIPE) | 0.45 | venue adapters, security master enrichment, Redpanda + NATS transports |
 | `ALLQ` correct-when-empty | **1.00** | complete for this phase — the only limitation left is the loopback binding, which is §22.1 and out of scope until Phase 5 |
 | `PORT` with TFM3 v1 | 0.60 | **screen ships** — three tabs off 1.34M ingested return facts; equal-weight 49-industry template at 16.48% vol, 97.6% factor. Six factors not 1,500; still no per-name panel |
-| `TVAL` v1 | 0.50 | Prong 2 (comparables / relative value) — half the methodology; plus the screen, the ML layer and snapshots |
+| `TVAL` v1 | 0.65 | **issuer curves ship** — 35 fitted on live N-PORT marks, 23 significant rich/cheap calls, each carrying the curve's own RMS. Rating and seniority still absent, so the comparable set reports itself incomplete; no screen yet |
 | `CDSW` vs ISDA test cases | 0.85 | **externally validated across six currencies** — ISDA's own grids, two trade dates; medians 0.04-0.33bp. Residual bounded but *not* attributed: two candidate causes tested and refuted |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
 | Canvas with FDC3 | 0.95 | **both clients draw it** — TUI compositor + shared TS `renderCanvasHtml`, with whole-workspace conformance across all three renderers. Layouts are configured, not authored in-app |
@@ -168,7 +168,7 @@ ordinary.
 > | criterion | blocker |
 > |---|---|
 > | `PORT` / TFM3 | **partial** — factor returns come from Ken French (below); per-name equity history still absent |
-> | `TVAL` Prong 2 | **partial** — §15.1 needs sector/rating/seniority to build a comparable set; the store has issuer (LEI), currency and maturity, and **no rating and no seniority**. `nport:issuerCat` is an N-PORT category, not a sector classification |
+> | `TVAL` Prong 2 | **partial, and narrower than recorded** — the issuer-curve half needs only issuer, maturity and price, all present: 35 curves fit on live marks. The similarity half still lacks rating and seniority and reports them as missing rather than dropping them. `nport:issuerCat` is an N-PORT category, not a sector classification |
 > | Ticker plant | **hard** — no trade or tick data. (`TRADE_COUNT` in the store is the DTCC adapter's own metadata about how many prints backed a curve node, not prints) |
 > | `SWPM` breadth | **hard** — swaptions/CMS need a `VCUB` vol surface; no swaption vol data |
 > | `CDSW` | external — ISDA's published test cases |
