@@ -195,8 +195,19 @@ ordinary.
 > **What is still blocked, precisely:** a portfolio of *individual equities*. Estimating a
 > stock's factor exposures needs that stock's return history, which the store still lacks, so
 > the model covers portfolios expressed over the published portfolios and not the equity
-> universe. That is the question a registration-gated source (Tiingo and similar) would
-> answer, and it is narrower than the one recorded here before.
+> universe.
+>
+> **Re-tested 2026-08-06, and this one holds.** Four other blocks recorded on this project
+> turned out narrower than their evidence, so this was measured again rather than carried
+> forward. N-PORT is the only free per-name equity mark: holdings are reported once per
+> filing at `repPdDate`, so marks are **quarterly** — the `mon1/mon2/mon3` tags are
+> fund-level returns and flows, not per-holding. Vanguard Index Funds' earliest N-PORT filing
+> is **2019-05-30**, capping any per-name history at roughly **28 quarterly observations**.
+> `MIN_OBSERVATIONS` is 60, and that floor is right rather than cautious: 28 quarterly points
+> cannot support a covariance over six factors. Only 7 N-PORT filings are currently ingested,
+> so today's panel is thin from under-fetching — but fetching all of them still lands under
+> the floor. Unblocking needs a daily or monthly per-name price source, and every free
+> candidate is registration-gated. **That is an account decision, not a modelling one.**
 >
 > The general lesson is recorded as failure class E: an explanation asserted rather than
 > tested. "No per-name prices" was measured; "therefore no factor model" was not.

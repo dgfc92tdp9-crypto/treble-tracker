@@ -223,9 +223,29 @@ phase_2:
                   total returns regressed as excess, a window taken from the
                   wrong end of history, and assets fitted over a shorter
                   window than their neighbours — and each refusal is
-                  mutation-verified. Outstanding: the per-name equity panel,
-                  which is the open question a registration-gated source
-                  would answer, and §16.2's 1,500+ factors"}
+                  mutation-verified. Outstanding: the per-name equity panel
+                  and §16.2's 1,500+ factors. The per-name gap was re-tested
+                  on 2026-08-06 rather than carried forward, because four
+                  other blocks recorded on this project turned out narrower
+                  than their evidence. This one holds, and now has a number.
+                  N-PORT is the only free per-name equity mark available:
+                  holdings are reported once per filing at repPdDate, so
+                  marks are quarterly — the mon1/mon2/mon3 tags in a filing
+                  are fund-level returns and flows, not per-holding. Vanguard
+                  Index Funds' earliest N-PORT filing is 2019-05-30, so the
+                  longest possible per-name history is roughly 28 quarterly
+                  observations, and only for a name held continuously by a
+                  fund filing since then. MIN_OBSERVATIONS is 60, and that
+                  guard is right rather than conservative: 28 quarterly
+                  points cannot support a covariance over six factors, and a
+                  quarterly-frequency risk model is not what §16 describes.
+                  Only 7 N-PORT filings are currently ingested, so today's
+                  panel is thin from under-fetching — but fetching every
+                  filing would still land under the floor. Unblocking needs a
+                  daily or monthly per-name price source, and every free
+                  candidate is registration-gated (Tiingo, Alpha Vantage,
+                  Twelve Data). That is a decision about accounts rather than
+                  a modelling problem"}
   P2_4:  {done: 0.75, name: "TVAL v1 with transparency drill-down",
           basis: "the criterion's two named requirements ship. Score: 1-10
                   from four published components — corroboration, timeliness,
