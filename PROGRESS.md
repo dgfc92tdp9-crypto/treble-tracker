@@ -112,6 +112,23 @@ Criteria in `CLAUDE.md` §8. The ledger (`config/completion.yaml`) tracks one en
 because here the criteria *are* the deliverables — unlike Phase 1 there is no separate work-package
 plan, and inventing one would put a second set of numbers beside the gate's own.
 
+**Verified state, 2026-08-06** — measured on a fresh clone of `7fc5124`, not on the working tree,
+because a working tree carries generated artefacts a clean checkout does not and that difference
+has already hidden a broken CI here once:
+
+| | |
+|---|---|
+| `make setup && make check` on a fresh clone | exit 0 |
+| tests | 1,472 passed, 11 deselected |
+| screens registered | 16 — the 11 from Phase 1 plus ALLQ, PORT, SWPM, TVAL, VCUB |
+| conformance cases | 32 screen cases + 2 canvas cases, each across three renderers |
+| analytics carrying an I3 envelope | 45 |
+
+Five screens were added in Phase 2 and each one closed a gap between an analytic and a user:
+`SWPM` gained OIS and tenor-basis tabs, `PORT` reached the factor model, `TVAL` the issuer
+curves, `VCUB` the volatility surface. That gap — working analytics nothing can display — was
+the single most common defect found in this phase, and it is worth checking for by default.
+
 | Criterion | State | What is outstanding |
 |---|---|---|
 | Ticker plant (conflated / TPIPE) | 0.78 | **a real venue feeds it, with bars, VWAP and a security master** — Coinbase `matches` over WebSocket, sequenced on `trade_id`. Crypto only; outstanding: Redpanda + NATS |
