@@ -176,3 +176,56 @@ class TestItSaysWhatItLeftOut:
         excluded and counted rather than dividing by it."""
         with pytest.raises(EmptySurfaceError):
             _build([(_quote(1.0, 10.0), 0.0, 0.0090)], as_of=TRADED, currency="EUR")
+
+
+class TestOneDayUnlessToldOtherwise:
+    """Volatility moves. Pooling a fortnight at one node reports the average
+    of a fortnight's surfaces as though it were today's — the same failure as
+    a curve whose front end is March's and whose long end is May's.
+
+    This was not hypothetical: the first multi-day build pooled fifteen days
+    silently, raising grid coverage from 21% to 79% and median node
+    dispersion from under 20% to 88%, with nodes at 376%. The coverage was
+    real and the agreement was not.
+    """
+
+    def test_prints_from_another_day_are_refused(self) -> None:
+        other = SwaptionQuote(
+            payer=True,
+            expiry=TRADED + timedelta(days=365),
+            underlier_maturity=TRADED + timedelta(days=365 * 11),
+            strike=FORWARD,
+            premium_fraction=0.01,
+            currency="EUR",
+            traded=TRADED - timedelta(days=18),
+        )
+        with pytest.raises(ValueError, match="trading days"):
+            _build(
+                [(_quote(1.0, 10.0), FORWARD, 0.0090), (other, FORWARD, 0.0300)],
+                as_of=TRADED,
+                currency="EUR",
+            )
+
+    def test_pooling_is_allowed_when_asked_for_and_recorded(self) -> None:
+        """Deliberate is fine; silent is not. The span travels on the result
+        so nothing downstream can read a fortnight's average as one day."""
+        other = SwaptionQuote(
+            payer=True,
+            expiry=TRADED + timedelta(days=365),
+            underlier_maturity=TRADED + timedelta(days=365 * 11),
+            strike=FORWARD,
+            premium_fraction=0.01,
+            currency="EUR",
+            traded=TRADED - timedelta(days=18),
+        )
+        surface = _build(
+            [(_quote(1.0, 10.0), FORWARD, 0.0090), (other, FORWARD, 0.0300)],
+            as_of=TRADED,
+            currency="EUR",
+            pool_days=True,
+        )
+        assert surface.pooled_days == 2
+
+    def test_a_single_day_surface_says_it_spans_one(self) -> None:
+        surface = _build(_triples((1.0, 10.0, 0.0090)), as_of=TRADED, currency="EUR")
+        assert surface.pooled_days == 1

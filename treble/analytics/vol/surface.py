@@ -89,6 +89,9 @@ class VolSurface:
     #: surface covering only the middle of the market must say so.
     excluded_off_the_money: int
     excluded_no_bucket: int
+    #: How many trading days the prints came from. One is a surface; more is
+    #: an average of that many surfaces, and the two must not be read alike.
+    pooled_days: int = 1
 
     def at(self, expiry_years: float, tenor_years: float) -> VolNode | None:
         """The node at a grid point, or `None`.
@@ -133,15 +136,36 @@ def build_surface(
     as_of: date,
     currency: str,
     moneyness_band: float = DEFAULT_MONEYNESS_BAND,
+    pool_days: bool = False,
 ) -> VolSurface:
     """Aggregate `(quote, forward, implied volatility)` triples into a grid.
 
     The forward comes in alongside because moneyness needs it and this module
     does not build curves — keeping the curve dependency out is what lets the
     surface be tested without one.
+
+    **One trading day, unless told otherwise.** Prints from other days are
+    refused rather than averaged in. Volatility moves, so pooling a fortnight
+    at one node reports the average of a fortnight's surfaces as though it
+    were today's — the same failure as a curve whose front end is March's and
+    whose long end is May's, which `SWPM` refuses for the same reason.
+
+    Measured on fifteen days of EUR prints: pooling raises grid coverage from
+    21% to 79% and median node dispersion from under 20% to 88%, with
+    individual nodes at 376%. The coverage is real and the agreement is not.
+    `pool_days=True` allows it deliberately, and the result records how many
+    days it spans so nothing downstream can mistake it for one.
     """
     if moneyness_band <= 0.0:
         raise ValueError("a moneyness band of zero admits nothing; the surface would be empty")
+
+    days = {quote.traded for quote, _forward, _vol in quotes}
+    if not pool_days and days - {as_of}:
+        raise ValueError(
+            f"prints from {len(days)} trading days were given for a surface as of {as_of}. "
+            "Volatility moves, so pooling them averages that many surfaces into one; pass "
+            "pool_days=True to do it on purpose"
+        )
 
     off_money = no_bucket = 0
     collected: dict[tuple[float, float], list[float]] = {}
@@ -182,6 +206,7 @@ def build_surface(
         nodes=tuple(nodes),
         excluded_off_the_money=off_money,
         excluded_no_bucket=no_bucket,
+        pooled_days=len(days),
     )
 
 

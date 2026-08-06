@@ -107,8 +107,17 @@ def _curve_quotes(store: DuckStore, curve: str, *, as_of: datetime) -> dict[date
     return by_date
 
 
-def build_swap_market(store: DuckStore, *, as_of: datetime) -> SwapMarket:
-    """The most recent day on which both curves can be built together."""
+def build_swap_market(
+    store: DuckStore, *, as_of: datetime, report_date: date | None = None
+) -> SwapMarket:
+    """A curve environment for one trading day.
+
+    `report_date` defaults to the most recent day on which both curves build.
+    Naming a day is what lets a caller value a print against the curve of the
+    day it printed on: a swaption from the 13th priced off the 31st's curve
+    has an eighteen-day-stale forward, which misplaces its moneyness and
+    inflates its implied volatility — measured, not hypothetical.
+    """
     discount_days = _curve_quotes(store, DISCOUNT_CURVE, as_of=as_of)
     forecast_days = _curve_quotes(store, FORECAST_CURVE, as_of=as_of)
     short_days = _curve_quotes(store, SHORT_FORECAST_CURVE, as_of=as_of)
@@ -118,6 +127,14 @@ def build_swap_market(store: DuckStore, *, as_of: datetime) -> SwapMarket:
             f"no trading day carries both {DISCOUNT_CURVE} and {FORECAST_CURVE}; "
             "run `treble populate` to ingest DTCC SDR prints"
         )
+    if report_date is not None:
+        if report_date not in shared_days:
+            raise SwapMarketUnavailableError(
+                f"{report_date} carries no curve pair. Falling back to another day would "
+                f"value that day's trades against a different day's market. Available: "
+                f"{', '.join(str(d) for d in shared_days[:5])}"
+            )
+        shared_days = [report_date]
 
     failures: list[str] = []
     for report_date in shared_days:
