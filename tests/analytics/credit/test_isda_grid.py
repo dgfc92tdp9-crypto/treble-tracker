@@ -236,12 +236,34 @@ class TestWhatTheResidualIs:
     reference by accident.
 
     What it does establish: the residual is not a fixed modelling limit but
-    something an input assumption moves by a factor of two. These fixtures
-    cannot settle which assumption, because converting ISDA's workbooks to
-    CSV kept only (type, tenor, rate) and discarded the conventions each
-    curve was published with. Recovering those columns is the next step, and
-    until then ACT/365F stays because it is the documented convention rather
-    than the one that fits.
+    something an input assumption moves by a factor of two.
+
+    **Correction, same day.** I recorded that the fixtures could not settle
+    which assumption because converting ISDA's workbooks had discarded each
+    curve's stated conventions. Re-downloading them shows that is false — the
+    `RFR Curve` sheet carries `Type | Tenor | Rates` and nothing else, so
+    there were no conventions to discard. They come from the ISDA model's
+    per-currency defaults, which are documentation rather than data.
+
+    **What the conversion did drop is more likely to matter.** The `Test
+    Grid` sheet also publishes, per case:
+
+        Start Date             2021-05-03    protection start, T+1 business
+        Cash Settlement Date   2021-05-05    T+3, where the upfront is valued
+        Accrued Premium        11111.11
+        Days Accrued           40
+
+    `price_cds` uses the *trade date* as the origin for both protection and
+    discounting. ISDA starts protection on the Start Date and discounts the
+    upfront to the Cash Settlement Date — a three-day shift on every discount
+    factor and every accrual. That is the right order of magnitude for the
+    ~0.0133-year annuity gap the coupon-scaling measurement implies, and it
+    explains why the error scales with coupon and with maturity while being
+    insensitive to protection-integral resolution.
+
+    It is a lead, not a result: nothing here has yet been re-measured with
+    those dates in place. But it is a better lead than the day count, and the
+    fixtures should carry those two columns before anyone tries again.
     """
 
     def test_the_error_grows_with_maturity(self, grid: tuple[str, list[tuple[int, float]]]) -> None:

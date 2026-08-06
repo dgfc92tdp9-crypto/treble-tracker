@@ -408,11 +408,23 @@ phase_2:
                   and chasing the benchmark is how a model comes to reproduce
                   a reference by accident. What it establishes is that the
                   residual is not a fixed modelling limit but something an
-                  input assumption moves by a factor of two. These fixtures
-                  cannot say which assumption: converting ISDA's workbooks to
-                  CSV kept only (type, tenor, rate) and discarded the
-                  conventions each curve was published with, so recovering
-                  those columns is the next step. Also outstanding: the older
+                  input assumption moves by a factor of two. A same-day
+                  correction to that entry: I wrote that the fixtures had
+                  discarded each curve's stated conventions, and
+                  re-downloading the workbooks shows the RFR Curve sheet
+                  carries Type/Tenor/Rates and nothing else — there were none
+                  to discard, they are model documentation rather than file
+                  data. What the conversion did drop matters more: the Test
+                  Grid publishes a Start Date (T+1, protection start) and a
+                  Cash Settlement Date (T+3, where the upfront is valued) per
+                  case, and price_cds uses the trade date as the origin for
+                  both. A three-day shift on every discount factor and accrual
+                  is the right order for the ~0.0133-year annuity gap the
+                  coupon scaling implies, and fits the error growing with
+                  coupon and maturity while ignoring protection-integral
+                  resolution. A lead, not a result — nothing is re-measured
+                  with those dates yet — but a better one than the day count,
+                  and the fixtures should carry both columns first. Also outstanding: the older
                   IBOR grids are not wired"}
   P2_6:  {done: 0.97, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
