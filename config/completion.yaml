@@ -422,9 +422,19 @@ phase_2:
                   is the right order for the ~0.0133-year annuity gap the
                   coupon scaling implies, and fits the error growing with
                   coupon and maturity while ignoring protection-integral
-                  resolution. A lead, not a result — nothing is re-measured
-                  with those dates yet — but a better one than the day count,
-                  and the fixtures should carry both columns first. Also outstanding: the older
+                  resolution. Measured the next day against a probe first
+                  validated to reproduce this model's own error: the lead is
+                  wrong. Step-in T+1 takes the AUD median from 0.0613bp to
+                  0.1091, step-in T+3 to 0.2046, cash settle T+3 to 0.0643,
+                  and the worst case moves under 1% in every case. The same
+                  probe refuted the IMM schedule a second time at 49.87bp
+                  median, ~800x worse. Five explanations eliminated, none
+                  surviving; the residual stays fenced by shape. The probe's
+                  first version put the shipped configuration at 33.96bp
+                  against a true 0.0614 and produced a whole comparison table
+                  off it — so the second refuses to print any toggle until
+                  its baseline matches, which is also what caught the USD
+                  grid at 0.3185 against 0.3244. Also outstanding: the older
                   IBOR grids are not wired"}
   P2_6:  {done: 0.97, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware

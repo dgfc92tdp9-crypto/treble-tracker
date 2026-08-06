@@ -261,9 +261,36 @@ class TestWhatTheResidualIs:
     explains why the error scales with coupon and with maturity while being
     insensitive to protection-integral resolution.
 
-    It is a lead, not a result: nothing here has yet been re-measured with
-    those dates in place. But it is a better lead than the day count, and the
-    fixtures should carry those two columns before anyone tries again.
+    **Measured the next day. The lead is wrong.** Both halves of it make the
+    fit worse, on AUD, against a probe validated to reproduce this model's
+    own error before any toggle was read off it:
+
+        baseline (as shipped)        median 0.0613bp   worst 6.4092bp
+        step-in T+1                         0.1091            6.3939
+        step-in T+3                         0.2046            6.3633
+        cash settle T+3                     0.0643            6.3892
+
+    The worst case moves under 1%. That is not a mechanism, and the medians
+    move the wrong way. The same probe re-tested the IMM schedule — refuted
+    once already — and refuted it again, harder: median 49.87bp, some 800x
+    worse than the equal-step schedule it replaces.
+
+    That leaves five eliminated explanations (protection-integral
+    resolution, the real IMM schedule twice, curve day count, step-in date,
+    cash-settlement discounting) and no surviving one. The residual is a
+    single shape — long-dated, high-coupon, tight-spread — and
+    `test_the_worst_case_is_the_known_shape` fences it so a new regression
+    cannot hide inside the tolerance it needs.
+
+    **The instrument is the part worth keeping.** The first version of that
+    probe put the shipped configuration at 33.96bp median where the shipped
+    model measures 0.0614, and produced a full comparison table off that
+    broken baseline. Every number in it was wrong and none of it was
+    obviously wrong. A measurement is a claim; a probe that cannot reproduce
+    the thing it is a probe *of* has not earned the right to report anything
+    about it, and the second version refuses to print its toggles when the
+    baseline does not match — which is also how the USD grid got caught
+    (0.3185 against 0.3244) rather than quietly averaged in.
     """
 
     def test_the_error_grows_with_maturity(self, grid: tuple[str, list[tuple[int, float]]]) -> None:
