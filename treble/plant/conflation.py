@@ -53,6 +53,12 @@ class Tick(BaseModel):
     sequence: int
     #: When the venue timestamped it, not when we received it.
     exchange_time: datetime
+    #: Traded quantity, where the venue reports one. Optional because not
+    #: every update is a trade — a quote or an index level has no size — and
+    #: because a VWAP computed over ticks with an assumed size of 1 is a
+    #: simple average wearing a volume-weighted name. `mktvwap` refuses
+    #: rather than substituting one for the other.
+    size: float | None = None
 
 
 class GapDetectedError(RuntimeError):

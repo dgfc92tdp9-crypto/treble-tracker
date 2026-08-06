@@ -78,7 +78,7 @@ phase_1:
 # separate work-package plan to track against, and inventing one would put a
 # second set of numbers beside the gate's own.
 phase_2:
-  P2_1:  {done: 0.6, name: "ticker plant — conflated display, unconflated TPIPE",
+  P2_1:  {done: 0.7, name: "ticker plant — conflated display, unconflated TPIPE",
           basis: "the conflation split, current-state cache, sequence-gap
                   detection and bounded TPIPE buffer ship and are
                   mutation-verified. TGN and TCMP composites now ship too
@@ -111,10 +111,22 @@ phase_2:
                   publishes the recorded stream with the channel sequence and
                   asserts the gap detector fires, so the adapter rests on a
                   mechanism shown to work rather than on the parser having
-                  looked right. Outstanding: this is one venue and crypto
-                  only — no equity or bond venue is reachable this way and
-                  none is claimed; plus security master enrichment and the
-                  Redpanda and NATS transports"}
+                  looked right. Bar and VWAP aggregation ships on top of
+                  it (treble/plant/bars.py): fixed-boundary OHLCV bars with
+                  the unfinished interval marked partial, because a bar cut
+                  at 'whenever the data stopped' reports a partial interval
+                  as a whole one and the newest bar is the one a reader
+                  trusts most. VWAP refuses rather than substituting — ticks
+                  with no size give vwap=None instead of a simple average
+                  wearing a volume-weighted name, which is precisely the
+                  number a large print moves and a simple average does not.
+                  Verified against the recorded feed, where Coinbase sizes
+                  are ~1.3e-07 and prints share a timestamp to the
+                  microsecond; every bar's VWAP lands inside its own high/low
+                  range. Outstanding: this is one venue and crypto only — no
+                  equity or bond venue is reachable this way and none is
+                  claimed; plus security master enrichment and the Redpanda
+                  and NATS transports"}
   P2_2:  {done: 1.0, name: "ALLQ correct-when-empty; contribution API",
           basis: "both halves ship. Correct-when-empty: expired quotes leave
                   the book empty rather than stale, it records when it last
@@ -473,8 +485,14 @@ phase_2:
                   FIRMNESS_UNSPECIFIED is rejected rather than defaulted.
                   Outstanding, and why this is not 1.0: spec §8.3 also lists
                   mktdata, mktbar, mktvwap, ems and docs, and names streaming
-                  subscriptions — all of which need the ticker plant's venue
-                  adapters, which do not exist. Those services are absent
-                  rather than stubbed, because an RPC that accepts a request
-                  and returns nothing useful is worse than one a client can
-                  see is missing"}
+                  subscriptions. The reason recorded here for their absence
+                  was that they need venue adapters 'which do not exist' —
+                  that stopped being true on 2026-08-06, when the Coinbase
+                  adapter and the bar/VWAP aggregation landed under P2_1. The
+                  data path for mktdata, mktbar and mktvwap now exists; what
+                  is missing is the gRPC surface over it, which is work
+                  rather than a block. `ems` needs an order path this system
+                  does not have, and `docs` needs a document store. Those
+                  services remain absent rather than stubbed, because an RPC
+                  that accepts a request and returns nothing useful is worse
+                  than one a client can see is missing"}

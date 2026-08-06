@@ -105,6 +105,10 @@ def parse_match(message: dict[str, Any]) -> Tick | None:
         value=price,
         sequence=int(message["trade_id"]),
         exchange_time=_venue_time(str(message["time"])),
+        # Coinbase reports size on every match. Carried because `mktvwap`
+        # weights by it, and a VWAP over sizes this adapter dropped would be
+        # a simple average under a volume-weighted name.
+        size=float(message["size"]) if "size" in message else None,
     )
 
 
