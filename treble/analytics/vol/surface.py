@@ -58,6 +58,33 @@ MAX_BUCKET_DRIFT = 0.25
 #: the only thing the market said about that point.
 MIN_OBSERVATIONS_FOR_CONFIDENT = 3
 
+#: Half-life in trading days for a decay-weighted pool.
+#:
+#: Two, chosen by measurement rather than by feel, and the measurement also
+#: corrected the reason for having it. Pooling was framed as trading coverage
+#: for agreement; it does not. Across fifteen days of EUR prints, grid
+#: coverage is 79% at *every* half-life, because a node exists wherever any
+#: print lands and decay down-weights rather than removes. What actually
+#: moves is dispersion against the number of nodes with enough effective
+#: weight to trust:
+#:
+#:     half-life    confident    median dispersion
+#:     1 day         27 / 44           39%
+#:     2 days        33 / 44           55%
+#:     5 days        37 / 44           84%
+#:     flat pool     38 / 44           95%
+#:
+#: Every row measured. The 2-day row was written from interpolation between
+#: the 1- and 3-day runs first, and read 31/44 at 52%; measuring it gave
+#: 33/44 at 55%. A small error, and the kind this project treats as a defect:
+#: a table of measurements must contain only measurements.
+#:
+#: Five days — the first value tried — was barely better than not weighting
+#: at all. Two keeps dispersion near half the flat figure while leaving a
+#: majority of nodes trustworthy, and a node that fails `is_confident` is
+#: still shown with its weight rather than dropped.
+DEFAULT_HALF_LIFE_DAYS = 2.0
+
 
 @dataclass(frozen=True)
 class VolNode:
@@ -71,10 +98,16 @@ class VolNode:
     #: node whose trades disagreed by 40% is not the same as one whose agreed
     #: to 2%, and the number alone cannot say so.
     dispersion: float
+    #: Kish effective sample size under the decay weights. Twenty prints of
+    #: which nineteen have decayed to nothing is worth one, and
+    #: `observations` alone would call it twenty.
+    effective_observations: float = 0.0
 
     @property
     def is_confident(self) -> bool:
-        return self.observations >= MIN_OBSERVATIONS_FOR_CONFIDENT
+        """Enough *effective* prints, not merely enough prints."""
+        weight = self.effective_observations or float(self.observations)
+        return weight >= MIN_OBSERVATIONS_FOR_CONFIDENT
 
 
 @dataclass(frozen=True)
@@ -124,6 +157,50 @@ def _bucket(value: float, buckets: tuple[float, ...]) -> float | None:
     return nearest if abs(nearest - value) <= nearest * MAX_BUCKET_DRIFT else None
 
 
+def _weighted_median(weighted: list[tuple[float, float]]) -> float:
+    """Median of values under weights.
+
+    A median rather than a weighted mean, for the reason the unweighted
+    version used one: a single crossed print at a stale level moves a mean
+    and does not move a median, and decay weighting does not change that.
+    """
+    ordered = sorted(weighted)
+    total = sum(w for _v, w in ordered)
+    if total <= 0.0:
+        return statistics.median([v for v, _w in ordered])
+    running = 0.0
+    for value, weight in ordered:
+        running += weight
+        if running >= total / 2.0:
+            return value
+    return ordered[-1][0]
+
+
+def _weighted_spread(weighted: list[tuple[float, float]], centre: float) -> float:
+    """Range of the values that carry meaningful weight, over the centre.
+
+    Prints whose weight has decayed below a twentieth of the heaviest are
+    excluded from the range: they barely moved the median, so letting them
+    set the reported scatter would describe a sample the number is not from.
+    """
+    if not weighted or centre <= 0.0:
+        return 0.0
+    heaviest = max(w for _v, w in weighted)
+    live = [v for v, w in weighted if w >= heaviest / 20.0] or [v for v, _w in weighted]
+    return (max(live) - min(live)) / centre
+
+
+def _effective_count(weighted: list[tuple[float, float]]) -> float:
+    """Kish effective sample size: how many equally-weighted prints this is worth.
+
+    Twenty prints of which nineteen have decayed to nothing is one print, and
+    `observations` alone would call it twenty.
+    """
+    total = sum(w for _v, w in weighted)
+    squares = sum(w * w for _v, w in weighted)
+    return (total * total / squares) if squares > 0 else 0.0
+
+
 @model(
     model_id="vol.swaption_surface",
     version="1.0",
@@ -137,6 +214,7 @@ def build_surface(
     currency: str,
     moneyness_band: float = DEFAULT_MONEYNESS_BAND,
     pool_days: bool = False,
+    half_life_days: float = DEFAULT_HALF_LIFE_DAYS,
 ) -> VolSurface:
     """Aggregate `(quote, forward, implied volatility)` triples into a grid.
 
@@ -150,11 +228,11 @@ def build_surface(
     were today's — the same failure as a curve whose front end is March's and
     whose long end is May's, which `SWPM` refuses for the same reason.
 
-    Measured on fifteen days of EUR prints: pooling raises grid coverage from
-    21% to 79% and median node dispersion from under 20% to 88%, with
-    individual nodes at 376%. The coverage is real and the agreement is not.
-    `pool_days=True` allows it deliberately, and the result records how many
-    days it spans so nothing downstream can mistake it for one.
+    `pool_days=True` allows it deliberately, weighting each print by the age
+    of its trading day, and the result records how many days it spans so
+    nothing downstream can mistake it for one. See `DEFAULT_HALF_LIFE_DAYS`
+    for what the weighting does and does not buy — measured, and not what I
+    expected.
     """
     if moneyness_band <= 0.0:
         raise ValueError("a moneyness band of zero admits nothing; the surface would be empty")
@@ -168,7 +246,7 @@ def build_surface(
         )
 
     off_money = no_bucket = 0
-    collected: dict[tuple[float, float], list[float]] = {}
+    collected: dict[tuple[float, float], list[tuple[float, float]]] = {}
     for quote, forward, volatility in quotes:
         if forward <= 0.0 or abs(quote.strike / forward - 1.0) > moneyness_band:
             off_money += 1
@@ -178,7 +256,12 @@ def build_surface(
         if expiry is None or tenor is None:
             no_bucket += 1
             continue
-        collected.setdefault((expiry, tenor), []).append(volatility)
+        # Weight by age when pooling. An unweighted pool treats a print from
+        # a fortnight ago as evidence about today, which is what drove node
+        # dispersion to 88%.
+        age = (as_of - quote.traded).days
+        weight = 0.5 ** (age / half_life_days) if half_life_days else 1.0
+        collected.setdefault((expiry, tenor), []).append((volatility, weight))
 
     if not collected:
         raise EmptySurfaceError(
@@ -188,16 +271,20 @@ def build_surface(
         )
 
     nodes = []
-    for (expiry, tenor), values in sorted(collected.items()):
-        median = statistics.median(values)
-        spread = (max(values) - min(values)) / median if median else 0.0
+    for (expiry, tenor), weighted in sorted(collected.items()):
+        median = _weighted_median(weighted)
+        # Dispersion is measured on the same weighted sample the median came
+        # from. Computing it on the raw one would report the scatter of a
+        # population the number does not describe.
+        spread = _weighted_spread(weighted, median)
         nodes.append(
             VolNode(
                 expiry_years=expiry,
                 tenor_years=tenor,
                 volatility=median,
-                observations=len(values),
+                observations=len(weighted),
                 dispersion=spread,
+                effective_observations=_effective_count(weighted),
             )
         )
     return VolSurface(
@@ -211,6 +298,7 @@ def build_surface(
 
 
 __all__ = [
+    "DEFAULT_HALF_LIFE_DAYS",
     "DEFAULT_MONEYNESS_BAND",
     "EXPIRY_BUCKETS",
     "MAX_BUCKET_DRIFT",

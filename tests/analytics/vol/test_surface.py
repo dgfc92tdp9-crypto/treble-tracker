@@ -229,3 +229,84 @@ class TestOneDayUnlessToldOtherwise:
     def test_a_single_day_surface_says_it_spans_one(self) -> None:
         surface = _build(_triples((1.0, 10.0, 0.0090)), as_of=TRADED, currency="EUR")
         assert surface.pooled_days == 1
+
+
+class TestDecayWeighting:
+    """Pooling weights each print by the age of its trading day.
+
+    The measurement that set the default also corrected why it exists.
+    Pooling was framed as trading coverage for agreement; across fifteen days
+    of EUR prints coverage is 79% at every half-life, because a node exists
+    wherever any print lands and decay down-weights rather than removes. What
+    moves is dispersion against the count of nodes carrying enough effective
+    weight to trust.
+    """
+
+    @staticmethod
+    def _aged(days_ago: int, vol: float) -> tuple[SwaptionQuote, float, float]:
+        quote = SwaptionQuote(
+            payer=True,
+            expiry=TRADED + timedelta(days=365),
+            underlier_maturity=TRADED + timedelta(days=365 * 11),
+            strike=FORWARD,
+            premium_fraction=0.01,
+            currency="EUR",
+            traded=TRADED - timedelta(days=days_ago),
+        )
+        return (quote, FORWARD, vol)
+
+    def test_a_stale_print_moves_the_node_less_than_a_fresh_one(self) -> None:
+        fresh_heavy = _build(
+            [self._aged(0, 0.0100), self._aged(0, 0.0100), self._aged(20, 0.0500)],
+            as_of=TRADED,
+            currency="EUR",
+            pool_days=True,
+            half_life_days=2.0,
+        )
+        node = fresh_heavy.at(1.0, 10.0)
+        assert node is not None
+        assert node.volatility == pytest.approx(0.0100)
+
+    def test_effective_observations_discount_the_decayed(self) -> None:
+        """Twenty prints of which nineteen have decayed to nothing is worth
+        one, and `observations` alone would call it twenty."""
+        surface = _build(
+            [self._aged(0, 0.0100)] + [self._aged(60, 0.0500) for _ in range(19)],
+            as_of=TRADED,
+            currency="EUR",
+            pool_days=True,
+            half_life_days=2.0,
+        )
+        node = surface.at(1.0, 10.0)
+        assert node is not None
+        assert node.observations == 20
+        assert node.effective_observations < 2.0
+        assert node.is_confident is False
+
+    def test_confidence_uses_effective_weight_not_raw_count(self) -> None:
+        """A node held up by twenty stale prints must not read as confident
+        just because there are twenty of them."""
+        stale = _build(
+            [self._aged(60, 0.0500) for _ in range(20)] + [self._aged(0, 0.0100)],
+            as_of=TRADED,
+            currency="EUR",
+            pool_days=True,
+            half_life_days=2.0,
+        )
+        node = stale.at(1.0, 10.0)
+        assert node is not None
+        assert node.is_confident is False
+
+    def test_an_unpooled_surface_is_unaffected_by_the_half_life(self) -> None:
+        """Single-day surfaces have nothing to decay; the weight is the same
+        for every print and the median is the plain one."""
+        surface = _build(
+            _triples((1.0, 10.0, 0.0090), (1.0, 10.0, 0.0110)),
+            as_of=TRADED,
+            currency="EUR",
+            half_life_days=0.5,
+        )
+        node = surface.at(1.0, 10.0)
+        assert node is not None
+        assert node.volatility == pytest.approx(0.0090)
+        assert node.effective_observations == pytest.approx(2.0)

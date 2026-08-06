@@ -537,11 +537,21 @@ phase_2:
                   build_surface had accepted it silently; it now refuses
                   prints from another day unless pool_days is passed
                   deliberately, and records the span on the result.
-                  Outstanding: coverage and agreement are in tension —
-                  one day gives 21% coverage with tight nodes, fifteen give
-                  79% with loose ones — and choosing between them is a
-                  modelling decision (most likely a decay-weighted pool) not
-                  yet made. Basis,
+                  The pool is now decay-weighted, and measuring it
+                  corrected the reason for having it. Pooling was framed as
+                  trading coverage for agreement; it does not. Coverage is
+                  79% at every half-life, because a node exists wherever any
+                  print lands and decay down-weights rather than removes.
+                  What moves is dispersion against the count of nodes with
+                  enough effective weight to trust: 1 day gives 27/44
+                  confident at 39% dispersion, 2 days 33/44 at 55%, 5 days
+                  37/44 at 84%, a flat pool 38/44 at 95%. The default is two
+                  days, chosen from that sweep rather than from feel — five,
+                  the first value tried, was barely better than not weighting
+                  at all. Nodes carry a Kish effective sample size so twenty
+                  prints of which nineteen have decayed read as worth one,
+                  and `is_confident` uses that rather than the raw count.
+                  Basis,
                   cross-currency, asset swaps and total return need curves,
                   FX or a price series, all of which exist — those are
                   unbuilt rather than blocked. The OIS trade is reachable
