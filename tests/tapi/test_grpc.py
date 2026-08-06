@@ -14,7 +14,8 @@ real if something checks it.
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime
+import threading
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import grpc
@@ -398,3 +399,112 @@ class TestAServerWithNoTape:
             stub.GetMarketData(tapi_pb2.MarketDataRequest(subject=BTC))
         assert raised.value.code() is grpc.StatusCode.FAILED_PRECONDITION
         assert "no ticker plant" in raised.value.details()
+
+
+@pytest.fixture
+def live_channel(tmp_path: Path):  # type: ignore[no-untyped-def]
+    """A server with a plant and a broadcaster, so ticks can be pushed live."""
+    from treble.plant.bars import TickHistory
+    from treble.plant.broadcast import TickBroadcaster
+    from treble.plant.conflation import TickerPlant
+
+    plant, history, broadcaster = TickerPlant(), TickHistory(), TickBroadcaster()
+    server = create_server(
+        LocalTapi(DuckStore(tmp_path / "t.db")),
+        plant=plant,
+        history=history,
+        broadcaster=broadcaster,
+        host=DEFAULT_HOST,
+        port=0,
+    )
+    port = server.add_insecure_port(f"{DEFAULT_HOST}:0")
+    server.start()
+    with grpc.insecure_channel(f"{DEFAULT_HOST}:{port}") as chan:
+        yield chan, plant, broadcaster
+    server.stop(grace=None)
+
+
+def _live_tick(sequence: int, price: float) -> object:
+    from treble.plant.conflation import Tick
+
+    return Tick(
+        subject=TUID(BTC),
+        field="PX_LAST",
+        value=price,
+        sequence=sequence,
+        exchange_time=datetime(2026, 8, 6, 12, 0, tzinfo=UTC) + timedelta(seconds=sequence),
+        size=1.5,
+    )
+
+
+class TestStreamingSubscriptions:
+    """§8.3's subscriptions. A client polling a snapshot cannot tell a quiet
+    market from a stalled feed, which is why these are streamed."""
+
+    def test_live_updates_reach_a_subscriber(self, live_channel) -> None:  # type: ignore[no-untyped-def]
+        channel, plant, broadcaster = live_channel
+        stub = tapi_pb2_grpc.MktDataStub(channel)
+        stream = stub.Subscribe(tapi_pb2.SubscribeRequest(subjects=[BTC]))
+
+        def push() -> None:
+            for i in range(1, 4):
+                tick = _live_tick(i, 100.0 + i)
+                plant.publish(tick)  # type: ignore[arg-type]
+                broadcaster.publish(tick)  # type: ignore[arg-type]
+
+        threading.Timer(0.3, push).start()
+        received = []
+        for update in stream:
+            received.append(update)
+            if len(received) == 3:
+                stream.cancel()
+                break
+        assert [u.sequence for u in received] == [1, 2, 3]
+        assert all(u.snapshot is False for u in received)
+        assert received[0].has_size is True
+
+    def test_the_snapshot_comes_first_when_asked_for(self, live_channel) -> None:  # type: ignore[no-untyped-def]
+        """A subscriber that began with the next trade would show nothing
+        until something printed, which on a quiet instrument is
+        indistinguishable from a broken feed."""
+        channel, plant, _ = live_channel
+        plant.publish(_live_tick(1, 101.0))  # type: ignore[arg-type]
+        stub = tapi_pb2_grpc.MktDataStub(channel)
+        stream = stub.Subscribe(tapi_pb2.SubscribeRequest(subjects=[BTC], snapshot_first=True))
+        first = next(iter(stream))
+        stream.cancel()
+        assert first.snapshot is True
+        assert first.value == pytest.approx(101.0)
+
+    def test_a_subscription_filters_to_the_requested_instruments(self, live_channel) -> None:  # type: ignore[no-untyped-def]
+        channel, _, broadcaster = live_channel
+        from treble.plant.conflation import Tick
+
+        other = Tick(
+            subject=TUID("crypto:coinbase:ETH-USD"),
+            field="PX_LAST",
+            value=42.0,
+            sequence=1,
+            exchange_time=datetime(2026, 8, 6, 12, 0, tzinfo=UTC),
+            size=1.0,
+        )
+        stub = tapi_pb2_grpc.MktDataStub(channel)
+        stream = stub.Subscribe(tapi_pb2.SubscribeRequest(subjects=[BTC]))
+
+        def push() -> None:
+            broadcaster.publish(other)
+            broadcaster.publish(_live_tick(5, 105.0))  # type: ignore[arg-type]
+
+        threading.Timer(0.3, push).start()
+        first = next(iter(stream))
+        stream.cancel()
+        assert first.subject == BTC, "an unrequested instrument reached the subscriber"
+
+    def test_a_server_without_a_broadcaster_says_so(self, tape_channel: grpc.Channel) -> None:
+        """`tape_channel` has a plant and history but no broadcaster. That is
+        a different failure from having no plant at all, and says which."""
+        stub = tapi_pb2_grpc.MktDataStub(tape_channel)
+        with pytest.raises(grpc.RpcError) as raised:
+            next(iter(stub.Subscribe(tapi_pb2.SubscribeRequest())))
+        assert raised.value.code() is grpc.StatusCode.FAILED_PRECONDITION
+        assert "no broadcaster" in raised.value.details()

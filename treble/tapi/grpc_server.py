@@ -31,7 +31,8 @@ import grpc
 
 from treble.core.identifiers import TUID, SecurityQuery
 from treble.plant.bars import TickHistory, bars_from_ticks, vwap_over
-from treble.plant.conflation import TickerPlant
+from treble.plant.broadcast import SubscriberOverflowError, TickBroadcaster
+from treble.plant.conflation import Tick, TickerPlant
 from treble.plant.quotes import Firmness
 from treble.plant.venues import PRICE_FIELD
 from treble.tapi._generated import tapi_pb2, tapi_pb2_grpc
@@ -41,6 +42,11 @@ from treble.tapi.contribution import (
     ContributionService,
 )
 from treble.tapi.local import LocalTapi, SecurityNotFoundError
+
+#: How long a streaming RPC waits for a tick before looking up to see
+#: whether its client is still there. Short enough that a cancelled
+#: subscription frees its server thread promptly; long enough not to spin.
+SUBSCRIBE_POLL_SECONDS = 0.25
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8758
@@ -302,9 +308,15 @@ class MktDataService(tapi_pb2_grpc.MktDataServicer):  # type: ignore[misc]
     more believable of the two.
     """
 
-    def __init__(self, plant: TickerPlant | None, history: TickHistory | None) -> None:
+    def __init__(
+        self,
+        plant: TickerPlant | None,
+        history: TickHistory | None,
+        broadcaster: TickBroadcaster | None = None,
+    ) -> None:
         self._plant = plant
         self._history = history
+        self._broadcaster = broadcaster
 
     def _tape(self, context: grpc.ServicerContext) -> tuple[TickerPlant, TickHistory]:
         """The plant and its history, or abort with why there is neither."""
@@ -393,6 +405,64 @@ class MktDataService(tapi_pb2_grpc.MktDataServicer):  # type: ignore[misc]
             last=result.last.isoformat(),
         )
 
+    def Subscribe(self, request, context):  # type: ignore[no-untyped-def] # noqa: N802
+        """Live updates until the client goes away (spec §8.3).
+
+        Each subscriber gets its own queue from the broadcaster rather than
+        reading TPIPE, which drains — one streaming client would otherwise
+        consume the tape out from under every other consumer.
+
+        A subscriber that falls behind ends with RESOURCE_EXHAUSTED. It is
+        not served a stream that skipped updates and looks complete: "most of
+        the ticks" and "all of the ticks" are indistinguishable downstream,
+        and that is the whole reason the plant counts drops.
+        """
+        plant, _ = self._tape(context)
+        if self._broadcaster is None:
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "this server has a plant but no broadcaster, so nothing is fanning ticks "
+                "out to subscribers",
+            )
+            raise RuntimeError("unreachable: ServicerContext.abort raises")
+
+        wanted = {TUID(s) for s in request.subjects}
+        with self._broadcaster.subscribe() as subscription:
+            if request.snapshot_first:
+                # The image first: a subscriber that began with the next
+                # trade would show nothing until something printed, which on
+                # a quiet instrument looks exactly like a broken feed.
+                for tick in plant.conflated():
+                    if not wanted or tick.subject in wanted:
+                        yield _tick_update(tick, snapshot=True)
+            # Liveness is checked every pass, not per tick. Checking only
+            # when a tick arrives leaves a cancelled subscription on a quiet
+            # instrument spinning forever — the server thread never notices
+            # the client went away, and one leaks per cancelled stream. Found
+            # by the suite hanging rather than by reading this code.
+            while context.is_active():
+                try:
+                    batch = subscription.next_batch(timeout=SUBSCRIBE_POLL_SECONDS)
+                except SubscriberOverflowError as error:
+                    context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED, str(error))
+                    raise RuntimeError("unreachable: ServicerContext.abort raises") from error
+                for tick in batch:
+                    if not wanted or tick.subject in wanted:
+                        yield _tick_update(tick, snapshot=False)
+
+
+def _tick_update(tick: Tick, *, snapshot: bool):  # type: ignore[no-untyped-def]
+    return tapi_pb2.TickUpdate(
+        subject=str(tick.subject),
+        field=tick.field,
+        value=tick.value,
+        sequence=tick.sequence,
+        exchange_time=tick.exchange_time.isoformat(),
+        has_size=tick.size is not None,
+        size=tick.size or 0.0,
+        snapshot=snapshot,
+    )
+
 
 def create_server(
     tapi: LocalTapi,
@@ -400,6 +470,7 @@ def create_server(
     contributions: ContributionService | None = None,
     plant: TickerPlant | None = None,
     history: TickHistory | None = None,
+    broadcaster: TickBroadcaster | None = None,
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
     max_workers: int = 8,
@@ -412,7 +483,7 @@ def create_server(
     tapi_pb2_grpc.add_InstrumentsServicer_to_server(InstrumentsService(tapi), server)
     tapi_pb2_grpc.add_ContribServicer_to_server(ContribService(service), server)
     tapi_pb2_grpc.add_TqlServicer_to_server(TqlService(tapi), server)
-    tapi_pb2_grpc.add_MktDataServicer_to_server(MktDataService(plant, history), server)
+    tapi_pb2_grpc.add_MktDataServicer_to_server(MktDataService(plant, history, broadcaster), server)
     server.add_insecure_port(f"{host}:{port}")
     return server
 

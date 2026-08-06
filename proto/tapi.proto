@@ -290,4 +290,35 @@ service MktData {
   rpc GetMarketData(MarketDataRequest) returns (MarketDataResponse);
   rpc GetBars(BarRequest) returns (BarResponse);
   rpc GetVwap(VwapRequest) returns (VwapResponse);
+  // The subscription §8.3 names. Ends with RESOURCE_EXHAUSTED if the
+  // subscriber falls behind, rather than continuing with a stream that
+  // looks complete and is not.
+  rpc Subscribe(SubscribeRequest) returns (stream TickUpdate);
+}
+
+// A live subscription. Server-streaming rather than unary polling: §8.3
+// names subscriptions, and a client polling a snapshot cannot tell a quiet
+// market from a stalled feed.
+message SubscribeRequest {
+  // Instruments to follow. Empty means every instrument the plant carries —
+  // stated rather than rejected, because "everything" is a real and common
+  // subscription for a machine consumer.
+  repeated string subjects = 1;
+  // Send the plant's current image before live updates. A subscriber that
+  // began with the next trade would show nothing until something printed,
+  // which on a quiet instrument is indistinguishable from a broken feed.
+  bool snapshot_first = 2;
+}
+
+message TickUpdate {
+  string subject = 1;
+  string field = 2;
+  double value = 3;
+  int64 sequence = 4;
+  string exchange_time = 5;
+  bool has_size = 6;
+  double size = 7;
+  // True for the initial image, false for live updates. A client that
+  // treated a snapshot as a print would count trades that did not happen.
+  bool snapshot = 8;
 }

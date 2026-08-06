@@ -477,7 +477,7 @@ phase_2:
                   or save — and FDC3 interop is modelled against the
                   standard's context shape without a real desktop agent to
                   federate with"}
-  P2_8:  {done: 0.9, name: "gRPC + Arrow Flight transports",
+  P2_8:  {done: 0.95, name: "gRPC + Arrow Flight transports",
           basis: "Arrow Flight ships: a FlightServerBase serving guarded
                   fact exports as Arrow tables with a fixed schema, reading
                   through the same store handle and the same point-in-time
@@ -530,9 +530,28 @@ phase_2:
                   no generated code and every gRPC test failed at import. Now
                   fixed, with tests/test_makefile.py asserting every target
                   is phony and that check still depends on proto, verified to
-                  fail against the original Makefile. Outstanding: §8.3's
-                  streaming subscriptions (a unary snapshot and a
-                  subscription are different contracts, and serving the first
-                  under the second's name would be the worse error); `ems`
-                  needs an order path this system does not have; `docs` needs
-                  a document store. Those remain absent rather than stubbed"}
+                  fail against the original Makefile. Streaming
+                  subscriptions now ship too: MktData.Subscribe is
+                  server-streaming, optionally sending the plant's image
+                  first because a subscriber that began with the next trade
+                  would show nothing until something printed — which on a
+                  quiet instrument is indistinguishable from a broken feed.
+                  Fan-out is treble/plant/broadcast.py: each subscriber gets
+                  its own bounded queue, so publishing never blocks and one
+                  stalled client cannot become a market-data outage, and a
+                  subscriber that falls behind ends with RESOURCE_EXHAUSTED
+                  rather than being served a stream that skipped updates and
+                  looks complete. Reading TPIPE instead would have consumed
+                  the tape out from under every other consumer. Building it
+                  surfaced a defect the suite found by hanging: the streaming
+                  RPC checked context.is_active() only when a tick arrived,
+                  so a cancelled subscription on a quiet instrument spun
+                  forever and leaked a server thread per stream. Liveness is
+                  now checked every pass via a bounded next_batch, and a test
+                  pins that a quiet feed returns promptly. Subscription.stream
+                  was removed in the same change rather than shipped: once
+                  next_batch existed it had no production caller, which is
+                  the declared-but-unread pattern this repository keeps
+                  finding. Outstanding: `ems` needs an order path this system
+                  does not have, and `docs` needs a document store. Both
+                  remain absent rather than stubbed"}
