@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 51.12%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 51.38%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -114,7 +114,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 
 | Criterion | State | What is outstanding |
 |---|---|---|
-| Ticker plant (conflated / TPIPE) | 0.70 | **a real venue feeds it, with bars and VWAP on top** — Coinbase `matches` over WebSocket, sequenced on `trade_id`. Crypto only; plus security master enrichment, Redpanda + NATS |
+| Ticker plant (conflated / TPIPE) | 0.78 | **a real venue feeds it, with bars, VWAP and a security master** — Coinbase `matches` over WebSocket, sequenced on `trade_id`. Crypto only; outstanding: Redpanda + NATS |
 | `ALLQ` correct-when-empty | **1.00** | complete for this phase — the only limitation left is the loopback binding, which is §22.1 and out of scope until Phase 5 |
 | `PORT` with TFM3 v1 | 0.60 | **screen ships** — three tabs off 1.34M ingested return facts; equal-weight 49-industry template at 16.48% vol, 97.6% factor. Six factors not 1,500; still no per-name panel |
 | `TVAL` v1 | 0.75 | **screen ships** — 3 tabs; 35 issuer curves, 135 ranked rich/cheap calls, and a METHOD tab naming every assumption and the three dimensions it could not match on. Rating and seniority still absent; ML layer and snapshots untouched |

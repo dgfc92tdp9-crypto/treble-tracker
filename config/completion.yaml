@@ -78,7 +78,7 @@ phase_1:
 # separate work-package plan to track against, and inventing one would put a
 # second set of numbers beside the gate's own.
 phase_2:
-  P2_1:  {done: 0.7, name: "ticker plant — conflated display, unconflated TPIPE",
+  P2_1:  {done: 0.78, name: "ticker plant — conflated display, unconflated TPIPE",
           basis: "the conflation split, current-state cache, sequence-gap
                   detection and bounded TPIPE buffer ship and are
                   mutation-verified. TGN and TCMP composites now ship too
@@ -125,7 +125,25 @@ phase_2:
                   microsecond; every bar's VWAP lands inside its own high/low
                   range. Outstanding: this is one venue and crypto only — no
                   equity or bond venue is reachable this way and none is
-                  claimed; plus security master enrichment and the Redpanda
+                  claimed. Security master enrichment now ships for the
+                  instruments the plant actually carries: CoinbaseProducts
+                  Adapter stores name, tick size, base and quote currency,
+                  minimum order value and — the reason it exists — trading
+                  status. A delisted product keeps its price history, so
+                  without a status an instrument the venue stopped trading
+                  looks exactly like one it still trades, and the last print
+                  reads as a current price rather than a final one.
+                  `trading_disabled` is stored only when the venue states it,
+                  because 'not disabled' and 'the venue did not say' are
+                  different and only one means the instrument trades.
+                  Increments are stored as numbers rather than the decimal
+                  strings the API returns, since compared as text '0.1' sorts
+                  below '0.01'. The subject comes from the document's own
+                  `id`, not from the requested URL, so a redirect cannot
+                  attach one instrument's reference data to another's
+                  subject. 16 reference facts on the live store, and a
+                  document with no recognised fields raises rather than
+                  storing whatever still parsed. Outstanding: the Redpanda
                   and NATS transports"}
   P2_2:  {done: 1.0, name: "ALLQ correct-when-empty; contribution API",
           basis: "both halves ship. Correct-when-empty: expired quotes leave

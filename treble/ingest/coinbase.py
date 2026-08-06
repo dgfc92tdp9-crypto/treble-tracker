@@ -118,3 +118,131 @@ class CoinbaseCandlesAdapter(SourceAdapter):
                     )
                 )
         return ParsedBatch(provenance=(provenance,), facts=tuple(facts))
+
+
+PRODUCTS_URL = "https://api.exchange.coinbase.com/products/{product}"
+
+#: The reference fields a crypto instrument needs to be more than a price
+#: series, and the storage field each lands under. Kept as data so the parser
+#: and the field dictionary cannot drift apart.
+_PRODUCT_FIELDS: dict[str, str] = {
+    "display_name": "SECURITY_NAME",
+    "base_currency": "crypto:base_currency",
+    "quote_currency": "crypto:quote_currency",
+    "status": "crypto:status",
+}
+
+#: Increments arrive as decimal strings. Stored as numbers because they are
+#: numbers: a tick size compared as text sorts "0.1" below "0.01".
+_PRODUCT_NUMBERS: dict[str, str] = {
+    "quote_increment": "TICK_SIZE",
+    "base_increment": "crypto:base_increment",
+    "min_market_funds": "crypto:min_order_value",
+}
+
+
+class CoinbaseProductsAdapter(SourceAdapter):
+    """Instrument reference data for the configured products (spec §9.1).
+
+    **Why this exists.** The ticker plant and the candle series both carry
+    `crypto:coinbase:*` subjects, and until now the store held nothing about
+    them but prices. Two consequences, and the second is the dangerous one:
+
+    - A price with no tick size is a number whose precision nobody can
+      state, and `TICK_SIZE` is what says whether 64,402.48 is a real level
+      or a rounded one.
+    - **A delisted product still has price history.** Without `status` and
+      `trading_disabled`, an instrument Coinbase stopped trading looks
+      exactly like one it still trades, and the last print looks like a
+      current price rather than a final one.
+
+    Same public endpoint family as the candle adapter, same terms.
+    """
+
+    meta = SourceMeta(
+        source_id="coinbase-products",
+        description="Coinbase Exchange product reference data",
+        licence="Public market data endpoints; no key, no redistribution limit stated",
+        redistribution_restricted=False,
+        rate_limit_per_second=3.0,
+    )
+    parser_version = "1"
+
+    def __init__(
+        self, payloads: PayloadStore, log: IngestLog, *, products: tuple[str, ...]
+    ) -> None:
+        super().__init__(payloads, log)
+        if not products:
+            raise ValueError("no products to describe; an empty universe fetches nothing")
+        self._products = products
+
+    def fetch(self) -> Iterator[RawPayload]:
+        for product in self._products:
+            self._throttle()
+            url = PRODUCTS_URL.format(product=product)
+            response = httpx.get(
+                url,
+                headers={"User-Agent": "treble-tracker"},
+                timeout=60.0,
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+            yield RawPayload(data=response.content, source_uri=url, fetched_at=utcnow())
+
+    def parse(self, payload: RawPayload, payload_hash: PayloadHash) -> ParsedBatch:
+        provenance = Provenance(
+            source_system=self.meta.source_id,
+            source_uri=payload.source_uri,
+            retrieved_at=payload.fetched_at,
+            method=ExtractionMethod.API,
+            extractor_version=self.parser_version,
+            payload_hash=payload_hash,
+        )
+        document = json.loads(payload.data)
+        identifier = document.get("id")
+        if not identifier:
+            raise ValueError(
+                "a product document with no `id` names no instrument; storing it would "
+                "attach reference data to whichever subject the URI happened to suggest"
+            )
+        subject = crypto_subject(str(identifier))
+        # Reference data is effective from when the venue was asked. It has no
+        # observation date of its own — a tick size is what it is until the
+        # venue changes it — so the retrieval day is the honest effective date
+        # and a later fetch supersedes it bitemporally (I2).
+        observed = payload.fetched_at.date()
+
+        facts: list[Fact] = []
+
+        def emit(field: str, value: object) -> None:
+            facts.append(
+                Fact(
+                    subject=subject,
+                    field=field,
+                    value=value,
+                    effective_from=observed,
+                    effective_to=observed,
+                    knowledge_from=payload.fetched_at,
+                    provenance_id=provenance.id,
+                )
+            )
+
+        for key, field in _PRODUCT_FIELDS.items():
+            if (raw := document.get(key)) not in (None, ""):
+                emit(field, str(raw))
+        for key, field in _PRODUCT_NUMBERS.items():
+            if (raw := document.get(key)) not in (None, ""):
+                emit(field, float(raw))
+        # Booleans explicitly rather than by absence: "not disabled" and
+        # "the venue did not say" are different, and only one of them means
+        # the instrument trades.
+        for key, field in (("trading_disabled", "crypto:trading_disabled"),):
+            if isinstance(document.get(key), bool):
+                emit(field, bool(document[key]))
+
+        if not facts:
+            raise ValueError(
+                f"{identifier}: no recognised reference fields in the product document; "
+                "the schema has changed and guessing at it would store confident nonsense"
+            )
+        return ParsedBatch(provenance=(provenance,), facts=tuple(facts))
