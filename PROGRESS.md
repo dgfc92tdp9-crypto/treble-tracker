@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 48.12%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 48.75%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -56,8 +56,8 @@ Then, in rough order of what is unblocked:
 - **`TVAL` Prong 2** — the relative value algorithm. Needs an issuer curve fitted across an
   issuer's outstanding debt and a similarity metric over sector, rating and seniority.
 - **Canvas + FDC3** — UI work, no data dependency.
-- **`PORT` / TFM3** — the model ships against Ken French's published factor returns; what
-  remains is the `PORT` screen itself, and per-name equity coverage (still absent).
+- **`PORT` / TFM3** — model and screen both ship. What remains is per-name equity coverage
+    (still absent), and the factor breadth §16.2 describes.
 - **`CDSW` to 1.0** — needs ISDA's published test cases.
 - **Ticker plant to 1.0** — venue adapters, TGN/TCMP composites, Redpanda and NATS transports.
 
@@ -116,7 +116,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 |---|---|---|
 | Ticker plant (conflated / TPIPE) | 0.45 | venue adapters, security master enrichment, Redpanda + NATS transports |
 | `ALLQ` correct-when-empty | **1.00** | complete for this phase — the only limitation left is the loopback binding, which is §22.1 and out of scope until Phase 5 |
-| `PORT` with TFM3 v1 | 0.40 | **unblocked** — factor covariance, exposures and risk decomposition ship on Fama/French's published returns. Six factors not 1,500; no per-name panel; no screen yet |
+| `PORT` with TFM3 v1 | 0.60 | **screen ships** — three tabs off 1.34M ingested return facts; equal-weight 49-industry template at 16.48% vol, 97.6% factor. Six factors not 1,500; still no per-name panel |
 | `TVAL` v1 | 0.50 | Prong 2 (comparables / relative value) — half the methodology; plus the screen, the ML layer and snapshots |
 | `CDSW` vs ISDA test cases | 0.85 | **externally validated across six currencies** — ISDA's own grids, two trade dates; medians 0.04-0.33bp. Residual bounded but *not* attributed: two candidate causes tested and refuted |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |

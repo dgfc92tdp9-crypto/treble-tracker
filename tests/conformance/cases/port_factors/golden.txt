@@ -1,0 +1,22 @@
+PORTFOLIO RISK · FACTOR DECOMPOSITION
+────────────────────────────────────────────────────────────────────────────
+Contributions are to VARIANCE and sum to the total; volatilities do not add.
+A negative contribution is a hedging tilt, not an error — read it with the beta.
+
+FACTOR    VOL % pa    PORT BETA    CONTRIB bp^2    SHARE %
++------------------------------------------------------------------------------+
+|[table_scroll:sys:port_factors]                                               |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Six published factors. TFM3's 1,500+ (§16.2) need data this store does not hold.

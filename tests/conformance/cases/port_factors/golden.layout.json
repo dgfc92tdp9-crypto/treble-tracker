@@ -1,0 +1,148 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "PORTFOLIO RISK · FACTOR DECOMPOSITION"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Contributions are to VARIANCE and sum to the total; volatilities do not add."
+    },
+    {
+      "at": [
+        3,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "A negative contribution is a hedging tilt, not an error — read it with the beta."
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "FACTOR    VOL % pa    PORT BETA    CONTRIB bp^2    SHARE %"
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Six published factors. TFM3's 1,500+ (§16.2) need data this store does not hold."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "PORT",
+  "panes": [
+    {
+      "binding": "sys:port_factors",
+      "data": [
+        [
+          "MKT_RF",
+          17.67,
+          0.9208,
+          254.47,
+          93.75
+        ],
+        [
+          "SMB",
+          10.86,
+          0.26,
+          18.83,
+          6.94
+        ],
+        [
+          "HML",
+          14.11,
+          0.1518,
+          -5.32,
+          -1.96
+        ],
+        [
+          "RMW",
+          10.78,
+          0.0533,
+          -3.35,
+          -1.23
+        ],
+        [
+          "CMA",
+          9.35,
+          0.1236,
+          -3.79,
+          -1.4
+        ],
+        [
+          "MOM",
+          17.08,
+          -0.0647,
+          4.08,
+          1.5
+        ]
+      ],
+      "region": [
+        6,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "factors"
+}

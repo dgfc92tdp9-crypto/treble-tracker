@@ -1,0 +1,22 @@
+PORTFOLIO RISK · SIX-FACTOR MODEL
+────────────────────────────────────────────────────────────────────────────
+Equally weighted across the 49 industries — a template, not a holding.
+Fama/French factors and industry portfolios; exposures fitted, not assigned.
+
+EX-ANTE RISK
++------------------------------------------------------------------------------+
+|[table_scroll:sys:port_summary]                                               |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+FACTORS · EXPOSURES tabs · marginal contributions are d(vol)/d(weight), % pa.

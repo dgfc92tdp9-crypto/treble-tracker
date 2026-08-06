@@ -1,0 +1,22 @@
+PORTFOLIO RISK · ASSET EXPOSURES
+────────────────────────────────────────────────────────────────────────────
+Every beta is regressed from the asset's own excess returns over the window.
+Specific risk is that same fit's residual — B and D cannot describe two fits.
+
+ASSET   MKT_RF    SMB     HML     RMW     CMA     MOM      R2    SPEC % pa
++------------------------------------------------------------------------------+
+|[table_scroll:sys:port_exposures]                                             |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Assets without a full window are omitted, never fitted over a shorter one.

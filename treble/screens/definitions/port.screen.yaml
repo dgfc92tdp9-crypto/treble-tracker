@@ -1,0 +1,133 @@
+# PORT — Portfolio & Risk Analytics (spec §16).
+#
+# A multi-factor risk decomposition on published factor returns: Fama/French
+# five factors plus momentum, fitted daily over five years, with the 49
+# industry portfolios as the assets.
+#
+# **The portfolio shown is a template, not a holding.** This system books no
+# positions, so the screen shows an equally weighted portfolio of the 49
+# industries rather than inventing someone's book. Equal weights specifically
+# because they are the one set that is not an opinion — any other weighting
+# would be a view this system has no basis for, displayed as though it were a
+# position. The caption says so on the screen rather than only here.
+#
+# **This is six factors, not TFM3's 1,500 (§16.2).** The limit is data: these
+# are the factors that are published, and the store still has no per-name
+# equity return history, so a portfolio of individual stocks cannot be
+# decomposed at all — only one expressed over the published portfolios. The
+# screen says which model it is rather than borrowing the name.
+#
+# **Contributions are to variance, not volatility.** Volatilities do not add
+# up, and a table whose "contributions" sum to the total while being labelled
+# in volatility units is a standard way for a risk report to mislead. The
+# columns say bp^2 and the shares sum to 100%.
+#
+# **A negative contribution is not an error.** A factor the portfolio is
+# tilted against, whose returns co-move with the dominant factor, reduces
+# total variance. The FACTORS tab shows the portfolio's beta beside the
+# contribution so the sign can be read rather than guessed at.
+mnemonic: PORT
+title: Portfolio & Risk Analytics
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "PORTFOLIO RISK · SIX-FACTOR MODEL"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Equally weighted across the 49 industries — a template, not a holding."
+        attrs: [label]
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "Fama/French factors and industry portfolios; exposures fitted, not assigned."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "EX-ANTE RISK"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 6, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:port_summary"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "FACTORS · EXPOSURES tabs · marginal contributions are d(vol)/d(weight), % pa."
+        attrs: [label]
+
+  - name: factors
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "PORTFOLIO RISK · FACTOR DECOMPOSITION"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Contributions are to VARIANCE and sum to the total; volatilities do not add."
+        attrs: [label]
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "A negative contribution is a hedging tilt, not an error — read it with the beta."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "FACTOR    VOL % pa    PORT BETA    CONTRIB bp^2    SHARE %"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 6, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:port_factors"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Six published factors. TFM3's 1,500+ (§16.2) need data this store does not hold."
+        attrs: [label]
+
+  - name: exposures
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "PORTFOLIO RISK · ASSET EXPOSURES"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Every beta is regressed from the asset's own excess returns over the window."
+        attrs: [label]
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "Specific risk is that same fit's residual — B and D cannot describe two fits."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "ASSET   MKT_RF    SMB     HML     RMW     CMA     MOM      R2    SPEC % pa"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 6, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:port_exposures"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Assets without a full window are omitted, never fitted over a shorter one."
+        attrs: [label]

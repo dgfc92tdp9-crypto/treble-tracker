@@ -1,0 +1,63 @@
+{
+  "fields": {},
+  "series": {
+    "sys:port_summary": [
+      [
+        "Window",
+        "2021-06-23 to 2026-06-30"
+      ],
+      [
+        "Observations",
+        1260
+      ],
+      [
+        "Assets",
+        49
+      ],
+      [
+        "Factors",
+        6
+      ],
+      [
+        "Weighting",
+        "equal \u2014 a template, not a holding"
+      ],
+      [
+        "Total volatility %",
+        16.48
+      ],
+      [
+        "Factor volatility %",
+        16.28
+      ],
+      [
+        "Specific volatility %",
+        2.55
+      ],
+      [
+        "Factor share of variance %",
+        97.6
+      ],
+      [
+        "Marginal: AUTOS",
+        31.218
+      ],
+      [
+        "Marginal: FABPR",
+        26.497
+      ],
+      [
+        "Marginal: ELCEQ",
+        25.011
+      ],
+      [
+        "Marginal: TXTLS",
+        24.093
+      ],
+      [
+        "Marginal: STEEL",
+        23.705
+      ]
+    ]
+  }
+}

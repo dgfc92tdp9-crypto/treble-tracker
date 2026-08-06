@@ -30,6 +30,7 @@ from treble.core.identifiers import TUID, SecurityQuery, YellowKey
 from treble.core.provenance import ProvenanceId
 from treble.store.duck import DuckStore
 from treble.tapi.contribution import ContributionService
+from treble.tapi.factor_model import FACTORS
 from treble.tapi.fields import FIELDS, FieldDef, FieldDictionary
 from treble.tapi.swap_market import SwapMarket
 from treble.tapi.types import FieldResult
@@ -263,6 +264,9 @@ class LocalTapi:
         "sys:swpm_cashflows",
         "sys:allq",
         "sys:allq_composites",
+        "sys:port_summary",
+        "sys:port_factors",
+        "sys:port_exposures",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -487,6 +491,8 @@ class LocalTapi:
             return self._swpm(binding, as_of=as_of)
         if binding in ("sys:allq", "sys:allq_composites"):
             return self._allq(security, binding, as_of=as_of)
+        if binding in ("sys:port_summary", "sys:port_factors", "sys:port_exposures"):
+            return self._port(binding, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -651,6 +657,82 @@ class LocalTapi:
             ("PV (pay fixed)", round(priced.pv, 2)),
             ("Annuity", round(priced.annuity, 2)),
             ("DV01 (+1bp)", round(dv01, 2)),
+        )
+
+    # -- PORT (spec §16.3) ----------------------------------------------
+
+    def _port(
+        self, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """The three `PORT` panes, off one fitted risk model.
+
+        A failure to fit returns the reason as a row rather than an empty
+        table, for the reason that governs every screen here: a portfolio
+        with no risk and a portfolio whose model could not be built must not
+        look the same, and zero volatility is the more believable of the two.
+        """
+        from treble.analytics.risk.factors import portfolio_risk
+        from treble.tapi.factor_model import (
+            FactorModelUnavailableError,
+            build_factor_model,
+            template_portfolio,
+        )
+
+        try:
+            fitted = build_factor_model(self._store, as_of=as_of)
+        except FactorModelUnavailableError as error:
+            return ((f"no risk model: {error}",),)
+
+        if binding == "sys:port_exposures":
+            return tuple(
+                (
+                    name,
+                    *(round(fitted.exposures.beta(name, factor), 4) for factor in FACTORS),
+                    round(float(fitted.exposures.r_squared[index]), 3),
+                    round(fitted.exposures.specific_volatility(name) * 100, 2),
+                )
+                for index, name in enumerate(fitted.exposures.assets)
+            )
+
+        weights = template_portfolio(fitted)
+        risk = portfolio_risk.__wrapped__(  # type: ignore[attr-defined]
+            weights, fitted.exposures, fitted.covariance
+        )
+
+        if binding == "sys:port_factors":
+            total = risk.total_volatility**2
+            return tuple(
+                (
+                    factor,
+                    round(fitted.covariance.volatility(factor) * 100, 2),
+                    # Portfolio beta to the factor: the weighted sum of the
+                    # holdings' betas, which is what the contribution below
+                    # is driven by.
+                    round(
+                        sum(
+                            weights[name] * fitted.exposures.beta(name, factor)
+                            for name in fitted.exposures.assets
+                        ),
+                        4,
+                    ),
+                    round(contribution * 1e4, 2),
+                    round(contribution / total * 100, 2) if total else None,
+                )
+                for factor, contribution in risk.factor_contributions
+            )
+
+        largest = sorted(risk.marginal_contributions, key=lambda pair: -pair[1])[:5]
+        return (
+            ("Window", f"{fitted.first_date.isoformat()} to {fitted.last_date.isoformat()}"),
+            ("Observations", fitted.observations),
+            ("Assets", len(fitted.exposures.assets)),
+            ("Factors", len(fitted.covariance.factors)),
+            ("Weighting", "equal — a template, not a holding"),
+            ("Total volatility %", round(risk.total_volatility * 100, 2)),
+            ("Factor volatility %", round(risk.factor_volatility * 100, 2)),
+            ("Specific volatility %", round(risk.specific_volatility * 100, 2)),
+            ("Factor share of variance %", round(risk.factor_share * 100, 1)),
+            *((f"Marginal: {name}", round(value * 100, 3)) for name, value in largest),
         )
 
     def _swpm_trade(self, market: SwapMarket) -> SwapSpec:

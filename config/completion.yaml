@@ -127,7 +127,7 @@ phase_2:
                   version of this basis said the service was 'in-process',
                   which was wrong — POST /contribute is a real network
                   endpoint, just not a routable one"}
-  P2_3:  {done: 0.4, name: "PORT with TFM3 v1; factor model validation",
+  P2_3:  {done: 0.6, name: "PORT with TFM3 v1; factor model validation",
           basis: "no longer zero. This was recorded on 2026-08-03 as
                   hard-blocked: the mathematics (§16.3) needs a K x K factor
                   covariance estimated from a return panel, and the store
@@ -168,11 +168,29 @@ phase_2:
                   higher: §16.2 specifies 1,500+ factors and this is six,
                   which is a data limit rather than an implementation one;
                   there is still no per-name equity panel, so a portfolio of
-                  individual stocks cannot be decomposed — only one expressed
-                  over the published portfolios; and the PORT *screen* is not
-                  built, so none of this is reachable from a command line
-                  yet. The per-name gap remains the open question a paid or
-                  registration-gated source would answer"}
+                  individual stocks cannot be decomposed — only one
+                  expressed over the published portfolios. The PORT screen
+                  now ships: three tabs (ex-ante risk, factor decomposition,
+                  asset exposures) rendering on both surfaces from one
+                  definition, with a conformance case per tab, off 1,341,473
+                  ingested facts. It shows the equally weighted 49-industry
+                  portfolio at 16.48% annualised volatility — 16.28% factor,
+                  2.55% specific, 97.6% of variance from the factors, with
+                  the market at 93.75% of it on a portfolio beta of 0.92.
+                  Equal weights because they are the one set that is not an
+                  opinion; the screen says 'a template, not a holding' rather
+                  than inventing a book, as SWPM does with its template
+                  trade. Contributions are labelled in bp^2 because
+                  volatilities do not add up, and negative contributions are
+                  explained on the screen as hedging tilts rather than left
+                  to be read as errors. treble/tapi/factor_model.py refuses
+                  three ways that would each yield a plausible wrong screen —
+                  total returns regressed as excess, a window taken from the
+                  wrong end of history, and assets fitted over a shorter
+                  window than their neighbours — and each refusal is
+                  mutation-verified. Outstanding: the per-name equity panel,
+                  which is the open question a registration-gated source
+                  would answer, and §16.2's 1,500+ factors"}
   P2_4:  {done: 0.5, name: "TVAL v1 with transparency drill-down",
           basis: "the criterion's two named requirements ship. Score: 1-10
                   from four published components — corroboration, timeliness,
