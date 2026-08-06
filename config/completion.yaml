@@ -127,23 +127,52 @@ phase_2:
                   version of this basis said the service was 'in-process',
                   which was wrong — POST /contribute is a real network
                   endpoint, just not a routable one"}
-  P2_3:  {done: 0.0, name: "PORT with TFM3 v1; factor model validation",
-          basis: "zero, and hard-blocked on data rather than effort —
-                  measured 2026-08-03 rather than assumed. TFM3 is 1,500+
-                  factors recalculated daily (§16.2) and its mathematics
-                  (§16.3) needs a K x K factor covariance estimated from a
-                  return panel. The store has no per-name equity price
-                  history at all: PX_LAST covers 36 FRED series (index
-                  levels, not constituents), 3 crypto and 3 FX pairs.
-                  N-PORT implied marks give 1,861 names across *three*
-                  report dates — two return observations per name, which
-                  cannot estimate a covariance matrix at any number of
-                  factors. No modelling recovers a panel that does not
-                  exist, so this is not a partial. Unblocking it needs a
-                  daily per-name equity price source; the one free candidate
-                  identified so far is a Tiingo registration. Recorded here
-                  so that the Phase 2 gate cannot be approached without
-                  someone deciding that question first"}
+  P2_3:  {done: 0.4, name: "PORT with TFM3 v1; factor model validation",
+          basis: "no longer zero. This was recorded on 2026-08-03 as
+                  hard-blocked: the mathematics (§16.3) needs a K x K factor
+                  covariance estimated from a return panel, and the store
+                  had none — PX_LAST covered 36 FRED index series, 3 FX and
+                  2 crypto pairs, and N-PORT implied marks gave three report
+                  dates. That measurement was right and the conclusion drawn
+                  from it was too wide: it is a block on *per-name* history,
+                  and a factor covariance does not need per-name history.
+                  Fama and French publish the factor returns themselves.
+                  treble/ingest/frenchdata.py now ingests the Kenneth R.
+                  French Data Library: FF5 plus momentum, daily since
+                  1963-07-01, and the 49 industry portfolios whose own return
+                  series make them usable as assets. Terms checked rather
+                  than assumed (robots.txt permits /pages/faculty/ken.french/;
+                  no terms-of-use statement on the data pages; files stamped
+                  Copyright Fama and French, so the source is marked
+                  redistribution-restricted and the bulk-export guard
+                  withholds it — asserted by a test, not just declared).
+                  treble/analytics/risk/factors.py implements §16.3:
+                  sigma_p^2 = w'(B Sigma_f B' + D)w, with the factor
+                  covariance (optionally exponentially weighted), exposures
+                  and specific risk from one time-series regression per asset
+                  so B and D cannot describe different fits, and a
+                  decomposition into per-factor variance contributions and
+                  Euler marginal contributions. Validated three ways, and the
+                  distinction is the point: recovery against simulated data
+                  with known betas (the only check with a true answer,
+                  compared against each coefficient's own standard error);
+                  identities that must hold (contributions sum to variance,
+                  Euler recovers total risk); and out-of-sample behaviour on
+                  the published returns. That last one is the structural
+                  check: a sample covariance predicts its fit period's
+                  volatility, so prediction error must track the regime
+                  change — measured across three decades, predicted/realised
+                  was 1.187 / 0.858 / 1.634 against volatility ratios of
+                  1.102 / 0.831 / 1.671. Median industry R^2 is 0.72 on six
+                  factors. Outstanding, and why this is 0.4 rather than
+                  higher: §16.2 specifies 1,500+ factors and this is six,
+                  which is a data limit rather than an implementation one;
+                  there is still no per-name equity panel, so a portfolio of
+                  individual stocks cannot be decomposed — only one expressed
+                  over the published portfolios; and the PORT *screen* is not
+                  built, so none of this is reachable from a command line
+                  yet. The per-name gap remains the open question a paid or
+                  registration-gated source would answer"}
   P2_4:  {done: 0.5, name: "TVAL v1 with transparency drill-down",
           basis: "the criterion's two named requirements ship. Score: 1-10
                   from four published components — corroboration, timeliness,

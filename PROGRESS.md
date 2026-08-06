@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 46.88%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 48.12%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -56,9 +56,8 @@ Then, in rough order of what is unblocked:
 - **`TVAL` Prong 2** — the relative value algorithm. Needs an issuer curve fitted across an
   issuer's outstanding debt and a similarity metric over sector, rating and seniority.
 - **Canvas + FDC3** — UI work, no data dependency.
-- **`PORT` / TFM3** — *check the data first.* A factor model needs a cross-section of equity
-  returns, and this store has index levels (`fred:SP500` and friends) but no per-name price
-  history. Expect this to be data-blocked like `SWPM` was, and establish that before building.
+- **`PORT` / TFM3** — the model ships against Ken French's published factor returns; what
+  remains is the `PORT` screen itself, and per-name equity coverage (still absent).
 - **`CDSW` to 1.0** — needs ISDA's published test cases.
 - **Ticker plant to 1.0** — venue adapters, TGN/TCMP composites, Redpanda and NATS transports.
 
@@ -117,7 +116,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 |---|---|---|
 | Ticker plant (conflated / TPIPE) | 0.45 | venue adapters, security master enrichment, Redpanda + NATS transports |
 | `ALLQ` correct-when-empty | **1.00** | complete for this phase — the only limitation left is the loopback binding, which is §22.1 and out of scope until Phase 5 |
-| `PORT` with TFM3 v1 | 0.00 | **hard-blocked on data** — no per-name equity price history exists; see below |
+| `PORT` with TFM3 v1 | 0.40 | **unblocked** — factor covariance, exposures and risk decomposition ship on Fama/French's published returns. Six factors not 1,500; no per-name panel; no screen yet |
 | `TVAL` v1 | 0.50 | Prong 2 (comparables / relative value) — half the methodology; plus the screen, the ML layer and snapshots |
 | `CDSW` vs ISDA test cases | 0.85 | **externally validated across six currencies** — ISDA's own grids, two trade dates; medians 0.04-0.33bp. Residual bounded but *not* attributed: two candidate causes tested and refuted |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
@@ -168,7 +167,7 @@ ordinary.
 >
 > | criterion | blocker |
 > |---|---|
-> | `PORT` / TFM3 | **hard** — no per-name equity price history (below) |
+> | `PORT` / TFM3 | **partial** — factor returns come from Ken French (below); per-name equity history still absent |
 > | `TVAL` Prong 2 | **partial** — §15.1 needs sector/rating/seniority to build a comparable set; the store has issuer (LEI), currency and maturity, and **no rating and no seniority**. `nport:issuerCat` is an N-PORT category, not a sector classification |
 > | Ticker plant | **hard** — no trade or tick data. (`TRADE_COUNT` in the store is the DTCC adapter's own metadata about how many prints backed a curve node, not prints) |
 > | `SWPM` breadth | **hard** — swaptions/CMS need a `VCUB` vol surface; no swaption vol data |
@@ -180,14 +179,27 @@ ordinary.
 > `...PerBasicShare` and "rating" matched `OperatingIncomeLoss`. Every hit was a false positive.
 > The table above is from fields actually present on `cusip:`/`isin:` subjects.
 
-> **`PORT`/TFM3 is blocked on data, and Phase 2 cannot gate without resolving it.** Measured
-> 2026-08-03: TFM3 needs a return panel to estimate its factor covariance (§16.3), and this
-> store has *no per-name equity price history*. `PX_LAST` covers 36 FRED series (index levels,
-> not constituents), 3 crypto and 3 FX pairs. N-PORT implied marks give 1,861 names across
-> **three** report dates — two return observations per name. A covariance matrix cannot be
-> estimated from two observations at any number of factors, so this is a hard block rather than
-> a partial. The one free candidate for daily per-name equity prices identified so far is a
-> Tiingo registration. **Decide this before attempting PORT**, not during.
+> **`PORT`/TFM3 was recorded as hard-blocked, and the block was drawn too wide.** The
+> measurement on 2026-08-03 was correct: the store had *no per-name equity price history*.
+> `PX_LAST` covered 36 FRED series (index levels, not constituents), 3 crypto and 3 FX pairs,
+> and N-PORT implied marks gave 1,861 names across **three** report dates — two return
+> observations per name, which cannot estimate a covariance at any number of factors.
+>
+> The conclusion drawn from it did not follow. That is a block on *per-name* history, and a
+> factor covariance does not need per-name history — Fama and French publish the factor
+> returns themselves. Since 2026-08-04 the store ingests the Kenneth R. French Data Library:
+> FF5 plus momentum daily since 1963-07-01, and the 49 industry portfolios, whose own return
+> series make them usable as assets with estimable exposures. §16.3 now ships and is validated
+> out-of-sample (see the risk model note below).
+>
+> **What is still blocked, precisely:** a portfolio of *individual equities*. Estimating a
+> stock's factor exposures needs that stock's return history, which the store still lacks, so
+> the model covers portfolios expressed over the published portfolios and not the equity
+> universe. That is the question a registration-gated source (Tiingo and similar) would
+> answer, and it is narrower than the one recorded here before.
+>
+> The general lesson is recorded as failure class E: an explanation asserted rather than
+> tested. "No per-name prices" was measured; "therefore no factor model" was not.
 
 **The `SWPM` screen ships** (2026-08-02): three tabs — valuation, curve environment, cash flow
 schedule — rendering on both surfaces from one definition, with a conformance case per tab. It
