@@ -217,6 +217,31 @@ class TestWhatTheResidualIs:
     bottom at 1.42bp on a 2-day stub. Front-stub handling is the thing to
     examine next, and refutation (2) says it is not as simple as generating
     the right dates.
+
+    A third finding, 2026-08-06, which narrows it and is why this is still
+    open. The residual is highly sensitive to the *curve* day count, which
+    these tests apply uniformly as ACT/365F across all six currencies. On the
+    worst-case shape:
+
+        grid   ACT/365F   ACT/360
+        AUD      6.512bp   2.860bp
+        GBP      3.058bp   1.552bp
+        USD      0.655bp   0.674bp
+
+    Switching AUD to ACT/360 more than halves its error, and would be the
+    wrong change. AONIA and SONIA are ACT/365 by market convention, so
+    ACT/365F is right — and a better fit under a wrong day count means
+    ACT/360 is *compensating* for another error rather than removing one.
+    Chasing the benchmark that way is how a model comes to reproduce a
+    reference by accident.
+
+    What it does establish: the residual is not a fixed modelling limit but
+    something an input assumption moves by a factor of two. These fixtures
+    cannot settle which assumption, because converting ISDA's workbooks to
+    CSV kept only (type, tenor, rate) and discarded the conventions each
+    curve was published with. Recovering those columns is the next step, and
+    until then ACT/365F stays because it is the documented convention rather
+    than the one that fits.
     """
 
     def test_the_error_grows_with_maturity(self, grid: tuple[str, list[tuple[int, float]]]) -> None:

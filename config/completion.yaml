@@ -396,8 +396,24 @@ phase_2:
                   having the highest rates. Recorded in the test as a lead,
                   not a conclusion. The wide worst-case tolerance is fenced
                   by an assertion that the maximum sits at the longest
-                  maturity, so it cannot double as a hiding place. Also
-                  outstanding: the older IBOR grids are not wired"}
+                  maturity, so it cannot double as a hiding place.
+                  Narrowed again 2026-08-06: the residual is highly sensitive
+                  to the curve day count, which the tests apply uniformly as
+                  ACT/365F across six currencies. On the worst-case shape AUD
+                  under ACT/360 falls from 6.512bp to 2.860bp and GBP from
+                  3.058bp to 1.552bp. That change is deliberately not made —
+                  AONIA and SONIA are ACT/365 by market convention, so a
+                  better fit under the wrong day count means ACT/360 is
+                  compensating for another error rather than removing one,
+                  and chasing the benchmark is how a model comes to reproduce
+                  a reference by accident. What it establishes is that the
+                  residual is not a fixed modelling limit but something an
+                  input assumption moves by a factor of two. These fixtures
+                  cannot say which assumption: converting ISDA's workbooks to
+                  CSV kept only (type, tenor, rate) and discarded the
+                  conventions each curve was published with, so recovering
+                  those columns is the next step. Also outstanding: the older
+                  IBOR grids are not wired"}
   P2_6:  {done: 0.97, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
