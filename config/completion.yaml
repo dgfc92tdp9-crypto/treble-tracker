@@ -191,7 +191,7 @@ phase_2:
                   mutation-verified. Outstanding: the per-name equity panel,
                   which is the open question a registration-gated source
                   would answer, and §16.2's 1,500+ factors"}
-  P2_4:  {done: 0.65, name: "TVAL v1 with transparency drill-down",
+  P2_4:  {done: 0.75, name: "TVAL v1 with transparency drill-down",
           basis: "the criterion's two named requirements ship. Score: 1-10
                   from four published components — corroboration, timeliness,
                   firmness, agreement — each exposed rather than rolled into
@@ -236,11 +236,30 @@ phase_2:
                   coverage of a recent month is thin until its funds file, so
                   the default is now the date with the most fittable issuers,
                   with the per-date coverage carried on the result.
-                  Outstanding, and why this is not higher: (a) rating and
-                  seniority remain absent, so the similarity metric is
-                  incomplete by construction and says so; (b) no TVAL screen,
-                  so neither prong is reachable from a command line; (c)
-                  §15.4's ML residual layer and §15.5's multi-time
+                  The TVAL screen now ships: three tabs on both surfaces
+                  from one definition, with a conformance case each. ISSUER
+                  CURVES lists all 35 fitted curves with their slope and RMS;
+                  RICH/CHEAP ranks 135 calls with significant ones first and
+                  the rest marked '(in noise)', because a screen ordered by
+                  residual alone puts the noisiest curves at the top; METHOD
+                  is the §15 transparency drill-down and is the honest centre
+                  of the screen — report date and why that date rather than
+                  the most recent, per-date coverage, the price source stated
+                  as an implied mark rather than a traded level, the day
+                  count and frequency N-PORT does not supply and this model
+                  assumes, the dimensions matched, and the three it could not
+                  match on named as absent. Every value on that tab is kept
+                  short enough to survive the pane's truncation, because a
+                  row reading 'absent from' with the rest cut off states the
+                  opposite of what it means. Prong 1 is deliberately not a
+                  tab: it scores contributed observations and nobody
+                  contributes to this install, so a tab permanently reading
+                  'no observations' would look like a broken screen rather
+                  than an empty network — ALLQ already renders that state
+                  correctly. Outstanding, and why this is not higher: (a)
+                  rating and seniority remain absent, so the similarity
+                  metric is incomplete by construction and says so on screen;
+                  (b) §15.4's ML residual layer and §15.5's multi-time
                   bid/mid/ask snapshots are untouched"}
   P2_5:  {done: 0.85, name: "CDSW against ISDA published test cases",
           basis: "the criterion is met: validated against ISDA's own

@@ -80,6 +80,10 @@ class IssuerCurveSet:
     #: showing one curve without showing that thirty-five were available a
     #: month earlier would read as 'this issuer is all there is'.
     coverage: tuple[tuple[date, int], ...]
+    #: LEI -> the issuer name N-PORT reported. An LEI is unreadable on a
+    #: screen, and a rich/cheap call nobody can attribute to a company is a
+    #: number they cannot act on or check.
+    names: dict[str, str]
 
     @property
     def issuers(self) -> tuple[str, ...]:
@@ -143,6 +147,7 @@ def build_issuer_curves(
 
     excluded: list[tuple[str, str]] = []
     usable: list[tuple[date, IssuerBond, str]] = []
+    names: dict[str, str] = {}
     for row in rows:
         identifier = str(row["identifier"])
         day = row["report_date"]
@@ -197,6 +202,9 @@ def build_issuer_curves(
             continue
 
         category = row.get("nport:issuerCat")
+        reported_name = row.get("nport:name")
+        if isinstance(reported_name, str) and lei not in names:
+            names[lei] = reported_name
         usable.append(
             (
                 day,
@@ -263,6 +271,7 @@ def build_issuer_curves(
         bonds=kept,
         excluded=tuple(sorted(excluded)),
         coverage=coverage,
+        names={lei: names.get(lei, lei) for lei in curves},
     )
 
 

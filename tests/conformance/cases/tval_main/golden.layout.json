@@ -1,0 +1,351 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TREBLE VALUATION · ISSUER CURVES"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "A least-squares yield curve per issuer, from that issuer's own bonds."
+    },
+    {
+      "at": [
+        3,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "RMS is the curve's own scatter — a fit with a wide RMS says little."
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "ISSUER                      BONDS   1Y %    SLOPE bp/yr   RMS bp"
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "VALUES · METHOD tabs · marks are implied from fund holdings, not traded."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "TVAL",
+  "panes": [
+    {
+      "binding": "sys:tval_curves",
+      "data": [
+        [
+          "BAT CAPITAL CORP",
+          3,
+          4.443,
+          -3.6,
+          3.4
+        ],
+        [
+          "NATWEST GROUP PLC",
+          3,
+          1.643,
+          109.7,
+          91.8
+        ],
+        [
+          "BARCLAYS PLC",
+          6,
+          5.405,
+          -22.3,
+          85.3
+        ],
+        [
+          "Securitized Term Auto Receiv",
+          4,
+          5.157,
+          -4.0,
+          7.5
+        ],
+        [
+          "United States Treasury",
+          4,
+          3.544,
+          24.7,
+          7.0
+        ],
+        [
+          "DELL INT LLC / EMC CORP",
+          3,
+          4.616,
+          -6.2,
+          2.3
+        ],
+        [
+          "Ford Credit Floorplan Master",
+          3,
+          3.509,
+          25.7,
+          10.0
+        ],
+        [
+          "Verizon Master Trust",
+          3,
+          3.99,
+          9.6,
+          0.9
+        ],
+        [
+          "GENERAL MOTORS FINL CO",
+          6,
+          4.677,
+          -7.1,
+          11.6
+        ],
+        [
+          "Wheels Fleet Lease Funding L",
+          3,
+          13.025,
+          -61.4,
+          2.6
+        ],
+        [
+          "TRUIST FINANCIAL CORP",
+          5,
+          5.157,
+          -17.1,
+          53.0
+        ],
+        [
+          "CVS HEALTH CORP",
+          3,
+          4.396,
+          4.4,
+          5.3
+        ],
+        [
+          "ARES STRATEGIC INCOME FU",
+          3,
+          5.002,
+          38.1,
+          2.8
+        ],
+        [
+          "ATHENE GLOBAL FUNDING",
+          4,
+          4.628,
+          -4.2,
+          2.9
+        ],
+        [
+          "Wells Fargo Commercial Mortg",
+          3,
+          5.784,
+          -8.4,
+          30.0
+        ],
+        [
+          "HPS CORPORATE LENDING FU",
+          4,
+          5.421,
+          25.1,
+          0.8
+        ],
+        [
+          "EQUITABLE FINANCIAL LIFE",
+          3,
+          4.123,
+          23.6,
+          3.9
+        ],
+        [
+          "JACKSON NATL LIFE GLOBAL",
+          3,
+          4.253,
+          29.8,
+          10.3
+        ],
+        [
+          "GOLDMAN SACHS GROUP INC",
+          4,
+          1.179,
+          119.9,
+          21.0
+        ],
+        [
+          "DEUTSCHE BANK NY",
+          5,
+          5.565,
+          -38.3,
+          104.4
+        ],
+        [
+          "JPMORGAN CHASE & CO",
+          5,
+          1.313,
+          86.5,
+          41.6
+        ],
+        [
+          "ENBRIDGE INC",
+          3,
+          4.416,
+          4.1,
+          6.6
+        ],
+        [
+          "BANK OF AMERICA CORP",
+          5,
+          3.985,
+          26.5,
+          58.0
+        ],
+        [
+          "PNC FINANCIAL SERVICES",
+          3,
+          5.435,
+          -13.6,
+          42.4
+        ],
+        [
+          "MORGAN STANLEY",
+          4,
+          3.069,
+          44.2,
+          2.7
+        ],
+        [
+          "Avis Budget Rental Car Fundi",
+          4,
+          4.461,
+          2.5,
+          13.3
+        ],
+        [
+          "HCA INC",
+          4,
+          4.509,
+          -2.7,
+          1.0
+        ],
+        [
+          "BANK OF NOVA SCOTIA",
+          3,
+          4.279,
+          5.7,
+          1.6
+        ],
+        [
+          "DANSKE BANK A/S",
+          3,
+          -3.351,
+          405.1,
+          36.1
+        ],
+        [
+          "HSBC HOLDINGS PLC",
+          4,
+          5.989,
+          -32.0,
+          27.0
+        ],
+        [
+          "US BANCORP",
+          3,
+          4.748,
+          8.8,
+          71.1
+        ],
+        [
+          "WELLS FARGO & COMPANY",
+          6,
+          3.102,
+          55.0,
+          53.6
+        ],
+        [
+          "Enterprise Fleet Financing L",
+          5,
+          4.055,
+          13.6,
+          11.9
+        ],
+        [
+          "BOEING CO",
+          4,
+          4.628,
+          -12.1,
+          8.2
+        ],
+        [
+          "FORD MOTOR CREDIT CO LLC",
+          4,
+          5.447,
+          -5.8,
+          23.8
+        ]
+      ],
+      "region": [
+        6,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

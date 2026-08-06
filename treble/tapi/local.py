@@ -267,6 +267,9 @@ class LocalTapi:
         "sys:port_summary",
         "sys:port_factors",
         "sys:port_exposures",
+        "sys:tval_curves",
+        "sys:tval_values",
+        "sys:tval_method",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -493,6 +496,8 @@ class LocalTapi:
             return self._allq(security, binding, as_of=as_of)
         if binding in ("sys:port_summary", "sys:port_factors", "sys:port_exposures"):
             return self._port(binding, as_of=as_of)
+        if binding in ("sys:tval_curves", "sys:tval_values", "sys:tval_method"):
+            return self._tval(binding, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -657,6 +662,104 @@ class LocalTapi:
             ("PV (pay fixed)", round(priced.pv, 2)),
             ("Annuity", round(priced.annuity, 2)),
             ("DV01 (+1bp)", round(dv01, 2)),
+        )
+
+    # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _tval(
+        self, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """The three `TVAL` panes, off one set of fitted issuer curves.
+
+        A failure to fit returns the reason as a row rather than an empty
+        table: a bond with nothing to say about it and a model that could not
+        be built must not look the same.
+        """
+        from collections import Counter
+
+        from treble.analytics.tval.relative import (
+            AVAILABLE_DIMENSIONS,
+            FAIR_BAND_BP,
+            MIN_CURVE_BONDS,
+            REQUIRED_DIMENSIONS,
+        )
+        from treble.tapi.issuer_curves import (
+            ASSUMED_DAY_COUNT,
+            ASSUMED_FREQUENCY,
+            IssuerCurvesUnavailableError,
+            build_issuer_curves,
+        )
+
+        try:
+            fitted = build_issuer_curves(self._store, as_of=as_of)
+        except IssuerCurvesUnavailableError as error:
+            return ((f"no issuer curves: {error}",),)
+
+        if binding == "sys:tval_curves":
+            return tuple(
+                (
+                    fitted.names[lei][:28],
+                    len(fitted.curves[lei].bonds),
+                    round(fitted.curves[lei].intercept * 100, 3),
+                    round(fitted.curves[lei].slope_bp_per_year, 1),
+                    round(fitted.curves[lei].residual_rms_bp, 1),
+                )
+                for lei in fitted.issuers
+            )
+
+        if binding == "sys:tval_values":
+            calls = [
+                (fitted.names[lei][:22], value)
+                for lei in fitted.issuers
+                for value in fitted.values_for(lei)
+            ]
+            # Significant first, then by size. A screen ordered by residual
+            # alone puts the noisiest curves at the top, which is the
+            # opposite of what a reader wants.
+            calls.sort(key=lambda pair: (not pair[1].is_significant, -abs(pair[1].residual_bp)))
+            return tuple(
+                (
+                    name,
+                    value.identifier.removeprefix("isin:"),
+                    round(value.observed_yield * 100, 3),
+                    round(value.curve_yield * 100, 3),
+                    round(value.residual_bp, 1),
+                    value.verdict if value.is_significant else f"{value.verdict} (in noise)",
+                )
+                for name, value in calls
+            )
+
+        # Per-issuer messages name the LEI, so each is unique and would fill
+        # the table with a hundred separate counts of one.
+        def _bucket(reason: str) -> str:
+            if "usable bond" in reason:
+                return f"issuer had under {MIN_CURVE_BONDS} usable bonds"
+            if "span" in reason:
+                return "issuer spanned too little maturity"
+            return reason
+
+        reasons = Counter(_bucket(reason) for _, reason in fitted.excluded)
+        # Every value is kept short enough to survive the pane's truncation.
+        # A row reading "absent from" with the rest cut off states the
+        # opposite of what it means, which is worse than not showing it.
+        return (
+            ("Report date", fitted.report_date.isoformat()),
+            ("Date chosen by", "most fittable issuers, not most recent"),
+            ("Why not most recent", "N-PORT coverage thins until funds file"),
+            *(
+                (f"Coverage {day.isoformat()}", f"{count} issuer(s), {MIN_CURVE_BONDS}+ bonds")
+                for day, count in fitted.coverage
+            ),
+            ("Issuer curves fitted", len(fitted.curves)),
+            ("Price source", "N-PORT value / face balance"),
+            ("Price is", "an implied mark, NOT a traded level"),
+            ("Assumed frequency", ASSUMED_FREQUENCY.name.title()),
+            ("Assumed day count", ASSUMED_DAY_COUNT.value),
+            ("Matched on", ", ".join(AVAILABLE_DIMENSIONS)),
+            ("NOT matched on", ", ".join(REQUIRED_DIMENSIONS)),
+            ("Those three are", "absent; similarity is incomplete"),
+            ("Fair band", f"max({FAIR_BAND_BP:.0f}bp, the curve's RMS)"),
+            *((f"Excluded: {reason}"[:36], count) for reason, count in reasons.most_common(2)),
         )
 
     # -- PORT (spec §16.3) ----------------------------------------------

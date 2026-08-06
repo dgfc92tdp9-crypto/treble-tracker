@@ -1,0 +1,22 @@
+TREBLE VALUATION · RICH / CHEAP
+────────────────────────────────────────────────────────────────────────────
+Cheap means the bond yields MORE than its issuer's curve — a lower price.
+Calls inside the curve's own scatter read (in noise) and sort last.
+
+ISSUER                  ISIN            YIELD %  CURVE %   RESID bp  VERDICT
++------------------------------------------------------------------------------+
+|[table_scroll:sys:tval_values]                                                |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+A residual is not a recommendation; it is a difference from a fitted line.

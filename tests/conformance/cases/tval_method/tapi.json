@@ -1,0 +1,71 @@
+{
+  "fields": {},
+  "series": {
+    "sys:tval_method": [
+      [
+        "Report date",
+        "2026-03-31"
+      ],
+      [
+        "Date chosen by",
+        "most fittable issuers, not most recent"
+      ],
+      [
+        "Why not most recent",
+        "N-PORT coverage thins until funds file"
+      ],
+      [
+        "Coverage 2026-03-31",
+        "35 issuer(s), 3+ bonds"
+      ],
+      [
+        "Coverage 2026-04-30",
+        "1 issuer(s), 3+ bonds"
+      ],
+      [
+        "Issuer curves fitted",
+        35
+      ],
+      [
+        "Price source",
+        "N-PORT value / face balance"
+      ],
+      [
+        "Price is",
+        "an implied mark, NOT a traded level"
+      ],
+      [
+        "Assumed frequency",
+        "Semiannual"
+      ],
+      [
+        "Assumed day count",
+        "30/360"
+      ],
+      [
+        "Matched on",
+        "currency, issuer_category, maturity_window"
+      ],
+      [
+        "NOT matched on",
+        "sector, rating, seniority"
+      ],
+      [
+        "Those three are",
+        "absent; similarity is incomplete"
+      ],
+      [
+        "Fair band",
+        "max(25bp, the curve's RMS)"
+      ],
+      [
+        "Excluded: no maturity or coupon repo",
+        1724
+      ],
+      [
+        "Excluded: no issuer LEI or currency ",
+        134
+      ]
+    ]
+  }
+}

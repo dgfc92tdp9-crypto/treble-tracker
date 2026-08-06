@@ -1,0 +1,125 @@
+# TVAL — Treble Valuation (spec §15).
+#
+# Prong 2: relative value against an issuer's own curve. A yield curve is
+# fitted across each issuer's outstanding bonds, and every bond is scored
+# rich or cheap against it.
+#
+# **The prices are implied marks, not traded levels.** N-PORT reports a
+# fund's holding as a USD value and a face balance; their ratio is what one
+# valuation agent thought the bond was worth at a month end. It is not a
+# print and not a quote, and the METHOD tab says so rather than leaving a
+# reader to assume a screen full of yields came from the market.
+#
+# **A verdict is shown with the noise it sits in.** A 100bp rich call against
+# a curve whose own residuals scatter by 100bp is not a view, and reporting
+# it as one would be presenting the fit's error as value. Calls inside the
+# curve's scatter are labelled "(in noise)" and sorted below the rest.
+#
+# **What could not be matched on is on the screen, not in a comment.** §15.1
+# asks for similarity over sector, rating and seniority; the store holds none
+# of the three. The METHOD tab names them as absent. A comparable set that
+# quietly dropped two of its three dimensions would return confident
+# comparisons between a senior secured note and a subordinated one.
+#
+# **Prong 1 is not on this screen.** `evaluate_price` scores an evaluated
+# price from contributed observations, and nobody contributes to this
+# install — the honest rendering of it is `ALLQ`'s empty book, which already
+# ships. Adding a tab that always reads "no observations" would look like a
+# broken screen rather than an empty network.
+mnemonic: TVAL
+title: Treble Valuation
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "TREBLE VALUATION · ISSUER CURVES"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "A least-squares yield curve per issuer, from that issuer's own bonds."
+        attrs: [label]
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "RMS is the curve's own scatter — a fit with a wide RMS says little."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "ISSUER                      BONDS   1Y %    SLOPE bp/yr   RMS bp"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 6, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:tval_curves"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "VALUES · METHOD tabs · marks are implied from fund holdings, not traded."
+        attrs: [label]
+
+  - name: values
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "TREBLE VALUATION · RICH / CHEAP"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Cheap means the bond yields MORE than its issuer's curve — a lower price."
+        attrs: [label]
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "Calls inside the curve's own scatter read (in noise) and sort last."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "ISSUER                  ISIN            YIELD %  CURVE %   RESID bp  VERDICT"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 6, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:tval_values"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "A residual is not a recommendation; it is a difference from a fitted line."
+        attrs: [label]
+
+  - name: method
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "TREBLE VALUATION · WHAT THIS RESTS ON"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "The transparency drill-down (§15): every input, assumption and exclusion."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:tval_method"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Rating and seniority are absent, so the similarity metric is incomplete."
+        attrs: [label]

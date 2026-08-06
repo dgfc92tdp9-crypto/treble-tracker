@@ -1,0 +1,1186 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TREBLE VALUATION · RICH / CHEAP"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Cheap means the bond yields MORE than its issuer's curve — a lower price."
+    },
+    {
+      "at": [
+        3,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Calls inside the curve's own scatter read (in noise) and sort last."
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "ISSUER                  ISIN            YIELD %  CURVE %   RESID bp  VERDICT"
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "A residual is not a recommendation; it is a difference from a fitted line."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "TVAL",
+  "panes": [
+    {
+      "binding": "sys:tval_values",
+      "data": [
+        [
+          "BARCLAYS PLC",
+          "US06738EBU82",
+          3.221,
+          5.037,
+          -181.6,
+          "rich"
+        ],
+        [
+          "DEUTSCHE BANK NY",
+          "US25160PAN78",
+          6.597,
+          5.073,
+          152.4,
+          "cheap"
+        ],
+        [
+          "DEUTSCHE BANK NY",
+          "US25160PAH01",
+          3.46,
+          4.886,
+          -142.6,
+          "rich"
+        ],
+        [
+          "NATWEST GROUP PLC",
+          "US639057AL28",
+          5.031,
+          3.748,
+          128.4,
+          "cheap"
+        ],
+        [
+          "BANK OF AMERICA CORP",
+          "US06051GLV94",
+          5.427,
+          4.372,
+          105.6,
+          "cheap"
+        ],
+        [
+          "US BANCORP",
+          "US91159HJP64",
+          5.885,
+          4.886,
+          99.9,
+          "cheap"
+        ],
+        [
+          "TRUIST FINANCIAL CORP",
+          "US89788MAN20",
+          5.83,
+          4.954,
+          87.6,
+          "cheap"
+        ],
+        [
+          "WELLS FARGO & COMPANY",
+          "US95000U3L56",
+          5.036,
+          4.237,
+          79.9,
+          "cheap"
+        ],
+        [
+          "WELLS FARGO & COMPANY",
+          "US95000U2S19",
+          3.541,
+          4.298,
+          -75.7,
+          "rich"
+        ],
+        [
+          "JPMORGAN CHASE & CO",
+          "US46647PCW41",
+          3.632,
+          2.96,
+          67.1,
+          "cheap"
+        ],
+        [
+          "BANK OF AMERICA CORP",
+          "US06051GHT94",
+          3.61,
+          4.267,
+          -65.7,
+          "rich"
+        ],
+        [
+          "TRUIST FINANCIAL CORP",
+          "US89788MAC64",
+          4.325,
+          4.928,
+          -60.3,
+          "rich"
+        ],
+        [
+          "PNC FINANCIAL SERVICES",
+          "US693475BT12",
+          5.823,
+          5.224,
+          59.9,
+          "cheap"
+        ],
+        [
+          "WELLS FARGO & COMPANY",
+          "US95000U3R27",
+          4.684,
+          4.103,
+          58.2,
+          "cheap"
+        ],
+        [
+          "JPMORGAN CHASE & CO",
+          "US46647PCB04",
+          1.731,
+          2.23,
+          -49.9,
+          "rich"
+        ],
+        [
+          "DANSKE BANK A/S",
+          "US23636ABG58",
+          4.898,
+          4.425,
+          47.3,
+          "cheap"
+        ],
+        [
+          "HSBC HOLDINGS PLC",
+          "US404280DR76",
+          5.603,
+          5.16,
+          44.3,
+          "cheap"
+        ],
+        [
+          "DANSKE BANK A/S",
+          "US23636ABC45",
+          4.367,
+          4.768,
+          -40.1,
+          "rich"
+        ],
+        [
+          "Wells Fargo Commercial",
+          "US95001WAZ14",
+          3.971,
+          3.595,
+          37.6,
+          "cheap"
+        ],
+        [
+          "Wells Fargo Commercial",
+          "US95001YAC84",
+          3.174,
+          3.531,
+          -35.7,
+          "rich"
+        ],
+        [
+          "FORD MOTOR CREDIT CO L",
+          "US345397D260",
+          5.758,
+          5.436,
+          32.2,
+          "cheap"
+        ],
+        [
+          "GOLDMAN SACHS GROUP IN",
+          "US38141GWL49",
+          4.113,
+          3.795,
+          31.8,
+          "cheap"
+        ],
+        [
+          "HSBC HOLDINGS PLC",
+          "US404280EF20",
+          5.03,
+          5.308,
+          -27.9,
+          "rich"
+        ],
+        [
+          "DEUTSCHE BANK NY",
+          "US25160PAM95",
+          4.128,
+          5.012,
+          -88.4,
+          "fair (in noise)"
+        ],
+        [
+          "BARCLAYS PLC",
+          "US06738ECJ29",
+          5.906,
+          5.081,
+          82.5,
+          "fair (in noise)"
+        ],
+        [
+          "NATWEST GROUP PLC",
+          "US639057AC29",
+          2.153,
+          2.964,
+          -81.1,
+          "fair (in noise)"
+        ],
+        [
+          "US BANCORP",
+          "US91159HHM51",
+          4.156,
+          4.755,
+          -59.9,
+          "fair (in noise)"
+        ],
+        [
+          "BARCLAYS PLC",
+          "US06738ECF07",
+          5.732,
+          5.158,
+          57.4,
+          "fair (in noise)"
+        ],
+        [
+          "NATWEST GROUP PLC",
+          "US639057AU27",
+          4.62,
+          5.093,
+          -47.3,
+          "fair (in noise)"
+        ],
+        [
+          "TRUIST FINANCIAL CORP",
+          "US89788MAG78",
+          4.326,
+          4.784,
+          -45.8,
+          "fair (in noise)"
+        ],
+        [
+          "DEUTSCHE BANK NY",
+          "US25160PAQ00",
+          4.915,
+          4.499,
+          41.5,
+          "fair (in noise)"
+        ],
+        [
+          "US BANCORP",
+          "US91159HJQ48",
+          4.684,
+          5.084,
+          -40.0,
+          "fair (in noise)"
+        ],
+        [
+          "DEUTSCHE BANK NY",
+          "US251526CV96",
+          5.224,
+          4.853,
+          37.1,
+          "fair (in noise)"
+        ],
+        [
+          "BANK OF AMERICA CORP",
+          "US06051GGF00",
+          4.107,
+          4.464,
+          -35.7,
+          "fair (in noise)"
+        ],
+        [
+          "JPMORGAN CHASE & CO",
+          "US46647PCJ30",
+          3.7,
+          4.057,
+          -35.7,
+          "fair (in noise)"
+        ],
+        [
+          "WELLS FARGO & COMPANY",
+          "US95000U2F97",
+          3.438,
+          3.77,
+          -33.2,
+          "fair (in noise)"
+        ],
+        [
+          "PNC FINANCIAL SERVICES",
+          "US693475BY07",
+          4.951,
+          5.257,
+          -30.6,
+          "fair (in noise)"
+        ],
+        [
+          "PNC FINANCIAL SERVICES",
+          "US693475BV67",
+          4.897,
+          5.19,
+          -29.3,
+          "fair (in noise)"
+        ],
+        [
+          "TRUIST FINANCIAL CORP",
+          "US89788MAR34",
+          4.751,
+          4.504,
+          24.7,
+          "fair (in noise)"
+        ],
+        [
+          "WELLS FARGO & COMPANY",
+          "US95000U2V48",
+          3.951,
+          4.193,
+          -24.2,
+          "fair (in noise)"
+        ],
+        [
+          "FORD MOTOR CREDIT CO L",
+          "US345397D831",
+          5.164,
+          5.394,
+          -23.0,
+          "fair (in noise)"
+        ],
+        [
+          "FORD MOTOR CREDIT CO L",
+          "US345397E748",
+          5.156,
+          5.382,
+          -22.6,
+          "fair (in noise)"
+        ],
+        [
+          "Enterprise Fleet Finan",
+          "US29375UAC36",
+          4.315,
+          4.528,
+          -21.3,
+          "fair (in noise)"
+        ],
+        [
+          "GOLDMAN SACHS GROUP IN",
+          "US38141GYM04",
+          2.844,
+          3.046,
+          -20.2,
+          "fair (in noise)"
+        ],
+        [
+          "JPMORGAN CHASE & CO",
+          "US46647PBR64",
+          3.388,
+          3.193,
+          19.6,
+          "fair (in noise)"
+        ],
+        [
+          "GENERAL MOTORS FINL CO",
+          "US37045XEF96",
+          4.871,
+          4.676,
+          19.5,
+          "fair (in noise)"
+        ],
+        [
+          "Avis Budget Rental Car",
+          "US05377RKX16",
+          4.747,
+          4.559,
+          18.9,
+          "fair (in noise)"
+        ],
+        [
+          "Avis Budget Rental Car",
+          "US05377RKW33",
+          4.37,
+          4.559,
+          -18.8,
+          "fair (in noise)"
+        ],
+        [
+          "BARCLAYS PLC",
+          "US06738ECP88",
+          5.154,
+          4.971,
+          18.3,
+          "fair (in noise)"
+        ],
+        [
+          "GOLDMAN SACHS GROUP IN",
+          "US38145GAP54",
+          4.375,
+          4.55,
+          -17.4,
+          "fair (in noise)"
+        ],
+        [
+          "JACKSON NATL LIFE GLOB",
+          "US46849LVA69",
+          4.772,
+          4.626,
+          14.6,
+          "fair (in noise)"
+        ],
+        [
+          "Enterprise Fleet Finan",
+          "US29375PAC41",
+          4.808,
+          4.664,
+          14.4,
+          "fair (in noise)"
+        ],
+        [
+          "BARCLAYS PLC",
+          "US06738EDG70",
+          4.624,
+          4.481,
+          14.3,
+          "fair (in noise)"
+        ],
+        [
+          "GENERAL MOTORS FINL CO",
+          "US37045XDK90",
+          4.528,
+          4.663,
+          -13.6,
+          "fair (in noise)"
+        ],
+        [
+          "FORD MOTOR CREDIT CO L",
+          "US345397J200",
+          5.407,
+          5.273,
+          13.5,
+          "fair (in noise)"
+        ],
+        [
+          "HSBC HOLDINGS PLC",
+          "US404280FK06",
+          4.601,
+          4.729,
+          -12.9,
+          "fair (in noise)"
+        ],
+        [
+          "BOEING CO",
+          "US097023CM50",
+          4.4,
+          4.526,
+          -12.7,
+          "fair (in noise)"
+        ],
+        [
+          "Ford Credit Floorplan ",
+          "US34529BAA44",
+          4.427,
+          4.549,
+          -12.2,
+          "fair (in noise)"
+        ],
+        [
+          "Ford Credit Floorplan ",
+          "US34529BAC00",
+          4.671,
+          4.549,
+          12.2,
+          "fair (in noise)"
+        ],
+        [
+          "GENERAL MOTORS FINL CO",
+          "US37045XDR44",
+          4.506,
+          4.613,
+          -10.6,
+          "fair (in noise)"
+        ],
+        [
+          "GENERAL MOTORS FINL CO",
+          "US37045XEB82",
+          4.657,
+          4.551,
+          10.6,
+          "fair (in noise)"
+        ],
+        [
+          "United States Treasury",
+          "US91282CLP40",
+          3.769,
+          3.667,
+          10.1,
+          "fair (in noise)"
+        ],
+        [
+          "BOEING CO",
+          "US097023DP72",
+          4.597,
+          4.497,
+          10.0,
+          "fair (in noise)"
+        ],
+        [
+          "BARCLAYS PLC",
+          "US06738EBY05",
+          4.97,
+          4.879,
+          9.1,
+          "fair (in noise)"
+        ],
+        [
+          "BANK OF AMERICA CORP",
+          "US06051GLS65",
+          4.815,
+          4.902,
+          -8.8,
+          "fair (in noise)"
+        ],
+        [
+          "ENBRIDGE INC",
+          "US29250NCA19",
+          4.371,
+          4.458,
+          -8.7,
+          "fair (in noise)"
+        ],
+        [
+          "Securitized Term Auto ",
+          "US81378WAC73",
+          4.975,
+          4.889,
+          8.6,
+          "fair (in noise)"
+        ],
+        [
+          "Securitized Term Auto ",
+          "US81378WAB90",
+          4.803,
+          4.889,
+          -8.6,
+          "fair (in noise)"
+        ],
+        [
+          "JACKSON NATL LIFE GLOB",
+          "US46849LVC26",
+          4.409,
+          4.487,
+          -7.8,
+          "fair (in noise)"
+        ],
+        [
+          "United States Treasury",
+          "US912797TJ68",
+          3.484,
+          3.558,
+          -7.4,
+          "fair (in noise)"
+        ],
+        [
+          "ENBRIDGE INC",
+          "US29250NBW48",
+          4.515,
+          4.442,
+          7.3,
+          "fair (in noise)"
+        ],
+        [
+          "DANSKE BANK A/S",
+          "US23636ABB61",
+          2.434,
+          2.506,
+          -7.2,
+          "fair (in noise)"
+        ],
+        [
+          "CVS HEALTH CORP",
+          "US126650BJ87",
+          4.518,
+          4.447,
+          7.0,
+          "fair (in noise)"
+        ],
+        [
+          "JACKSON NATL LIFE GLOB",
+          "US46849CJN20",
+          4.718,
+          4.786,
+          -6.8,
+          "fair (in noise)"
+        ],
+        [
+          "Securitized Term Auto ",
+          "US81378RAC88",
+          5.008,
+          4.946,
+          6.2,
+          "fair (in noise)"
+        ],
+        [
+          "Securitized Term Auto ",
+          "US81378RAB06",
+          4.884,
+          4.946,
+          -6.2,
+          "fair (in noise)"
+        ],
+        [
+          "TRUIST FINANCIAL CORP",
+          "US89788MAL63",
+          4.613,
+          4.674,
+          -6.1,
+          "fair (in noise)"
+        ],
+        [
+          "Enterprise Fleet Finan",
+          "US29375TAB89",
+          4.375,
+          4.313,
+          6.1,
+          "fair (in noise)"
+        ],
+        [
+          "GOLDMAN SACHS GROUP IN",
+          "US38141GZK39",
+          3.518,
+          3.46,
+          5.8,
+          "fair (in noise)"
+        ],
+        [
+          "CVS HEALTH CORP",
+          "US126650DM98",
+          4.4,
+          4.457,
+          -5.8,
+          "fair (in noise)"
+        ],
+        [
+          "United States Treasury",
+          "US91282CKE02",
+          3.724,
+          3.78,
+          -5.6,
+          "fair (in noise)"
+        ],
+        [
+          "EQUITABLE FINANCIAL LI",
+          "US29449WAB37",
+          4.506,
+          4.455,
+          5.1,
+          "fair (in noise)"
+        ],
+        [
+          "WELLS FARGO & COMPANY",
+          "US95000U3G61",
+          5.014,
+          5.063,
+          -4.9,
+          "fair (in noise)"
+        ],
+        [
+          "BAT CAPITAL CORP",
+          "US05526DBP96",
+          4.454,
+          4.406,
+          4.7,
+          "fair (in noise)"
+        ],
+        [
+          "BANK OF AMERICA CORP",
+          "US06051GKW86",
+          4.643,
+          4.598,
+          4.6,
+          "fair (in noise)"
+        ],
+        [
+          "MORGAN STANLEY",
+          "US61744YAP34",
+          4.273,
+          4.317,
+          -4.3,
+          "fair (in noise)"
+        ],
+        [
+          "EQUITABLE FINANCIAL LI",
+          "US29449WAR88",
+          4.467,
+          4.509,
+          -4.2,
+          "fair (in noise)"
+        ],
+        [
+          "ATHENE GLOBAL FUNDING",
+          "US04685A3T66",
+          4.629,
+          4.586,
+          4.2,
+          "fair (in noise)"
+        ],
+        [
+          "ARES STRATEGIC INCOME ",
+          "US04020EAL11",
+          5.893,
+          5.933,
+          -4.0,
+          "fair (in noise)"
+        ],
+        [
+          "GENERAL MOTORS FINL CO",
+          "US37045XEQ51",
+          4.56,
+          4.599,
+          -3.9,
+          "fair (in noise)"
+        ],
+        [
+          "Wheels Fleet Lease Fun",
+          "US96328GCK13",
+          4.387,
+          4.35,
+          3.7,
+          "fair (in noise)"
+        ],
+        [
+          "ATHENE GLOBAL FUNDING",
+          "US04685A4E88",
+          4.559,
+          4.595,
+          -3.6,
+          "fair (in noise)"
+        ],
+        [
+          "HSBC HOLDINGS PLC",
+          "US404280DZ92",
+          5.515,
+          5.551,
+          -3.6,
+          "fair (in noise)"
+        ],
+        [
+          "DELL INT LLC / EMC COR",
+          "US24703DBJ90",
+          4.469,
+          4.502,
+          -3.2,
+          "fair (in noise)"
+        ],
+        [
+          "BOEING CO",
+          "US097023CH65",
+          4.649,
+          4.618,
+          3.1,
+          "fair (in noise)"
+        ],
+        [
+          "Enterprise Fleet Finan",
+          "US29390HAC34",
+          4.478,
+          4.449,
+          2.9,
+          "fair (in noise)"
+        ],
+        [
+          "MORGAN STANLEY",
+          "US61744YAK47",
+          4.12,
+          4.091,
+          2.9,
+          "fair (in noise)"
+        ],
+        [
+          "BAT CAPITAL CORP",
+          "US05526DBB01",
+          4.365,
+          4.393,
+          -2.9,
+          "fair (in noise)"
+        ],
+        [
+          "United States Treasury",
+          "US912797TE71",
+          3.63,
+          3.602,
+          2.8,
+          "fair (in noise)"
+        ],
+        [
+          "ARES STRATEGIC INCOME ",
+          "US04020EAP25",
+          6.089,
+          6.066,
+          2.3,
+          "fair (in noise)"
+        ],
+        [
+          "Enterprise Fleet Finan",
+          "US29375QAD07",
+          4.711,
+          4.731,
+          -2.1,
+          "fair (in noise)"
+        ],
+        [
+          "GENERAL MOTORS FINL CO",
+          "US37045XFH44",
+          4.565,
+          4.586,
+          -2.0,
+          "fair (in noise)"
+        ],
+        [
+          "BANK OF NOVA SCOTIA",
+          "US06418GAT40",
+          4.4,
+          4.42,
+          -2.0,
+          "fair (in noise)"
+        ],
+        [
+          "BANK OF NOVA SCOTIA",
+          "US06418GAL14",
+          4.439,
+          4.419,
+          2.0,
+          "fair (in noise)"
+        ],
+        [
+          "Wells Fargo Commercial",
+          "US94990GAA76",
+          4.756,
+          4.776,
+          -1.9,
+          "fair (in noise)"
+        ],
+        [
+          "Wheels Fleet Lease Fun",
+          "US96328GCE52",
+          4.534,
+          4.553,
+          -1.9,
+          "fair (in noise)"
+        ],
+        [
+          "BAT CAPITAL CORP",
+          "US05526DBJ37",
+          4.408,
+          4.427,
+          -1.9,
+          "fair (in noise)"
+        ],
+        [
+          "Wheels Fleet Lease Fun",
+          "US96328GCP00",
+          4.125,
+          4.143,
+          -1.8,
+          "fair (in noise)"
+        ],
+        [
+          "DELL INT LLC / EMC COR",
+          "US24703DBR17",
+          4.455,
+          4.437,
+          1.8,
+          "fair (in noise)"
+        ],
+        [
+          "ARES STRATEGIC INCOME ",
+          "US04020EAG26",
+          5.764,
+          5.747,
+          1.7,
+          "fair (in noise)"
+        ],
+        [
+          "ATHENE GLOBAL FUNDING",
+          "US04685A4X69",
+          4.569,
+          4.584,
+          -1.5,
+          "fair (in noise)"
+        ],
+        [
+          "DELL INT LLC / EMC COR",
+          "US24703TAE64",
+          4.599,
+          4.585,
+          1.4,
+          "fair (in noise)"
+        ],
+        [
+          "ENBRIDGE INC",
+          "US29250NCB91",
+          4.555,
+          4.541,
+          1.4,
+          "fair (in noise)"
+        ],
+        [
+          "HCA INC",
+          "US404119CY34",
+          4.443,
+          4.457,
+          -1.4,
+          "fair (in noise)"
+        ],
+        [
+          "CVS HEALTH CORP",
+          "US126650CU24",
+          4.391,
+          4.403,
+          -1.3,
+          "fair (in noise)"
+        ],
+        [
+          "Verizon Master Trust",
+          "US92348KDM27",
+          4.424,
+          4.437,
+          -1.2,
+          "fair (in noise)"
+        ],
+        [
+          "HPS CORPORATE LENDING ",
+          "US40440VAQ86",
+          6.023,
+          6.036,
+          -1.2,
+          "fair (in noise)"
+        ],
+        [
+          "MORGAN STANLEY",
+          "US61747YFK64",
+          4.761,
+          4.749,
+          1.2,
+          "fair (in noise)"
+        ],
+        [
+          "HCA INC",
+          "US404119CP27",
+          4.461,
+          4.45,
+          1.2,
+          "fair (in noise)"
+        ],
+        [
+          "JPMORGAN CHASE & CO",
+          "US46647PEB85",
+          4.606,
+          4.617,
+          -1.1,
+          "fair (in noise)"
+        ],
+        [
+          "Verizon Master Trust",
+          "US92348KDR14",
+          4.463,
+          4.453,
+          1.0,
+          "fair (in noise)"
+        ],
+        [
+          "ATHENE GLOBAL FUNDING",
+          "US04685A2Z36",
+          4.627,
+          4.618,
+          0.9,
+          "fair (in noise)"
+        ],
+        [
+          "EQUITABLE FINANCIAL LI",
+          "US29449W7M32",
+          4.181,
+          4.19,
+          -0.9,
+          "fair (in noise)"
+        ],
+        [
+          "HCA INC",
+          "US404119BU21",
+          4.493,
+          4.485,
+          0.7,
+          "fair (in noise)"
+        ],
+        [
+          "HPS CORPORATE LENDING ",
+          "US40440VAH87",
+          5.877,
+          5.87,
+          0.6,
+          "fair (in noise)"
+        ],
+        [
+          "HPS CORPORATE LENDING ",
+          "US40440VAU98",
+          6.181,
+          6.175,
+          0.6,
+          "fair (in noise)"
+        ],
+        [
+          "HCA INC",
+          "US404119CH01",
+          4.478,
+          4.483,
+          -0.5,
+          "fair (in noise)"
+        ],
+        [
+          "BOEING CO",
+          "US097023CU76",
+          4.493,
+          4.497,
+          -0.4,
+          "fair (in noise)"
+        ],
+        [
+          "MORGAN STANLEY",
+          "US61747YFQ35",
+          4.863,
+          4.86,
+          0.3,
+          "fair (in noise)"
+        ],
+        [
+          "Verizon Master Trust",
+          "US92348KDY64",
+          4.374,
+          4.372,
+          0.2,
+          "fair (in noise)"
+        ],
+        [
+          "HPS CORPORATE LENDING ",
+          "US40440VAL99",
+          5.716,
+          5.717,
+          -0.1,
+          "fair (in noise)"
+        ],
+        [
+          "BANK OF NOVA SCOTIA",
+          "US06418GAY35",
+          4.5,
+          4.5,
+          0.0,
+          "fair (in noise)"
+        ],
+        [
+          "Avis Budget Rental Car",
+          "US05377RKL77",
+          4.546,
+          4.546,
+          -0.0,
+          "fair (in noise)"
+        ],
+        [
+          "Avis Budget Rental Car",
+          "US05377RFP47",
+          4.534,
+          4.534,
+          0.0,
+          "fair (in noise)"
+        ],
+        [
+          "Ford Credit Floorplan ",
+          "US34528QJB14",
+          4.292,
+          4.292,
+          0.0,
+          "fair (in noise)"
+        ]
+      ],
+      "region": [
+        6,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "values"
+}

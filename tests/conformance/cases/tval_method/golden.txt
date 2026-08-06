@@ -1,0 +1,22 @@
+TREBLE VALUATION · WHAT THIS RESTS ON
+────────────────────────────────────────────────────────────────────────────
+The transparency drill-down (§15): every input, assumption and exclusion.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:tval_method]                                                |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Rating and seniority are absent, so the similarity metric is incomplete.

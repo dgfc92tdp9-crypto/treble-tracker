@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 49.22%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 49.53%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -53,8 +53,8 @@ DuckDB/Parquet/Arrow: TQL result sets and bulk universe pulls are the natural pa
 
 Then, in rough order of what is unblocked:
 
-- **`TVAL` Prong 2** — the issuer curve half ships. What remains is a screen for either
-  prong, and the rating/seniority dimensions the similarity metric declares missing.
+- **`TVAL` Prong 2** — issuer curves and the screen both ship. What remains is the
+  rating/seniority data the similarity metric declares missing, plus §15.4/§15.5.
 - **Canvas + FDC3** — UI work, no data dependency.
 - **`PORT` / TFM3** — model and screen both ship. What remains is per-name equity coverage
     (still absent), and the factor breadth §16.2 describes.
@@ -117,7 +117,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 | Ticker plant (conflated / TPIPE) | 0.45 | venue adapters, security master enrichment, Redpanda + NATS transports |
 | `ALLQ` correct-when-empty | **1.00** | complete for this phase — the only limitation left is the loopback binding, which is §22.1 and out of scope until Phase 5 |
 | `PORT` with TFM3 v1 | 0.60 | **screen ships** — three tabs off 1.34M ingested return facts; equal-weight 49-industry template at 16.48% vol, 97.6% factor. Six factors not 1,500; still no per-name panel |
-| `TVAL` v1 | 0.65 | **issuer curves ship** — 35 fitted on live N-PORT marks, 23 significant rich/cheap calls, each carrying the curve's own RMS. Rating and seniority still absent, so the comparable set reports itself incomplete; no screen yet |
+| `TVAL` v1 | 0.75 | **screen ships** — 3 tabs; 35 issuer curves, 135 ranked rich/cheap calls, and a METHOD tab naming every assumption and the three dimensions it could not match on. Rating and seniority still absent; ML layer and snapshots untouched |
 | `CDSW` vs ISDA test cases | 0.85 | **externally validated across six currencies** — ISDA's own grids, two trade dates; medians 0.04-0.33bp. Residual bounded but *not* attributed: two candidate causes tested and refuted |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
 | Canvas with FDC3 | 0.95 | **both clients draw it** — TUI compositor + shared TS `renderCanvasHtml`, with whole-workspace conformance across all three renderers. Layouts are configured, not authored in-app |

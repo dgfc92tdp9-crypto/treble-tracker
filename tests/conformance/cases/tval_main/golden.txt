@@ -1,0 +1,22 @@
+TREBLE VALUATION · ISSUER CURVES
+────────────────────────────────────────────────────────────────────────────
+A least-squares yield curve per issuer, from that issuer's own bonds.
+RMS is the curve's own scatter — a fit with a wide RMS says little.
+
+ISSUER                      BONDS   1Y %    SLOPE bp/yr   RMS bp
++------------------------------------------------------------------------------+
+|[table_scroll:sys:tval_curves]                                                |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+VALUES · METHOD tabs · marks are implied from fund holdings, not traded.
