@@ -25,6 +25,7 @@ a chart shows a spurious drop on every refresh.
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -205,4 +206,46 @@ def vwap_over(ticks: Sequence[Tick]) -> Vwap:
     )
 
 
-__all__ = ["EPOCH", "Bar", "NoTicksError", "Vwap", "bars_from_ticks", "vwap_over"]
+class TickHistory:
+    """Retained ticks per instrument, for aggregation.
+
+    Needed because `TickerPlant.tpipe()` *drains*: it is the machine path and
+    has one consumer. Aggregating bars off it would consume the stream out
+    from under whatever else was reading it, and the second caller would get
+    an empty tape rather than the same one.
+
+    So history is recorded alongside rather than taken from the pipe.
+    Bounded per instrument, and the bound is enforced by dropping the oldest
+    — which is honest for a rolling window and is why `bars_from_ticks`
+    reports the interval each bar covers rather than assuming completeness.
+    """
+
+    def __init__(self, *, per_subject: int = 100_000) -> None:
+        if per_subject <= 0:
+            raise ValueError("a history retaining nothing cannot aggregate anything")
+        self._per_subject = per_subject
+        self._ticks: dict[TUID, deque[Tick]] = {}
+
+    def record(self, tick: Tick) -> None:
+        bucket = self._ticks.setdefault(tick.subject, deque(maxlen=self._per_subject))
+        bucket.append(tick)
+
+    def ticks(self, subject: TUID) -> tuple[Tick, ...]:
+        return tuple(self._ticks.get(subject, ()))
+
+    def subjects(self) -> tuple[TUID, ...]:
+        return tuple(sorted(self._ticks))
+
+    def __len__(self) -> int:
+        return sum(len(bucket) for bucket in self._ticks.values())
+
+
+__all__ = [
+    "EPOCH",
+    "Bar",
+    "NoTicksError",
+    "TickHistory",
+    "Vwap",
+    "bars_from_ticks",
+    "vwap_over",
+]

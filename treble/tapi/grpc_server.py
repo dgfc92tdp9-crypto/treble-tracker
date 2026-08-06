@@ -25,12 +25,15 @@ See `proto/tapi.proto` for why.
 from __future__ import annotations
 
 from concurrent import futures
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import grpc
 
-from treble.core.identifiers import SecurityQuery
+from treble.core.identifiers import TUID, SecurityQuery
+from treble.plant.bars import TickHistory, bars_from_ticks, vwap_over
+from treble.plant.conflation import TickerPlant
 from treble.plant.quotes import Firmness
+from treble.plant.venues import PRICE_FIELD
 from treble.tapi._generated import tapi_pb2, tapi_pb2_grpc
 from treble.tapi.contribution import (
     ContributionRejectedError,
@@ -287,10 +290,116 @@ class TqlService(tapi_pb2_grpc.TqlServicer):  # type: ignore[misc]
         )
 
 
+class MktDataService(tapi_pb2_grpc.MktDataServicer):  # type: ignore[misc]
+    """`mktdata`, `mktbar` and `mktvwap` over gRPC (spec §8.3).
+
+    These were recorded as blocked on the ticker plant's venue adapters. One
+    exists now, so they are served from real prints.
+
+    A server built with no plant refuses with FAILED_PRECONDITION rather than
+    returning an empty snapshot: "this deployment has no tape" and "this
+    instrument has not printed" are different answers, and the second is the
+    more believable of the two.
+    """
+
+    def __init__(self, plant: TickerPlant | None, history: TickHistory | None) -> None:
+        self._plant = plant
+        self._history = history
+
+    def _tape(self, context: grpc.ServicerContext) -> tuple[TickerPlant, TickHistory]:
+        """The plant and its history, or abort with why there is neither."""
+        if self._plant is None or self._history is None:
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "no ticker plant is attached to this server, so there is no tape to read. "
+                "That is different from an instrument having no prints",
+            )
+            # `abort` always raises; grpc does not declare it NoReturn, so
+            # this states it for the type checker rather than leaving the
+            # callers to narrow with an assert.
+            raise RuntimeError("unreachable: ServicerContext.abort raises")
+        return self._plant, self._history
+
+    def GetMarketData(self, request, context):  # type: ignore[no-untyped-def] # noqa: N802
+        plant, _ = self._tape(context)
+        tick = plant.image(TUID(request.subject), PRICE_FIELD)
+        if tick is None:
+            return tapi_pb2.MarketDataResponse(subject=request.subject, has_price=False)
+        return tapi_pb2.MarketDataResponse(
+            subject=request.subject,
+            has_price=True,
+            price=tick.value,
+            sequence=tick.sequence,
+            exchange_time=tick.exchange_time.isoformat(),
+            has_size=tick.size is not None,
+            size=tick.size or 0.0,
+        )
+
+    def GetBars(self, request, context):  # type: ignore[no-untyped-def] # noqa: N802
+        _, history = self._tape(context)
+        if request.interval_seconds <= 0:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "interval_seconds must be positive; defaulting it would decide what a bar "
+                "means for every client that forgot to say",
+            )
+        ticks = history.ticks(TUID(request.subject))
+        if not ticks:
+            context.abort(
+                grpc.StatusCode.NOT_FOUND,
+                f"no ticks recorded for {request.subject!r}; an empty bar series and an "
+                "instrument that has never printed are different answers",
+            )
+        bars = bars_from_ticks(ticks, interval=timedelta(seconds=request.interval_seconds))
+        return tapi_pb2.BarResponse(
+            subject=request.subject,
+            bars=[
+                tapi_pb2.MarketBar(
+                    start=bar.start.isoformat(),
+                    end=bar.end.isoformat(),
+                    open=bar.open,
+                    high=bar.high,
+                    low=bar.low,
+                    close=bar.close,
+                    trades=bar.trades,
+                    has_volume=bar.volume is not None,
+                    volume=bar.volume or 0.0,
+                    has_vwap=bar.vwap is not None,
+                    vwap=bar.vwap or 0.0,
+                    complete=bar.complete,
+                )
+                for bar in bars
+            ],
+        )
+
+    def GetVwap(self, request, context):  # type: ignore[no-untyped-def] # noqa: N802
+        _, history = self._tape(context)
+        ticks = history.ticks(TUID(request.subject))
+        if not ticks:
+            context.abort(grpc.StatusCode.NOT_FOUND, f"no ticks recorded for {request.subject!r}")
+        try:
+            result = vwap_over(ticks)
+        except ValueError as error:
+            # Chiefly the unsized-tick case. Returning a simple average here
+            # would answer the question with a different number under the
+            # same name, which is the one outcome this must not do.
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(error))
+        return tapi_pb2.VwapResponse(
+            subject=request.subject,
+            price=result.price,
+            volume=result.volume,
+            trades=result.trades,
+            first=result.first.isoformat(),
+            last=result.last.isoformat(),
+        )
+
+
 def create_server(
     tapi: LocalTapi,
     *,
     contributions: ContributionService | None = None,
+    plant: TickerPlant | None = None,
+    history: TickHistory | None = None,
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
     max_workers: int = 8,
@@ -303,6 +412,7 @@ def create_server(
     tapi_pb2_grpc.add_InstrumentsServicer_to_server(InstrumentsService(tapi), server)
     tapi_pb2_grpc.add_ContribServicer_to_server(ContribService(service), server)
     tapi_pb2_grpc.add_TqlServicer_to_server(TqlService(tapi), server)
+    tapi_pb2_grpc.add_MktDataServicer_to_server(MktDataService(plant, history), server)
     server.add_insecure_port(f"{host}:{port}")
     return server
 

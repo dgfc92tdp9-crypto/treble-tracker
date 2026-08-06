@@ -291,3 +291,110 @@ def test_the_server_builds_without_a_contribution_service(tmp_path: Path) -> Non
     accidentally run a server whose contributions go somewhere else."""
     server = create_server(LocalTapi(DuckStore(tmp_path / "t.db")), port=0)
     assert isinstance(server, grpc.Server)
+
+
+@pytest.fixture
+def tape_channel(tmp_path: Path):  # type: ignore[no-untyped-def]
+    """A server with a plant fed from the recorded Coinbase frames."""
+    from treble.plant.bars import TickHistory
+    from treble.plant.conflation import TickerPlant
+    from treble.plant.venues import ticks_from_messages
+
+    frames = (
+        (Path(__file__).resolve().parents[1] / "fixtures" / "coinbase" / "ws_matches.jsonl")
+        .read_text()
+        .splitlines()
+    )
+    plant, history = TickerPlant(), TickHistory()
+    for tick in ticks_from_messages(frames):
+        plant.publish(tick)
+        history.record(tick)
+
+    server = create_server(
+        LocalTapi(DuckStore(tmp_path / "t.db")),
+        plant=plant,
+        history=history,
+        host=DEFAULT_HOST,
+        port=0,
+    )
+    port = server.add_insecure_port(f"{DEFAULT_HOST}:0")
+    server.start()
+    with grpc.insecure_channel(f"{DEFAULT_HOST}:{port}") as chan:
+        yield chan
+    server.stop(grace=None)
+
+
+BTC = "crypto:coinbase:BTC-USD"
+
+
+class TestTheTapeServices:
+    """§8.3's `mktdata`, `mktbar` and `mktvwap`, over real recorded prints."""
+
+    def test_market_data_returns_the_current_image(self, tape_channel: grpc.Channel) -> None:
+        stub = tapi_pb2_grpc.MktDataStub(tape_channel)
+        response = stub.GetMarketData(tapi_pb2.MarketDataRequest(subject=BTC))
+        assert response.has_price is True
+        assert response.price > 0
+        assert response.sequence > 0
+        assert response.exchange_time.startswith("2026-")
+
+    def test_an_instrument_with_no_prints_is_not_a_price_of_zero(
+        self, tape_channel: grpc.Channel
+    ) -> None:
+        """`has_price` carries what proto3 scalars cannot. Without it a
+        never-traded instrument arrives as a price of 0.0."""
+        stub = tapi_pb2_grpc.MktDataStub(tape_channel)
+        response = stub.GetMarketData(tapi_pb2.MarketDataRequest(subject="crypto:coinbase:NOPE"))
+        assert response.has_price is False
+        assert response.price == 0.0
+
+    def test_bars_come_back_with_their_vwap(self, tape_channel: grpc.Channel) -> None:
+        stub = tapi_pb2_grpc.MktDataStub(tape_channel)
+        response = stub.GetBars(tapi_pb2.BarRequest(subject=BTC, interval_seconds=60))
+        assert response.bars
+        for bar in response.bars:
+            assert bar.low <= bar.open <= bar.high
+            assert bar.has_vwap is True
+            assert bar.low <= bar.vwap <= bar.high
+
+    def test_the_partial_bar_is_flagged_on_the_wire(self, tape_channel: grpc.Channel) -> None:
+        """A client drawing the unfinished interval beside completed ones
+        shows a spurious drop on every refresh."""
+        stub = tapi_pb2_grpc.MktDataStub(tape_channel)
+        response = stub.GetBars(tapi_pb2.BarRequest(subject=BTC, interval_seconds=3600))
+        assert response.bars[-1].complete is False
+
+    def test_a_zero_interval_is_refused(self, tape_channel: grpc.Channel) -> None:
+        """Defaulting it would decide what a bar means for every client that
+        forgot to say."""
+        stub = tapi_pb2_grpc.MktDataStub(tape_channel)
+        with pytest.raises(grpc.RpcError) as raised:
+            stub.GetBars(tapi_pb2.BarRequest(subject=BTC, interval_seconds=0))
+        assert raised.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+
+    def test_an_unknown_subject_is_not_found_not_empty(self, tape_channel: grpc.Channel) -> None:
+        stub = tapi_pb2_grpc.MktDataStub(tape_channel)
+        with pytest.raises(grpc.RpcError) as raised:
+            stub.GetBars(tapi_pb2.BarRequest(subject="crypto:coinbase:NOPE", interval_seconds=60))
+        assert raised.value.code() is grpc.StatusCode.NOT_FOUND
+
+    def test_vwap_is_volume_weighted_and_inside_the_range(self, tape_channel: grpc.Channel) -> None:
+        stub = tapi_pb2_grpc.MktDataStub(tape_channel)
+        response = stub.GetVwap(tapi_pb2.VwapRequest(subject=BTC))
+        assert response.volume > 0
+        assert response.trades > 0
+        assert response.price > 0
+
+
+class TestAServerWithNoTape:
+    def test_the_tape_services_refuse_rather_than_returning_nothing(
+        self, channel: grpc.Channel
+    ) -> None:
+        """'This deployment has no tape' and 'this instrument has not
+        printed' are different answers, and the second is the more
+        believable of the two."""
+        stub = tapi_pb2_grpc.MktDataStub(channel)
+        with pytest.raises(grpc.RpcError) as raised:
+            stub.GetMarketData(tapi_pb2.MarketDataRequest(subject=BTC))
+        assert raised.value.code() is grpc.StatusCode.FAILED_PRECONDITION
+        assert "no ticker plant" in raised.value.details()

@@ -1,4 +1,4 @@
-.PHONY: setup lint types test golden conformance check tui web desktop app clean
+.PHONY: app audit check clean completion conformance deep desktop desktop-install drift gate golden imports lint mutate mutation proto setup test tui types web
 
 setup:                ## create the venv and install everything
 	uv venv --python 3.12

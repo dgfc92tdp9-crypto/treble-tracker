@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 50.31%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 50.62%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -121,7 +121,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 | `CDSW` vs ISDA test cases | 0.85 | **externally validated across six currencies** — ISDA's own grids, two trade dates; medians 0.04-0.33bp. Residual bounded but *not* attributed: two candidate causes tested and refuted |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
 | Canvas with FDC3 | 0.95 | **both clients draw it** — TUI compositor + shared TS `renderCanvasHtml`, with whole-workspace conformance across all three renderers. Layouts are configured, not authored in-app |
-| gRPC + Arrow Flight | 0.80 | streaming and the real-time services (mktdata, mktbar, mktvwap, ems, docs) — all need venue adapters that do not exist |
+| gRPC + Arrow Flight | 0.90 | **mktdata / mktbar / mktvwap ship** over real Coinbase prints. Outstanding: streaming subscriptions, `ems` (no order path), `docs` (no document store) |
 
 **The swap curves exist, and the whole chain is verified on them.** The DTCC SDR adapter
 (2026-08-02) ingests CFTC Part 43 public price dissemination — ~20,000 interest-rate prints a

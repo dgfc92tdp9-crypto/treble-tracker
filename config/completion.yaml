@@ -457,7 +457,7 @@ phase_2:
                   or save — and FDC3 interop is modelled against the
                   standard's context shape without a real desktop agent to
                   federate with"}
-  P2_8:  {done: 0.8, name: "gRPC + Arrow Flight transports",
+  P2_8:  {done: 0.9, name: "gRPC + Arrow Flight transports",
           basis: "Arrow Flight ships: a FlightServerBase serving guarded
                   fact exports as Arrow tables with a fixed schema, reading
                   through the same store handle and the same point-in-time
@@ -487,12 +487,32 @@ phase_2:
                   mktdata, mktbar, mktvwap, ems and docs, and names streaming
                   subscriptions. The reason recorded here for their absence
                   was that they need venue adapters 'which do not exist' —
-                  that stopped being true on 2026-08-06, when the Coinbase
-                  adapter and the bar/VWAP aggregation landed under P2_1. The
-                  data path for mktdata, mktbar and mktvwap now exists; what
-                  is missing is the gRPC surface over it, which is work
-                  rather than a block. `ems` needs an order path this system
-                  does not have, and `docs` needs a document store. Those
-                  services remain absent rather than stubbed, because an RPC
-                  that accepts a request and returns nothing useful is worse
-                  than one a client can see is missing"}
+                  that stopped being true on 2026-08-06. mktdata, mktbar and
+                  mktvwap now ship as a `MktData` service over real Coinbase
+                  prints: the plant's current-state image, fixed-boundary
+                  bars with the partial interval flagged on the wire, and a
+                  volume-weighted price. has_price, has_volume and has_vwap
+                  carry what proto3 scalars cannot, so a never-traded
+                  instrument is not a price of zero and a bar with unsized
+                  ticks withholds its VWAP rather than returning a simple
+                  average under the name. A server built with no plant
+                  refuses FAILED_PRECONDITION rather than answering empty,
+                  because 'this deployment has no tape' and 'this instrument
+                  has not printed' are different answers. Aggregation reads a
+                  retained TickHistory rather than TPIPE, which drains — a
+                  bar query off the machine path would consume the stream out
+                  from under its other consumer. Building this exposed a
+                  defect that had made the whole gRPC guarantee false: `make
+                  check` depends on `proto`, `proto` was not declared .PHONY,
+                  and a directory named proto/ exists — so make considered
+                  the target up to date and never regenerated the stubs.
+                  Since the stubs are gitignored, CI on a clean checkout had
+                  no generated code and every gRPC test failed at import. Now
+                  fixed, with tests/test_makefile.py asserting every target
+                  is phony and that check still depends on proto, verified to
+                  fail against the original Makefile. Outstanding: §8.3's
+                  streaming subscriptions (a unary snapshot and a
+                  subscription are different contracts, and serving the first
+                  under the second's name would be the worse error); `ems`
+                  needs an order path this system does not have; `docs` needs
+                  a document store. Those remain absent rather than stubbed"}
