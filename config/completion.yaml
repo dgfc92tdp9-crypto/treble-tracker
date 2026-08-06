@@ -459,8 +459,29 @@ phase_2:
                   would not. Cashflows carry `compounded` so a schedule says
                   which convention set the rate rather than leaving it to be
                   inferred from the curve's name. Note for the remaining
-                  list: only swaptions/caps/floors, CMS and
-                  cancellable/extendible need a volatility surface. Basis,
+                  list: swaptions/caps/floors, CMS and
+                  cancellable/extendible need a volatility. That was recorded
+                  as needing a surface no free source provides, and it was
+                  wrong — the CFTC Part 43 tape already ingested for curves
+                  carries option premiums, strikes, first-exercise dates and
+                  underlier maturities on real swaption trades: 406 with a
+                  full expiry-into-tenor in one day's file, across USD SOFR,
+                  EUR, GBP and JPY at standard points (1Y1Y, 1Y10Y, 0Y30Y).
+                  treble/analytics/vol/swaption.py prices Black swaptions and
+                  solves the vol a transacted premium implies, verified by
+                  round-tripping the solver against the pricer to 1e-8 and by
+                  exact put-call parity. It refuses rather than returning a
+                  number where Black has no answer: a non-positive forward is
+                  a Bachelier market rather than a high-vol one, and a premium
+                  above the price at 300% vol is a data problem rather than a
+                  swaption. Run on the live tape it does NOT yet give a usable
+                  surface — 61 EUR swaptions solved, dispersion too wide to
+                  interpolate, two receivers on the same strike and forward
+                  implying 68.0% and 7.7% and wing strikes implying 137-156%.
+                  Short expiries are genuinely hypersensitive to the premium;
+                  the wing values are recorded as unexplained rather than
+                  attributed. So the vol *block* is dissolved and the surface
+                  is unbuilt. Basis,
                   cross-currency, asset swaps and total return need curves,
                   FX or a price series, all of which exist — those are
                   unbuilt rather than blocked. The OIS trade is reachable
