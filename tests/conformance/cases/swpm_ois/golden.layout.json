@@ -1,0 +1,166 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SWAP MANAGER · ESTR OIS (DAILY COMPOUNDING)"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "The floating leg compounds the overnight index daily — not a term forward."
+    },
+    {
+      "at": [
+        3,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Self-discounted, so the leg must equal N x (D(0) - D(T)). Both are shown."
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "VALUATION"
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "No lookback, lockout or payment delay: a real SOFR trade sets those."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "SWPM",
+  "panes": [
+    {
+      "binding": "sys:swpm_ois",
+      "data": [
+        [
+          "Curve date",
+          "2026-07-31"
+        ],
+        [
+          "Index",
+          "EUR-ESTR-OIS compounded daily"
+        ],
+        [
+          "Discount curve",
+          "EUR-ESTR-OIS"
+        ],
+        [
+          "Both legs pay",
+          "annually"
+        ],
+        [
+          "Notional",
+          100000000.0
+        ],
+        [
+          "Effective",
+          "2026-08-04"
+        ],
+        [
+          "Maturity",
+          "2036-08-04"
+        ],
+        [
+          "Par rate %",
+          2.972143
+        ],
+        [
+          "PV at par",
+          0.0
+        ],
+        [
+          "Annuity",
+          859056816.64
+        ],
+        [
+          "DV01 (+1bp)",
+          85930.1
+        ],
+        [
+          "Compounded payments",
+          10
+        ],
+        [
+          "Float leg PV",
+          25532397.441
+        ],
+        [
+          "N x (D(0) - D(T))",
+          25532397.441
+        ],
+        [
+          "Identity residual",
+          2e-08
+        ]
+      ],
+      "region": [
+        6,
+        0,
+        15,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "ois"
+}

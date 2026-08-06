@@ -119,3 +119,36 @@ tabs:
         at: {row: 21, col: 0}
         text: "Floating rates are projected forwards, not fixings — no rate here has set."
         attrs: [label]
+
+  - name: ois
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SWAP MANAGER · ESTR OIS (DAILY COMPOUNDING)"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "The floating leg compounds the overnight index daily — not a term forward."
+        attrs: [label]
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "Self-discounted, so the leg must equal N x (D(0) - D(T)). Both are shown."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "VALUATION"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 6, col: 0, height: 15, width: 80}
+        pane_type: table_scroll
+        binding: "sys:swpm_ois"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "No lookback, lockout or payment delay: a real SOFR trade sets those."
+        attrs: [label]

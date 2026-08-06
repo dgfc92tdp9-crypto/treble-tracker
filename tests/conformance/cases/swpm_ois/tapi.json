@@ -1,0 +1,67 @@
+{
+  "fields": {},
+  "series": {
+    "sys:swpm_ois": [
+      [
+        "Curve date",
+        "2026-07-31"
+      ],
+      [
+        "Index",
+        "EUR-ESTR-OIS compounded daily"
+      ],
+      [
+        "Discount curve",
+        "EUR-ESTR-OIS"
+      ],
+      [
+        "Both legs pay",
+        "annually"
+      ],
+      [
+        "Notional",
+        100000000.0
+      ],
+      [
+        "Effective",
+        "2026-08-04"
+      ],
+      [
+        "Maturity",
+        "2036-08-04"
+      ],
+      [
+        "Par rate %",
+        2.972143
+      ],
+      [
+        "PV at par",
+        0.0
+      ],
+      [
+        "Annuity",
+        859056816.64
+      ],
+      [
+        "DV01 (+1bp)",
+        85930.1
+      ],
+      [
+        "Compounded payments",
+        10
+      ],
+      [
+        "Float leg PV",
+        25532397.441
+      ],
+      [
+        "N x (D(0) - D(T))",
+        25532397.441
+      ],
+      [
+        "Identity residual",
+        2e-08
+      ]
+    ]
+  }
+}

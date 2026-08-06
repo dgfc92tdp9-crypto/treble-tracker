@@ -1,0 +1,22 @@
+SWAP MANAGER · ESTR OIS (DAILY COMPOUNDING)
+────────────────────────────────────────────────────────────────────────────
+The floating leg compounds the overnight index daily — not a term forward.
+Self-discounted, so the leg must equal N x (D(0) - D(T)). Both are shown.
+
+VALUATION
++------------------------------------------------------------------------------+
+|[table_scroll:sys:swpm_ois]                                                   |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+No lookback, lockout or payment delay: a real SOFR trade sets those.

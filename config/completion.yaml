@@ -349,7 +349,7 @@ phase_2:
                   by an assertion that the maximum sits at the longest
                   maturity, so it cannot double as a hiding place. Also
                   outstanding: the older IBOR grids are not wired"}
-  P2_6:  {done: 0.9, name: "SWPM multi-curve CSA-aware discounting",
+  P2_6:  {done: 0.92, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
                   bootstrapped against an exogenous discount curve (never
@@ -414,7 +414,17 @@ phase_2:
                   cancellable/extendible need a volatility surface. Basis,
                   cross-currency, asset swaps and total return need curves,
                   FX or a price series, all of which exist — those are
-                  unbuilt rather than blocked"}
+                  unbuilt rather than blocked. The OIS trade is reachable
+                  rather than merely implemented: SWPM gained a fourth tab
+                  showing a spot-starting 10Y ESTR OIS at its own par rate
+                  (2.972143% on the 2026-07-31 curve), with the telescoping
+                  identity printed beside the computed leg — float leg PV
+                  25,532,397.441 against N x (D(0)-D(T)) of the same, residual
+                  2e-08. Putting the identity on screen rather than only in a
+                  test is deliberate: a reader who can see the two agree can
+                  see the compounding is right instead of trusting it. The
+                  caption names what is not modelled — no lookback, lockout
+                  or payment delay, which a real SOFR trade sets"}
   P2_7:  {done: 0.95, name: "Canvas with FDC3 context propagation",
           basis: "the criterion's named semantic ships and is
                   mutation-verified 6/6. Colour-group context propagation

@@ -262,6 +262,7 @@ class LocalTapi:
         "sys:swap_curves",
         "sys:swpm_valuation",
         "sys:swpm_cashflows",
+        "sys:swpm_ois",
         "sys:allq",
         "sys:allq_composites",
         "sys:port_summary",
@@ -490,7 +491,12 @@ class LocalTapi:
             )
         if binding == "sys:treasury_curve":
             return self._treasury_curve(as_of=as_of)
-        if binding in ("sys:swap_curves", "sys:swpm_valuation", "sys:swpm_cashflows"):
+        if binding in (
+            "sys:swap_curves",
+            "sys:swpm_valuation",
+            "sys:swpm_cashflows",
+            "sys:swpm_ois",
+        ):
             return self._swpm(binding, as_of=as_of)
         if binding in ("sys:allq", "sys:allq_composites"):
             return self._allq(security, binding, as_of=as_of)
@@ -626,6 +632,9 @@ class LocalTapi:
                 )
                 for tenor in market.tenors
             )
+
+        if binding == "sys:swpm_ois":
+            return self._swpm_ois(market)
 
         spec = self._swpm_trade(market)
         csa = CsaTerms(collateral_currency="EUR", discount_curve=DISCOUNT_CURVE)
@@ -836,6 +845,60 @@ class LocalTapi:
             ("Specific volatility %", round(risk.specific_volatility * 100, 2)),
             ("Factor share of variance %", round(risk.factor_share * 100, 1)),
             *((f"Marginal: {name}", round(value * 100, 3)) for name, value in largest),
+        )
+
+    def _swpm_ois(self, market: SwapMarket) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """A spot-starting 10-year ESTR OIS, struck at its own par rate.
+
+        The floating leg is the overnight index *compounded daily*, not a
+        discrete forward. The pane reports the identity that makes that leg
+        exact — a self-discounted compounded leg is worth
+        `N x (D(start) - D(end))` — beside the computed value, because a
+        reader who can see the two agree can see the compounding is right
+        rather than taking it on trust.
+        """
+        from treble.analytics.derivatives.csa import CsaTerms
+        from treble.analytics.derivatives.swap import price_swap, swap_dv01, swap_par_rate
+        from treble.tapi.swap_market import DISCOUNT_CURVE
+
+        spec = self._swpm_trade(market).model_copy(
+            update={
+                # The OIS curve forecasts its own compounded leg. Annual on
+                # both legs is the market convention, and it is stated on the
+                # trade rather than assumed by the pricer.
+                "forecast_curve": DISCOUNT_CURVE,
+                "float_frequency": 1,
+                "float_day_count": DayCount.ACT_360,
+            }
+        )
+        csa = CsaTerms(collateral_currency="EUR", discount_curve=DISCOUNT_CURVE)
+        par = swap_par_rate.__wrapped__(spec, market.curves, csa)  # type: ignore[attr-defined]
+        at_par = spec.model_copy(update={"fixed_rate": par})
+        priced = price_swap.__wrapped__(at_par, market.curves, csa)  # type: ignore[attr-defined]
+        dv01 = swap_dv01.__wrapped__(at_par, market.curves, csa)  # type: ignore[attr-defined]
+
+        curve = market.curves.curve(DISCOUNT_CURVE)
+        floating = [flow for flow in priced.cashflows if flow.leg == "float"]
+        identity = spec.notional * (
+            curve.discount_at(min(flow.accrual_start for flow in floating))
+            - curve.discount_at(max(flow.accrual_end for flow in floating))
+        )
+        return (
+            ("Curve date", market.report_date.isoformat()),
+            ("Index", f"{DISCOUNT_CURVE} compounded daily"),
+            ("Discount curve", DISCOUNT_CURVE),
+            ("Both legs pay", "annually"),
+            ("Notional", round(spec.notional, 2)),
+            ("Effective", spec.effective.isoformat()),
+            ("Maturity", spec.maturity.isoformat()),
+            ("Par rate %", round(par * 100, 6)),
+            ("PV at par", round(priced.pv, 6)),
+            ("Annuity", round(priced.annuity, 2)),
+            ("DV01 (+1bp)", round(dv01, 2)),
+            ("Compounded payments", len(floating)),
+            ("Float leg PV", round(priced.float_leg_pv, 4)),
+            ("N x (D(0) - D(T))", round(identity, 4)),
+            ("Identity residual", round(abs(priced.float_leg_pv - identity), 8)),
         )
 
     def _swpm_trade(self, market: SwapMarket) -> SwapSpec:
