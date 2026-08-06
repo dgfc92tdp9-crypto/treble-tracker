@@ -525,9 +525,23 @@ phase_2:
                   facts on the matched day the EUR surface gives 12 nodes at
                   21% coverage with most nodes under 20% dispersion, against
                   8 nodes at 14% and 84-105% dispersion from the ad-hoc
-                  script. Outstanding: a per-day curve environment, so every
-                  day's prints can be solved against their own curve rather
-                  than only the one day whose curves are built. Basis,
+                  script. build_swap_market now takes a report_date, so
+                  every day's prints solve against their own curve: all
+                  fifteen EUR days build, 1,462 prints solved, grid coverage
+                  79% against 21% from one day. That is where the useful part
+                  ended and a second defect of mine began — pooling fifteen
+                  days at one node raised median dispersion from under 20% to
+                  88%, with nodes at 376%, because volatility moves and the
+                  pool averages fifteen surfaces while reporting today's
+                  date. That is the curve-mixing failure SWPM refuses, and
+                  build_surface had accepted it silently; it now refuses
+                  prints from another day unless pool_days is passed
+                  deliberately, and records the span on the result.
+                  Outstanding: coverage and agreement are in tension —
+                  one day gives 21% coverage with tight nodes, fifteen give
+                  79% with loose ones — and choosing between them is a
+                  modelling decision (most likely a decay-weighted pool) not
+                  yet made. Basis,
                   cross-currency, asset swaps and total return need curves,
                   FX or a price series, all of which exist — those are
                   unbuilt rather than blocked. The OIS trade is reachable
