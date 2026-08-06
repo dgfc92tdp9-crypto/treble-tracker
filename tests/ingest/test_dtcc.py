@@ -592,3 +592,111 @@ class TestTheFloatingLegConventionIsChecked:
             if r["UPI Underlier Name"] in EUR_EURIBOR_6M.underliers
         }
         assert floats == {EUR_EURIBOR_6M.float_day_count}
+
+
+class TestSwaptionPrints:
+    """Option prints on the tape (spec §11.3).
+
+    The tape carries premiums, strikes, first-exercise dates and underlier
+    maturities on real swaptions — everything a volatility can be implied
+    from. This only reads what the file says; the vol solve needs a curve and
+    lives in `analytics`.
+    """
+
+    @staticmethod
+    def _row(**overrides: str) -> dict[str, str]:
+        row = {
+            "Action type": "NEWT",
+            "Event type": "TRAD",
+            "Dissemination Identifier": "4164746906000000101",
+            "UPI FISN": "NA/O Call Epn Fxd Flt EUR",
+            "Strike Price": "0.02939",
+            "Option Premium Amount": "3,339,007.3935",
+            "Notional amount-Leg 1": "420,000,000",
+            "First exercise date": "2027-01-13",
+            "Maturity date of the underlier": "2037-01-13",
+            "Block trade election indicator": "FALSE",
+            "Large notional off-facility swap election indicator": "FALSE",
+        }
+        row.update(overrides)
+        return row
+
+    def test_a_swaption_print_is_read(self) -> None:
+        from treble.ingest.dtcc import swaption_prints
+
+        prints = swaption_prints([self._row()], date(2026, 7, 13))
+        assert len(prints) == 1
+        subject, values = prints[0]
+        assert str(subject).startswith("swaption:EUR:")
+        assert values["PAYER"] is True
+        assert values["STRIKE"] == pytest.approx(0.02939)
+        assert values["PREMIUM_FRACTION"] == pytest.approx(3_339_007.3935 / 420_000_000)
+        assert values["EXPIRY_DATE"] == date(2027, 1, 13)
+        assert values["UNDERLIER_MATURITY"] == date(2037, 1, 13)
+
+    def test_a_receiver_is_not_a_payer(self) -> None:
+        """ "Call" is a payer in the FISN's vocabulary and "P" a receiver.
+        Getting this backwards prices every option on the wrong side of the
+        forward and still produces a plausible volatility."""
+        from treble.ingest.dtcc import swaption_prints
+
+        _, values = swaption_prints(
+            [self._row(**{"UPI FISN": "NA/O P Epn Fxd Flt EUR"})], date(2026, 7, 13)
+        )[0]
+        assert values["PAYER"] is False
+
+    def test_a_print_without_the_underlier_maturity_is_skipped(self) -> None:
+        """Expiry alone puts a swaption on no grid: "1Y into what?" has no
+        answer, and a guessed tenor is a wrong label on a real premium."""
+        from treble.ingest.dtcc import swaption_prints
+
+        assert (
+            swaption_prints(
+                [self._row(**{"Maturity date of the underlier": ""})], date(2026, 7, 13)
+            )
+            == ()
+        )
+
+    def test_amendments_and_corrections_are_excluded(self) -> None:
+        """The same lifecycle filter the curve build uses: an amendment
+        references an existing trade and would count the contract twice."""
+        from treble.ingest.dtcc import swaption_prints
+
+        assert swaption_prints([self._row(**{"Action type": "CORR"})], date(2026, 7, 13)) == ()
+        assert swaption_prints([self._row(**{"Event type": "NOVA"})], date(2026, 7, 13)) == ()
+
+    def test_a_capped_notional_is_flagged_not_dropped(self) -> None:
+        """The premium is real and the notional is a floor, so the premium
+        fraction is too large and the implied vol is biased upward. The print
+        is still the only thing the market said."""
+        from treble.ingest.dtcc import swaption_prints
+
+        _, values = swaption_prints(
+            [self._row(**{"Block trade election indicator": "TRUE"})], date(2026, 7, 13)
+        )[0]
+        assert values["NOTIONAL_CAPPED"] is True
+
+    def test_a_trailing_plus_on_the_notional_still_parses(self) -> None:
+        """The CFTC writes a capped size as `784044998+`. Read naively that
+        is not a number at all and the print would be silently lost."""
+        from treble.ingest.dtcc import _decimal
+
+        assert _decimal("784,044,998+") == pytest.approx(784_044_998.0)
+
+    def test_an_expiry_before_the_report_date_is_skipped(self) -> None:
+        """An option that has already expired has no time value to imply a
+        volatility from."""
+        from treble.ingest.dtcc import swaption_prints
+
+        assert swaption_prints([self._row()], date(2028, 1, 1)) == ()
+
+    def test_a_currency_with_no_curve_is_skipped(self) -> None:
+        """A premium in a currency this system builds no curve for cannot be
+        turned into a volatility, so storing it would be storing something
+        permanently unusable."""
+        from treble.ingest.dtcc import swaption_prints
+
+        assert (
+            swaption_prints([self._row(**{"UPI FISN": "NA/O Call Epn OIS MXN"})], date(2026, 7, 13))
+            == ()
+        )

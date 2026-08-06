@@ -304,6 +304,25 @@ def _as_date(value: str | None) -> date | None:
         return None
 
 
+def _decimal(value: str | None) -> float | None:
+    """A tape number, or None.
+
+    Notionals arrive comma-grouped and may carry a trailing `+` — the CFTC's
+    marker for a capped size, meaning "this much or more". The `+` is
+    stripped so the number parses, and the cap itself is recorded separately
+    rather than being inferred from punctuation at the point of use.
+    """
+    if value is None:
+        return None
+    cleaned = value.strip().replace(",", "").rstrip("+")
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
 def _live_prints(rows: Sequence[dict[str, str]]) -> list[dict[str, str]]:
     """New trades, with anything later flagged as an error removed.
 
@@ -414,6 +433,88 @@ def par_rates(
     return tuple(observations)
 
 
+#: Currencies whose swaption prints are read. Named rather than discovered:
+#: a surface needs a discount and forecast curve in the same currency to turn
+#: a premium into a volatility, and this repository builds those for EUR and
+#: USD only. A print in a currency with no curve would be stored and never
+#: usable.
+SWAPTION_CURRENCIES: tuple[str, ...] = ("EUR", "USD", "GBP", "JPY")
+
+
+def swaption_prints(
+    rows: Sequence[dict[str, str]], report_date: date
+) -> tuple[tuple[TUID, dict[str, object]], ...]:
+    """Executed swaptions on the tape, as (subject, fields) pairs.
+
+    The tape carries option premiums, strikes, first-exercise dates and
+    underlier maturities on real swaption trades — everything a volatility
+    can be implied from. Turning a premium into a volatility needs a curve,
+    so that happens in `analytics`; this only reads what the file says.
+
+    **Only prints with a derivable expiry-into-tenor.** `First exercise date`
+    gives the option's expiry and `Maturity date of the underlier` the swap's
+    maturity, and a swaption without both is a point on no grid. Roughly a
+    third of the option prints lack the underlier maturity and are skipped
+    rather than assigned a guessed tenor.
+
+    The same lifecycle filter as `par_rates`: new trades only, so an
+    amendment cannot count a contract twice.
+    """
+    out: list[tuple[TUID, dict[str, object]]] = []
+    for row in rows:
+        if row.get("Action type") != "NEWT" or row.get("Event type") != "TRAD":
+            continue
+        fisn = row.get("UPI FISN") or ""
+        if "/O " not in fisn:
+            continue
+        currency = next((c for c in SWAPTION_CURRENCIES if c in fisn), None)
+        if currency is None:
+            continue
+        try:
+            expiry = date.fromisoformat((row.get("First exercise date") or "")[:10])
+            underlier = date.fromisoformat((row.get("Maturity date of the underlier") or "")[:10])
+            strike = _decimal(row.get("Strike Price"))
+            premium = _decimal(row.get("Option Premium Amount"))
+            notional = _decimal(row.get("Notional amount-Leg 1"))
+        except (ValueError, TypeError):
+            continue
+        # Narrowed individually rather than with `None in (...)`: the tuple
+        # form satisfies a reader and not a type checker, and mypy is right
+        # that `premium / notional` is unreachable knowledge otherwise.
+        if strike is None or premium is None or notional is None or notional <= 0:
+            continue
+        if underlier <= expiry or expiry <= report_date:
+            continue
+
+        identifier = row.get("Dissemination Identifier") or ""
+        if not identifier:
+            continue
+        capped = (row.get("Block trade election indicator") or "").upper() == "TRUE" or (
+            row.get("Large notional off-facility swap election indicator") or ""
+        ).upper() == "TRUE"
+        out.append(
+            (
+                TUID(f"swaption:{currency}:{identifier}"),
+                {
+                    # "Call" is a payer in the FISN's vocabulary; "P" a receiver.
+                    "PAYER": "Call" in fisn,
+                    "STRIKE": strike,
+                    # Premium as a fraction of notional: the two are in the
+                    # same currency, and the ratio is what a vol solve needs.
+                    "PREMIUM_FRACTION": premium / notional,
+                    "EXPIRY_DATE": expiry,
+                    "UNDERLIER_MATURITY": underlier,
+                    "CURRENCY": currency,
+                    # A capped notional makes the premium fraction too large,
+                    # so the implied vol is biased upward. Carried rather than
+                    # dropped: the print is real, its size is a floor.
+                    "NOTIONAL_CAPPED": capped,
+                },
+            )
+        )
+    return tuple(out)
+
+
 class DtccSdrRatesAdapter(SourceAdapter):
     """Daily CFTC interest-rate cumulative files, reduced to curve points."""
 
@@ -520,4 +621,20 @@ class DtccSdrRatesAdapter(SourceAdapter):
                             provenance_id=provenance.id,
                         )
                     )
+        for subject, values in swaption_prints(rows, report_date):
+            # `entry` rather than `value`: the curve loop above binds `value`
+            # as a float, and reusing the name here makes mypy read this
+            # dict's `object` values as that float.
+            for field, entry in values.items():
+                facts.append(
+                    Fact(
+                        subject=subject,
+                        field=field,
+                        value=entry,
+                        effective_from=report_date,
+                        effective_to=report_date,
+                        knowledge_from=payload.fetched_at,
+                        provenance_id=provenance.id,
+                    )
+                )
         return ParsedBatch(provenance=(provenance,), facts=tuple(facts))

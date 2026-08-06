@@ -490,8 +490,18 @@ phase_2:
                   Black's was 3.5x, with comparable dispersion. Bachelier is
                   kept because it is independently right for EUR and JPY and
                   is defined at or below a zero forward where Black is not.
-                  Two explanations eliminated, the anomaly open, and it is
-                  recorded as open. The surface itself now ships
+                  Two explanations eliminated — and then the anomaly
+                  itself largely explained, on the third attempt, by a defect
+                  in my own measurement: the exploratory script priced
+                  2026-07-13 prints against a 2026-07-31 curve, an
+                  eighteen-day-stale forward that misplaces every trade's
+                  moneyness and inflates the wings most. With print day
+                  matched to curve day, node dispersion falls from 84-105% to
+                  0-17%, off-moneyness exclusions from 16% to 4%, and p90/p10
+                  from 9.53 to 2.64. A contributor rather than the whole
+                  story, since 2.64x is still wide — but two commits had
+                  recorded the wings as unexplained when the leading
+                  explanation was a date mismatch in the measuring script. The surface itself now ships
                   (treble/analytics/vol/surface.py), built from the
                   near-the-money prints only, which does not require the wing
                   question answered. It refuses the three things that would
@@ -507,7 +517,17 @@ phase_2:
                   level. That is not yet a usable market surface, and the
                   object says so through its own fields rather than through a
                   caveat somebody has to remember. What it needs is more
-                  days: the machinery is done and the sample is one file. Basis,
+                  days, and it now has them. The DTCC adapter emits
+                  swaption prints as facts (treble/ingest/dtcc.py
+                  swaption_prints), replaying the fifteen stored payloads
+                  with no network to give 7,975 prints across USD (4,797),
+                  EUR (2,200), GBP (494) and JPY (484). Built from stored
+                  facts on the matched day the EUR surface gives 12 nodes at
+                  21% coverage with most nodes under 20% dispersion, against
+                  8 nodes at 14% and 84-105% dispersion from the ad-hoc
+                  script. Outstanding: a per-day curve environment, so every
+                  day's prints can be solved against their own curve rather
+                  than only the one day whose curves are built. Basis,
                   cross-currency, asset swaps and total return need curves,
                   FX or a price series, all of which exist — those are
                   unbuilt rather than blocked. The OIS trade is reachable

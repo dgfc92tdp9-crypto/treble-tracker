@@ -29,14 +29,21 @@ here interpolates between them.
 61 EUR swaptions solved on the 2026-07-13 file, and the results are too
 dispersed to interpolate: two receivers with the same strike and forward
 implied 68.0% and 7.7%, and deep out-of-the-money receivers implied 137-156%.
-The dispersion is explained by *moneyness*, and by nothing else tested:
-trades within 10% of the money have a median 39.1% and those outside it
-137.5%. Capped notionals do not account for it (one of the six extremes is
-flagged), nor do non-standard terms, nor expiry. Reading a normal-vol market
-lognormally does not either — :func:`implied_normal_vol` was added to test
-that and shows the same 2.7x step. Two explanations eliminated, the anomaly
-open. The machinery below is correct and tested; turning prints into a
-surface is not done, and would be built on nine trades nobody has explained.
+**The dispersion was substantially my own doing, found on the third
+attempt.** The exploratory script that produced those numbers priced
+2026-07-13 prints against a 2026-07-31 curve — an eighteen-day-stale forward,
+which puts the moneyness of every trade in the wrong place and inflates the
+wings most. Running the same code with the print day matched to the curve
+day: node dispersion falls from 84-105% to 0-17%, the share of trades outside
+the moneyness band from 16% to 4%, and p90/p10 across all solved vols from
+9.53 to 2.64.
+
+It is a contributor rather than the whole story — the lag effect across
+fifteen days is noisy, and 2.64x dispersion at zero lag is still wide for a
+market surface. But two earlier commits recorded the wings as unexplained
+when the leading explanation was a date mismatch in the measurement, which
+is the same failure as reporting an untested attribution: the difference is
+only that this one was in a script rather than a docstring.
 """
 
 from __future__ import annotations
