@@ -349,7 +349,7 @@ phase_2:
                   by an assertion that the maximum sits at the longest
                   maturity, so it cannot double as a hiding place. Also
                   outstanding: the older IBOR grids are not wired"}
-  P2_6:  {done: 0.85, name: "SWPM multi-curve CSA-aware discounting",
+  P2_6:  {done: 0.9, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
                   bootstrapped against an exogenous discount curve (never
@@ -387,7 +387,34 @@ phase_2:
                   30 cash flows, and the basis per tenor. Counted 0.85
                   rather than 1.0 because the trade is a template rather
                   than a bookable position, and because the §12.1 product
-                  set above is genuinely part of what SWPM means"}
+                  set above is genuinely part of what SWPM means.
+                  OIS legs with daily compounding now ship, which removes the
+                  first product on that list. They had been refused rather
+                  than approximated, and the refusal was right: scheduling an
+                  overnight index as discrete periods values a different
+                  instrument. What makes them supportable without a daily
+                  loop is that compounding the curve's own daily forwards
+                  telescopes — prod P(t_i)/P(t_i+1) = P(start)/P(end) — so the
+                  compounded growth over a period is exactly the ratio of
+                  discount factors, and no daily iteration could be more
+                  accurate than the curve it would read. What genuinely
+                  differed was the schedule, so the trade now states
+                  `float_frequency`; an overnight curve with none is still
+                  refused, because assuming the market's annual convention
+                  would value a quarterly-paying trade as an annual one
+                  silently. Validated exactly rather than to a tolerance: a
+                  self-discounted compounded leg equals N*(D(start)-D(end))
+                  to 0.00000000 on the live ESTR curve, a par OIS swap prices
+                  to zero, and paying annually or quarterly gives the same
+                  leg value — which a model that got the compounding wrong
+                  would not. Cashflows carry `compounded` so a schedule says
+                  which convention set the rate rather than leaving it to be
+                  inferred from the curve's name. Note for the remaining
+                  list: only swaptions/caps/floors, CMS and
+                  cancellable/extendible need a volatility surface. Basis,
+                  cross-currency, asset swaps and total return need curves,
+                  FX or a price series, all of which exist — those are
+                  unbuilt rather than blocked"}
   P2_7:  {done: 0.95, name: "Canvas with FDC3 context propagation",
           basis: "the criterion's named semantic ships and is
                   mutation-verified 6/6. Colour-group context propagation

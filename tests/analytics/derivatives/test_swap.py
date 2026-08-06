@@ -300,12 +300,18 @@ class TestRefusals:
         with pytest.raises(SwapPricingError, match="already fixed"):
             price_swap(make_swap(effective=date(2025, 7, 2)), curves, usd_csa)
 
-    def test_an_overnight_curve_cannot_forecast_an_index_leg(
+    def test_an_overnight_curve_still_needs_a_stated_payment_frequency(
         self, curves: CurveSet, usd_csa: CsaTerms
     ) -> None:
-        """An overnight index compounds daily within each period; scheduling
-        it as discrete index periods would value a different instrument."""
-        with pytest.raises(SwapPricingError, match="forecasts no index tenor"):
+        """Overnight legs are now supported as *compounded* legs, but an
+        overnight index has no tenor to schedule from.
+
+        The refusal used to be "OIS legs are not supported"; it is now
+        "say how often this one pays". The trade is still refused rather than
+        priced, because assuming the market's annual convention would value a
+        quarterly-paying trade as an annual one without saying so.
+        """
+        with pytest.raises(SwapPricingError, match="no tenor to schedule from"):
             price_swap(make_swap(forecast_curve=OIS_NAME), curves, usd_csa)
 
     def test_an_unknown_forecast_curve_is_named(self, curves: CurveSet, usd_csa: CsaTerms) -> None:
@@ -380,3 +386,157 @@ class TestCsaResolution:
             price_swap(make_swap(), curves, with_mta).value.pv
             == price_swap(make_swap(), curves, usd_csa).value.pv
         )
+
+
+class TestCompoundedOvernightLegs:
+    """OIS legs — spec §12.1's "OIS legs (daily compounding)".
+
+    These were refused rather than approximated: an overnight index compounds
+    daily and scheduling it as discrete index periods values a different
+    instrument. What makes them supportable without a daily loop is that
+    compounding the curve's *own* daily forwards telescopes —
+
+        prod_i P(t_i)/P(t_i+1) = P(start)/P(end)
+
+    — so the compounded growth over a period is exactly the ratio of the
+    curve's discount factors. No daily iteration can be more accurate than
+    the curve it would be reading. What genuinely differs from a term-index
+    leg is the *schedule*, and that is what the trade now states.
+    """
+
+    def test_a_self_discounted_compounded_leg_equals_the_telescoping_identity(
+        self, curves: CurveSet, usd_csa: CsaTerms
+    ) -> None:
+        """The strongest available check, and it holds exactly rather than to
+        a tolerance: a floating leg discounted on its own curve is worth
+        `N * (D(start) - D(end))`, whatever the schedule in between."""
+        spec = SwapSpec(
+            notional=NOTIONAL,
+            fixed_rate=0.03,
+            effective=SPOT,
+            maturity=TEN_YEAR,
+            forecast_curve=OIS_NAME,
+            float_frequency=1,
+        )
+        priced = price_swap.__wrapped__(spec, curves, usd_csa)
+        curve = curves.curve(OIS_NAME)
+        flows = [f for f in priced.cashflows if f.leg == "float"]
+        identity = NOTIONAL * (
+            curve.discount_at(min(f.accrual_start for f in flows))
+            - curve.discount_at(max(f.accrual_end for f in flows))
+        )
+        assert priced.float_leg_pv == pytest.approx(identity, abs=1e-6)
+
+    def test_a_par_ois_swap_prices_to_zero(self, curves: CurveSet, usd_csa: CsaTerms) -> None:
+        spec = SwapSpec(
+            notional=NOTIONAL,
+            fixed_rate=0.0,
+            effective=SPOT,
+            maturity=TEN_YEAR,
+            forecast_curve=OIS_NAME,
+            float_frequency=1,
+        )
+        par = swap_par_rate.__wrapped__(spec, curves, usd_csa)
+        priced = price_swap.__wrapped__(
+            spec.model_copy(update={"fixed_rate": par}), curves, usd_csa
+        )
+        assert priced.pv == pytest.approx(0.0, abs=1e-6)
+
+    def test_the_schedule_comes_from_the_trade_not_the_curve(
+        self, curves: CurveSet, usd_csa: CsaTerms
+    ) -> None:
+        """An overnight curve has no tenor to schedule from, so the same
+        trade at annual and quarterly must produce different schedules."""
+        base = {
+            "notional": NOTIONAL,
+            "fixed_rate": 0.03,
+            "effective": SPOT,
+            "maturity": TEN_YEAR,
+            "forecast_curve": OIS_NAME,
+        }
+        annual = price_swap.__wrapped__(SwapSpec(**base, float_frequency=1), curves, usd_csa)
+        quarterly = price_swap.__wrapped__(SwapSpec(**base, float_frequency=4), curves, usd_csa)
+        assert len([f for f in annual.cashflows if f.leg == "float"]) == 10
+        assert len([f for f in quarterly.cashflows if f.leg == "float"]) == 40
+
+    def test_the_payment_frequency_does_not_change_the_legs_value(
+        self, curves: CurveSet, usd_csa: CsaTerms
+    ) -> None:
+        """A consequence of telescoping worth pinning: paying the compounded
+        rate annually or quarterly moves *when* cash arrives but not what the
+        self-discounted leg is worth. A model that got the compounding wrong
+        would show these diverging."""
+        base = {
+            "notional": NOTIONAL,
+            "fixed_rate": 0.03,
+            "effective": SPOT,
+            "maturity": TEN_YEAR,
+            "forecast_curve": OIS_NAME,
+        }
+        annual = price_swap.__wrapped__(SwapSpec(**base, float_frequency=1), curves, usd_csa)
+        quarterly = price_swap.__wrapped__(SwapSpec(**base, float_frequency=4), curves, usd_csa)
+        assert annual.float_leg_pv == pytest.approx(quarterly.float_leg_pv, abs=1e-6)
+
+    def test_an_overnight_curve_without_a_stated_frequency_is_refused(
+        self, curves: CurveSet, usd_csa: CsaTerms
+    ) -> None:
+        """Assuming the market's annual convention would value a
+        quarterly-paying trade as an annual one without saying so."""
+        spec = SwapSpec(
+            notional=NOTIONAL,
+            fixed_rate=0.03,
+            effective=SPOT,
+            maturity=TEN_YEAR,
+            forecast_curve=OIS_NAME,
+        )
+        with pytest.raises(SwapPricingError, match="no tenor to schedule from"):
+            price_swap.__wrapped__(spec, curves, usd_csa)
+
+    def test_compounded_flows_say_so_and_term_index_flows_do_not(
+        self, curves: CurveSet, usd_csa: CsaTerms
+    ) -> None:
+        """On a schedule both read as "the floating rate for this period".
+        They come from different conventions, so the flow says which."""
+        ois = price_swap.__wrapped__(
+            SwapSpec(
+                notional=NOTIONAL,
+                fixed_rate=0.03,
+                effective=SPOT,
+                maturity=TEN_YEAR,
+                forecast_curve=OIS_NAME,
+                float_frequency=1,
+            ),
+            curves,
+            usd_csa,
+        )
+        term = price_swap.__wrapped__(
+            SwapSpec(
+                notional=NOTIONAL,
+                fixed_rate=0.03,
+                effective=SPOT,
+                maturity=TEN_YEAR,
+                forecast_curve=FORECAST_NAME,
+            ),
+            curves,
+            usd_csa,
+        )
+        assert all(f.compounded for f in ois.cashflows if f.leg == "float")
+        assert not any(f.compounded for f in term.cashflows if f.leg == "float")
+
+    def test_a_term_index_leg_still_schedules_from_its_curve(
+        self, curves: CurveSet, usd_csa: CsaTerms
+    ) -> None:
+        """Regression: a 3M index leg pays quarterly by construction, and
+        adding `float_frequency` must not have made that optional."""
+        priced = price_swap.__wrapped__(
+            SwapSpec(
+                notional=NOTIONAL,
+                fixed_rate=0.03,
+                effective=SPOT,
+                maturity=TEN_YEAR,
+                forecast_curve=FORECAST_NAME,
+            ),
+            curves,
+            usd_csa,
+        )
+        assert len([f for f in priced.cashflows if f.leg == "float"]) == 40

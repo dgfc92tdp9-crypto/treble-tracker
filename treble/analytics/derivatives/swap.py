@@ -82,6 +82,13 @@ class SwapSpec(BaseModel):
     calendar: Market = Market.US_SETTLEMENT
     #: Notional steps, in date order. Empty means a constant notional.
     amortisation: tuple[NotionalStep, ...] = ()
+    #: Floating payment frequency. `None` takes it from the forecast curve's
+    #: index tenor, which is right for a term index — a 6M EURIBOR leg pays
+    #: every six months by construction. An overnight index has no tenor to
+    #: take it from, so an OIS leg must state it; market convention is annual
+    #: on both legs, and this refuses rather than assuming that for a trade
+    #: that might be quarterly.
+    float_frequency: int | None = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def _coherent(self) -> SwapSpec:
@@ -126,6 +133,12 @@ class Cashflow(BaseModel):
     amount: float
     discount_factor: float
     present_value: float
+    #: Whether `rate` is a daily-compounded overnight rate rather than a
+    #: discrete index forward. On a schedule the two look identical — both
+    #: read as "the floating rate for this period" — and they come from
+    #: different conventions, so the flow says which instead of leaving a
+    #: reader to infer it from the curve's name.
+    compounded: bool = False
 
 
 class SwapPricing(BaseModel):
@@ -220,11 +233,20 @@ def _float_flows(spec: SwapSpec, discount: Curve, forecast: Curve) -> tuple[Cash
     Both times are converted by the forecast curve, so a difference in day
     count between the two curves cannot leak into the projection.
     """
-    dates = _schedule(spec, forecast.config.index_frequency)
+    compounded = forecast.config.index_tenor is None
+    frequency = spec.float_frequency or forecast.config.index_frequency
+    dates = _schedule(spec, frequency)
     flows = []
     for start, end in pairwise(dates):
         notional = spec.notional_at(start)
         accrual = _accrual(spec.float_day_count, start, end)
+        # For a term index this is the discrete forward. For an overnight
+        # index it is the *daily-compounded* rate over the period, and the
+        # two share a formula for a real reason rather than by approximation:
+        # compounding the curve's own daily forwards telescopes,
+        #     prod_i P(t_i)/P(t_i+1) = P(start)/P(end),
+        # so the compounded growth is exactly this ratio. No daily loop can
+        # be more accurate than the curve it would be reading.
         growth = forecast.discount_at(start) / forecast.discount_at(end) - 1.0
         forward = growth / accrual
         rate = forward + spec.float_spread
@@ -233,6 +255,7 @@ def _float_flows(spec: SwapSpec, discount: Curve, forecast: Curve) -> tuple[Cash
         flows.append(
             Cashflow(
                 leg="float",
+                compounded=compounded,
                 accrual_start=start,
                 accrual_end=end,
                 notional=notional,
@@ -250,12 +273,12 @@ def _resolve_curves(spec: SwapSpec, curves: CurveSet, csa: CsaTerms) -> tuple[Cu
     """The discount curve (from the CSA) and the forecast curve (from the trade)."""
     discount = csa.resolve(curves)
     forecast = curves.curve(spec.forecast_curve)
-    if forecast.config.index_tenor is None:
+    if forecast.config.index_tenor is None and spec.float_frequency is None:
         raise SwapPricingError(
-            f"{spec.forecast_curve!r} forecasts no index tenor. An overnight index "
-            "compounds daily within each period; scheduling it as discrete index "
-            "periods would value a different instrument, so OIS legs are refused "
-            "rather than approximated"
+            f"{spec.forecast_curve!r} forecasts an overnight index, which has no tenor "
+            "to schedule from. Set `float_frequency` to say how often the compounded "
+            "leg pays — assuming the market's annual convention would value a "
+            "quarterly-paying trade as an annual one without saying so"
         )
     if spec.effective < curves.as_of:
         raise SwapPricingError(
