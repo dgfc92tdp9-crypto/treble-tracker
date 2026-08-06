@@ -1,0 +1,22 @@
+SWAP MANAGER · EURIBOR 3M / 6M TENOR BASIS
+────────────────────────────────────────────────────────────────────────────
+Float versus float: the spread on the 3M leg against a 6M leg, per tenor.
+RATIO is basis ÷ quote gap — the annuity ratio, and it should be flat.
+
+TENOR    3M %      6M %      QUOTE bp    BASIS bp    RATIO
++------------------------------------------------------------------------------+
+|[table_scroll:sys:swpm_basis]                                                 |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Both legs discount on ESTR; self-discounting each would erase the basis.

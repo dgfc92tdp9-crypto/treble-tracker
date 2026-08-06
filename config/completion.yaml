@@ -349,7 +349,7 @@ phase_2:
                   by an assertion that the maximum sits at the longest
                   maturity, so it cannot double as a hiding place. Also
                   outstanding: the older IBOR grids are not wired"}
-  P2_6:  {done: 0.94, name: "SWPM multi-curve CSA-aware discounting",
+  P2_6:  {done: 0.96, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
                   bootstrapped against an exogenous discount curve (never
@@ -450,7 +450,15 @@ phase_2:
                   'float', losing which side each row belonged to; and
                   BasisSwapSpec defaulted to a different calendar from
                   SwapSpec, so the same leg priced 0.03 apart on 35.6m in the
-                  two. Both fixed and pinned"}
+                  two. Both fixed and pinned. The basis reaches a screen
+                  as well: a fifth SWPM tab shows the 3M/6M term structure
+                  across six tenors on the live curves, with the par spread
+                  beside the two curves' quote difference and the ratio
+                  between them. That ratio is the annuity ratio and should be
+                  flat; measured 0.973 to 0.975 from 2Y to 10Y, so a reader
+                  can check the engine against the market data on the same
+                  row rather than taking the spread on trust. A day with no
+                  3M curve says so instead of drawing an empty table"}
   P2_7:  {done: 0.95, name: "Canvas with FDC3 context propagation",
           basis: "the criterion's named semantic ships and is
                   mutation-verified 6/6. Colour-group context propagation

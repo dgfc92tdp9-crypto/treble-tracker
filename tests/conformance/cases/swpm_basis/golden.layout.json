@@ -1,0 +1,154 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SWAP MANAGER · EURIBOR 3M / 6M TENOR BASIS"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Float versus float: the spread on the 3M leg against a 6M leg, per tenor."
+    },
+    {
+      "at": [
+        3,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "RATIO is basis ÷ quote gap — the annuity ratio, and it should be flat."
+    },
+    {
+      "at": [
+        5,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TENOR    3M %      6M %      QUOTE bp    BASIS bp    RATIO"
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Both legs discount on ESTR; self-discounting each would erase the basis."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "SWPM",
+  "panes": [
+    {
+      "binding": "sys:swpm_basis",
+      "data": [
+        [
+          "2Y",
+          2.912,
+          3.0107,
+          9.87,
+          9.61,
+          0.973
+        ],
+        [
+          "3Y",
+          2.9185,
+          3.027,
+          10.85,
+          10.58,
+          0.975
+        ],
+        [
+          "4Y",
+          2.909,
+          3.013,
+          10.4,
+          10.14,
+          0.975
+        ],
+        [
+          "5Y",
+          2.938,
+          3.0497,
+          11.17,
+          10.88,
+          0.974
+        ],
+        [
+          "7Y",
+          2.9955,
+          3.106,
+          11.05,
+          10.77,
+          0.975
+        ],
+        [
+          "10Y",
+          3.1082,
+          3.2178,
+          10.96,
+          10.68,
+          0.974
+        ]
+      ],
+      "region": [
+        6,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "basis"
+}

@@ -263,6 +263,7 @@ class LocalTapi:
         "sys:swpm_valuation",
         "sys:swpm_cashflows",
         "sys:swpm_ois",
+        "sys:swpm_basis",
         "sys:allq",
         "sys:allq_composites",
         "sys:port_summary",
@@ -496,6 +497,7 @@ class LocalTapi:
             "sys:swpm_valuation",
             "sys:swpm_cashflows",
             "sys:swpm_ois",
+            "sys:swpm_basis",
         ):
             return self._swpm(binding, as_of=as_of)
         if binding in ("sys:allq", "sys:allq_composites"):
@@ -635,6 +637,9 @@ class LocalTapi:
 
         if binding == "sys:swpm_ois":
             return self._swpm_ois(market)
+
+        if binding == "sys:swpm_basis":
+            return self._swpm_basis(market)
 
         spec = self._swpm_trade(market)
         csa = CsaTerms(collateral_currency="EUR", discount_curve=DISCOUNT_CURVE)
@@ -846,6 +851,67 @@ class LocalTapi:
             ("Factor share of variance %", round(risk.factor_share * 100, 1)),
             *((f"Marginal: {name}", round(value * 100, 3)) for name, value in largest),
         )
+
+    def _swpm_basis(self, market: SwapMarket) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """The EURIBOR 3M/6M tenor basis, per tenor.
+
+        Shows the basis-swap par spread beside the difference in the two
+        curves' own input quotes. They are not equal and should not be: the
+        spread is quoted on a quarterly ACT/360 leg while the quotes are par
+        rates against an annual 30/360 fixed leg, so the ratio between them
+        is the annuity ratio. Printing both puts that where a reader can
+        check it, and a ratio that stopped being flat across tenors would be
+        visible at once.
+        """
+        import QuantLib as ql
+
+        from treble.analytics import _ql
+        from treble.analytics.derivatives.basis import BasisSwapSpec, price_basis_swap
+        from treble.analytics.derivatives.csa import CsaTerms
+        from treble.tapi.swap_market import (
+            CALENDAR,
+            DISCOUNT_CURVE,
+            FORECAST_CURVE,
+            SHORT_FORECAST_CURVE,
+            _tenor_years,
+        )
+
+        if not market.short_rates:
+            return (
+                (
+                    f"no {SHORT_FORECAST_CURVE} curve on {market.report_date}: a tenor basis "
+                    "needs two real curves, and interpolating the short one from the long "
+                    "one would make the basis a property of the interpolator",
+                ),
+            )
+
+        csa = CsaTerms(collateral_currency="EUR", discount_curve=DISCOUNT_CURVE)
+        calendar = _ql.calendar(CALENDAR)
+        start = _ql.to_ql_date(market.report_date)
+        rows: list[tuple[str | float | int | None, ...]] = []
+        for tenor in sorted(set(market.short_rates) & set(market.forecast_rates), key=_tenor_years):
+            maturity = _ql.from_ql_date(calendar.advance(start, ql.Period(tenor)))
+            spec = BasisSwapSpec(
+                notional=100_000_000.0,
+                effective=market.report_date,
+                maturity=maturity,
+                pay_curve=SHORT_FORECAST_CURVE,
+                receive_curve=FORECAST_CURVE,
+                calendar=CALENDAR,
+            )
+            priced = price_basis_swap.__wrapped__(spec, market.curves, csa)  # type: ignore[attr-defined]
+            quote_gap = (market.forecast_rates[tenor] - market.short_rates[tenor]) * 1e4
+            rows.append(
+                (
+                    tenor,
+                    round(market.short_rates[tenor] * 100, 4),
+                    round(market.forecast_rates[tenor] * 100, 4),
+                    round(quote_gap, 2),
+                    round(priced.par_spread_bp, 2),
+                    round(priced.par_spread_bp / quote_gap, 3) if quote_gap else None,
+                )
+            )
+        return tuple(rows)
 
     def _swpm_ois(self, market: SwapMarket) -> tuple[tuple[str | float | int | None, ...], ...]:
         """A spot-starting 10-year ESTR OIS, struck at its own par rate.

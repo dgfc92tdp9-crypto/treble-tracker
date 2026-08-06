@@ -152,3 +152,36 @@ tabs:
         at: {row: 21, col: 0}
         text: "No lookback, lockout or payment delay: a real SOFR trade sets those."
         attrs: [label]
+
+  - name: basis
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SWAP MANAGER · EURIBOR 3M / 6M TENOR BASIS"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Float versus float: the spread on the 3M leg against a 6M leg, per tenor."
+        attrs: [label]
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "RATIO is basis ÷ quote gap — the annuity ratio, and it should be flat."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "TENOR    3M %      6M %      QUOTE bp    BASIS bp    RATIO"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 6, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:swpm_basis"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Both legs discount on ESTR; self-discounting each would erase the basis."
+        attrs: [label]

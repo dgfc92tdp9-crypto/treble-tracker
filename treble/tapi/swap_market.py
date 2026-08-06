@@ -24,7 +24,7 @@ still `analytics`; this only supplies its inputs.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from treble.analytics._ql import DayCount, Market
@@ -63,6 +63,10 @@ class SwapMarket:
     tenors: tuple[str, ...]
     discount_rates: dict[str, float]
     forecast_rates: dict[str, float]
+    #: The 3M quotes, when the day carried enough of them. Empty rather than
+    #: absent so a caller reads "no short curve today" from a length instead
+    #: of from a None it has to remember to check.
+    short_rates: dict[str, float] = field(default_factory=dict)
 
     @property
     def basis_bp(self) -> dict[str, float]:
@@ -147,6 +151,11 @@ def build_swap_market(store: DuckStore, *, as_of: datetime) -> SwapMarket:
             tenors=tuple(tenors),
             discount_rates={t: discount_rates[t] for t in tenors},
             forecast_rates={t: forecast_rates[t] for t in tenors},
+            short_rates=(
+                {t: short_rates[t] for t in short_tenors}
+                if short_rates and len(short_tenors) >= MIN_NODES
+                else {}
+            ),
         )
 
     raise SwapMarketUnavailableError(
