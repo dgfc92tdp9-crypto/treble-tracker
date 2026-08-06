@@ -15,12 +15,16 @@ from treble.analytics.vol.swaption import (
     MAX_VOL,
     ImpliedVolError,
     SwaptionQuote,
+    bachelier_swaption,
     black_swaption,
     implied_black_vol,
+    implied_normal_vol,
 )
 
 _price = black_swaption.__wrapped__
 _implied = implied_black_vol.__wrapped__
+_bachelier = bachelier_swaption.__wrapped__
+_implied_normal = implied_normal_vol.__wrapped__
 
 FORWARD, STRIKE, EXPIRY, ANNUITY = 0.030, 0.029, 1.0, 8.5
 
@@ -285,3 +289,136 @@ class TestWhatASinglePrintCanAndCannotSupport:
         exists to keep the question open rather than to check behaviour.
         """
         assert True
+
+
+class TestBachelier:
+    """Normal vol: the EUR/JPY quoting convention, and the one defined at or
+    below a zero forward where Black has no answer at all."""
+
+    @pytest.mark.parametrize("volatility", [0.0002, 0.0020, 0.0080, 0.0200])
+    def test_the_solver_inverts_the_pricer(self, volatility: float) -> None:
+        premium = _bachelier(
+            forward=FORWARD,
+            strike=STRIKE,
+            expiry_years=EXPIRY,
+            volatility=volatility,
+            annuity=ANNUITY,
+        )
+        recovered = _implied_normal(
+            premium_fraction=premium,
+            forward=FORWARD,
+            strike=STRIKE,
+            expiry_years=EXPIRY,
+            annuity=ANNUITY,
+        )
+        assert recovered == pytest.approx(volatility, rel=1e-8)
+
+    def test_put_call_parity_holds_exactly(self) -> None:
+        payer = _bachelier(
+            forward=FORWARD,
+            strike=STRIKE,
+            expiry_years=EXPIRY,
+            volatility=0.008,
+            annuity=ANNUITY,
+            payer=True,
+        )
+        receiver = _bachelier(
+            forward=FORWARD,
+            strike=STRIKE,
+            expiry_years=EXPIRY,
+            volatility=0.008,
+            annuity=ANNUITY,
+            payer=False,
+        )
+        assert payer - receiver == pytest.approx(ANNUITY * (FORWARD - STRIKE), abs=1e-12)
+
+    def test_it_prices_where_black_cannot(self) -> None:
+        """A negative forward is an ordinary Bachelier input and has no Black
+        price at all. This is the reason both exist."""
+        with pytest.raises(ValueError, match="lognormal"):
+            _price(forward=-0.002, strike=0.001, expiry_years=1.0, volatility=0.30, annuity=ANNUITY)
+        priced = _bachelier(
+            forward=-0.002, strike=0.001, expiry_years=1.0, volatility=0.006, annuity=ANNUITY
+        )
+        assert priced > 0.0
+
+    def test_zero_volatility_gives_intrinsic(self) -> None:
+        assert _bachelier(
+            forward=FORWARD,
+            strike=STRIKE,
+            expiry_years=EXPIRY,
+            volatility=0.0,
+            annuity=ANNUITY,
+        ) == pytest.approx(ANNUITY * (FORWARD - STRIKE))
+
+    def test_an_impossible_premium_is_refused(self) -> None:
+        huge = (
+            _bachelier(
+                forward=FORWARD,
+                strike=STRIKE,
+                expiry_years=EXPIRY,
+                volatility=0.10,
+                annuity=ANNUITY,
+            )
+            * 2.0
+        )
+        with pytest.raises(ImpliedVolError, match="Bachelier price"):
+            _implied_normal(
+                premium_fraction=huge,
+                forward=FORWARD,
+                strike=STRIKE,
+                expiry_years=EXPIRY,
+                annuity=ANNUITY,
+            )
+
+    def test_switching_convention_does_not_explain_the_tape_wings(self) -> None:
+        """The hypothesis this was added to test, and it failed.
+
+        Reading a normal-vol market lognormally inflates low strikes, which
+        looked like it might account for the tape's 137-156% wing values.
+        Measured on the live file it does not: normal vol shows the same
+        shape, 120.6bp at the money against 329.3bp outside 10% moneyness —
+        a 2.7x step where Black's was 3.5x.
+
+        Reproduced here in miniature: price a wing option at a *flat* normal
+        vol and invert it lognormally. The lognormal number is far from the
+        at-the-money one, so a flat normal surface does look smiled in Black
+        — but the size of that effect is not what the tape shows.
+        """
+        flat_normal = 0.0080
+        atm = _bachelier(
+            forward=FORWARD,
+            strike=FORWARD,
+            expiry_years=EXPIRY,
+            volatility=flat_normal,
+            annuity=ANNUITY,
+        )
+        wing = _bachelier(
+            forward=FORWARD,
+            strike=FORWARD * 0.667,
+            expiry_years=EXPIRY,
+            volatility=flat_normal,
+            annuity=ANNUITY,
+            payer=False,
+        )
+        atm_ln = _implied(
+            premium_fraction=atm,
+            forward=FORWARD,
+            strike=FORWARD,
+            expiry_years=EXPIRY,
+            annuity=ANNUITY,
+        )
+        wing_ln = _implied(
+            premium_fraction=wing,
+            forward=FORWARD,
+            strike=FORWARD * 0.667,
+            expiry_years=EXPIRY,
+            annuity=ANNUITY,
+            payer=False,
+        )
+        assert wing_ln > atm_ln, "a flat normal surface should look smiled in Black"
+        # …and the ratio it produces is nowhere near the tape's 3.5x.
+        assert wing_ln / atm_ln < 2.0, (
+            "if convention alone produced a 3x step, the tape's wings would be explained "
+            "and this module's docstring is stale"
+        )

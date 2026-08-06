@@ -478,10 +478,22 @@ phase_2:
                   surface — 61 EUR swaptions solved, dispersion too wide to
                   interpolate, two receivers on the same strike and forward
                   implying 68.0% and 7.7% and wing strikes implying 137-156%.
-                  Short expiries are genuinely hypersensitive to the premium;
-                  the wing values are recorded as unexplained rather than
-                  attributed. So the vol *block* is dissolved and the surface
-                  is unbuilt. Basis,
+                  The dispersion is explained by moneyness and by nothing
+                  else tested: within 10% of the money the median is 39.1%,
+                  outside it 137.5%. Capped notionals do not account for it
+                  (one of six extremes is flagged), nor non-standard terms,
+                  nor expiry. A second hypothesis — that this is a normal-vol
+                  market read lognormally, which is the EUR convention — was
+                  tested by adding Bachelier pricing and implied normal vol,
+                  and it fails: normal vol shows the same shape, 120.6bp at
+                  the money against 329.3bp outside, a 2.7x step where
+                  Black's was 3.5x, with comparable dispersion. Bachelier is
+                  kept because it is independently right for EUR and JPY and
+                  is defined at or below a zero forward where Black is not.
+                  Two explanations eliminated, the anomaly open, and it is
+                  recorded as open. So the vol *block* is dissolved and the
+                  surface is unbuilt — building one on nine trades nobody has
+                  explained would be the wrong move. Basis,
                   cross-currency, asset swaps and total return need curves,
                   FX or a price series, all of which exist — those are
                   unbuilt rather than blocked. The OIS trade is reachable

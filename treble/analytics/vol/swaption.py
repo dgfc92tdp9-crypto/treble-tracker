@@ -29,12 +29,14 @@ here interpolates between them.
 61 EUR swaptions solved on the 2026-07-13 file, and the results are too
 dispersed to interpolate: two receivers with the same strike and forward
 implied 68.0% and 7.7%, and deep out-of-the-money receivers implied 137-156%.
-Short expiries are genuinely hypersensitive to the premium, which explains
-some of it. The wing values it does not explain, and no explanation is
-offered here — candidates are a capped notional inflating the premium
-fraction, a premium in another currency, or those rows being a product the
-FISN parse reads as a plain swaption. The machinery below is correct and
-tested; turning prints into a surface is not done.
+The dispersion is explained by *moneyness*, and by nothing else tested:
+trades within 10% of the money have a median 39.1% and those outside it
+137.5%. Capped notionals do not account for it (one of the six extremes is
+flagged), nor do non-standard terms, nor expiry. Reading a normal-vol market
+lognormally does not either — :func:`implied_normal_vol` was added to test
+that and shows the same 2.7x step. Two explanations eliminated, the anomaly
+open. The machinery below is correct and tested; turning prints into a
+surface is not done, and would be built on nine trades nobody has explained.
 """
 
 from __future__ import annotations
@@ -199,11 +201,117 @@ def implied_black_vol(
     return float(brentq(gap, MIN_VOL, MAX_VOL, xtol=1e-10))
 
 
+@model(
+    model_id="vol.bachelier_swaption",
+    version="1.0",
+    spec_section="§11.3",
+    summary="Bachelier (normal) swaption price per unit notional",
+)
+def bachelier_swaption(
+    *,
+    forward: float,
+    strike: float,
+    expiry_years: float,
+    volatility: float,
+    annuity: float,
+    payer: bool = True,
+) -> float:
+    """Normal-vol swaption price, per unit notional.
+
+    The convention EUR and JPY swaptions are quoted in, and the one that
+    works when a forward or strike is at or below zero — where Black has no
+    answer at all rather than a large one.
+    """
+    if expiry_years <= 0.0:
+        raise ValueError("an expired option has no time value; its price is intrinsic")
+    sign = 1.0 if payer else -1.0
+    moneyness = sign * (forward - strike)
+    if volatility <= 0.0:
+        return annuity * max(moneyness, 0.0)
+    total = volatility * math.sqrt(expiry_years)
+    d = moneyness / total
+    density = math.exp(-0.5 * d * d) / math.sqrt(2.0 * math.pi)
+    return annuity * (moneyness * _norm_cdf(d) + total * density)
+
+
+@model(
+    model_id="vol.implied_normal_vol",
+    version="1.0",
+    spec_section="§11.3",
+    summary="Normal volatility implied by a transacted swaption premium",
+)
+def implied_normal_vol(
+    *,
+    premium_fraction: float,
+    forward: float,
+    strike: float,
+    expiry_years: float,
+    annuity: float,
+    payer: bool = True,
+) -> float:
+    """Solve Bachelier for the volatility that reproduces a traded premium.
+
+    **Why this exists.** EUR and JPY swaptions are quoted in normal vol, and
+    Bachelier is defined where Black is not — at or below a zero forward. It
+    belongs here for both reasons independently of anything below.
+
+    **What it does not explain.** It was added to test a hypothesis about the
+    live tape: Black gave a median 39.1% within 10% of the money and 137.5%
+    outside, which looks like the signature of reading a normal-vol market
+    lognormally. Measured, the hypothesis fails. Normal vol shows the same
+    shape — 120.6bp within 10% of the money against 329.3bp outside, a 2.7x
+    step where Black's was 3.5x — and comparable dispersion (p90/p10 of 5.30
+    against Black's 5.03). Both measures price those nine wing trades at
+    roughly three times the at-the-money level, which is too steep for a
+    smile in either convention.
+
+    So the convention is not the answer, and the wing anomaly stands with two
+    explanations now eliminated rather than one. What remains untested: the
+    premium field carrying more than the option premium, the notional not
+    being the swaption's, or those rows not being plain European swaptions
+    despite the FISN.
+    """
+    if premium_fraction <= 0.0:
+        raise ImpliedVolError("a premium of zero or less implies no volatility")
+    intrinsic = annuity * max((forward - strike) if payer else (strike - forward), 0.0)
+    if premium_fraction < intrinsic - 1e-12:
+        raise ImpliedVolError(
+            f"premium {premium_fraction:.8f} is below intrinsic {intrinsic:.8f}; no "
+            "volatility is low enough, so the inputs disagree"
+        )
+
+    def gap(vol: float) -> float:
+        priced: float = bachelier_swaption.__wrapped__(  # type: ignore[attr-defined]
+            forward=forward,
+            strike=strike,
+            expiry_years=expiry_years,
+            volatility=vol,
+            annuity=annuity,
+            payer=payer,
+        )
+        return priced - premium_fraction
+
+    # Normal vol is an absolute rate move, so its scale is basis points
+    # rather than percent: 1e-6 is 0.0001bp and 0.10 is 1,000bp a year.
+    low, high = 1e-6, 0.10
+    if gap(high) < 0.0:
+        raise ImpliedVolError(
+            f"premium {premium_fraction:.8f} exceeds the Bachelier price at "
+            f"{high * 1e4:.0f}bp normal vol; the inputs disagree rather than the market "
+            "being that volatile"
+        )
+    if gap(low) > 0.0:
+        raise ImpliedVolError(f"premium {premium_fraction:.8f} is below the price at 0.01bp vol")
+    return float(brentq(gap, low, high, xtol=1e-12))
+
+
 __all__ = [
     "MAX_VOL",
     "MIN_VOL",
     "ImpliedVolError",
     "SwaptionQuote",
+    "bachelier_swaption",
     "black_swaption",
     "implied_black_vol",
+    "implied_normal_vol",
 ]
