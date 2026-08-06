@@ -70,18 +70,59 @@ _HOLDING_NUMERIC_FIELDS = ("balance", "valUSD", "pctVal")
 _DEBT_TEXT_FIELDS = ("couponKind", "isDefault", "areIntrstPmntsInArrs", "isPaidKind")
 
 
+#: Identifier values that are filers saying "there isn't one". Treated as
+#: absent rather than as identifiers, because they are not unique: every
+#: holding filed with `cusip=N/A` keyed to the *same* subject, so unrelated
+#: positions from different funds and different filings piled onto one
+#: instrument and overwrote each other's fields. The parser's comment said
+#: unidentifiable holdings were skipped; this is what makes that true.
+#: `000000000` is the same thing written numerically, and appeared on 932
+#: facts across 32 fields in the live store.
+_NULL_IDENTIFIERS: frozenset[str] = frozenset({"", "N/A", "NA", "NONE", "000000000", "0"})
+
+
+def _identifier(raw: str) -> str:
+    """An identifier, or empty when the filer said there is none."""
+    cleaned = raw.strip().upper()
+    return "" if cleaned in _NULL_IDENTIFIERS else cleaned
+
+
 def holding_subject(*, cusip: str, isin: str) -> TUID:
     """Key a holding by its instrument identifier.
 
     CUSIP/ISIN are stored and matched where they arrive in public filings
     but never bulk-exported (spec §9.3 redistribution guard); FIGI
     resolution happens at security-master population.
+
+    Placeholder identifiers raise rather than keying: `N/A` is not a CUSIP,
+    and treating it as one merges every unidentified holding in every filing
+    into a single subject whose fields are whatever the last one written
+    happened to be.
     """
-    if isin:
-        return TUID(f"isin:{isin.upper()}")
-    if cusip:
-        return TUID(f"cusip:{cusip.upper()}")
+    if clean_isin := _identifier(isin):
+        return TUID(f"isin:{clean_isin}")
+    if clean_cusip := _identifier(cusip):
+        return TUID(f"cusip:{clean_cusip}")
     raise ValueError("holding has neither CUSIP nor ISIN")
+
+
+def derivative_subject(*, counterparty: str, kind: str, termination: str) -> TUID:
+    """Key an OTC derivative by what actually identifies one.
+
+    A swap has no CUSIP, and the previous behaviour keyed it to `cusip:N/A`
+    along with every other unidentified holding. What identifies an OTC
+    contract is its counterparty and its terms, so that is the key: the
+    counterparty, the contract type, and the termination date.
+
+    Raises when the counterparty is unnamed, because a contract with no
+    counterparty and no identifier cannot be told apart from another one —
+    which is the situation this replaces, not a variation on it.
+    """
+    party = counterparty.strip().upper()
+    if not party or party in _NULL_IDENTIFIERS:
+        raise ValueError("derivative holding names no counterparty and has no identifier")
+    stamp = termination.strip()[:10] or "open"
+    return TUID(f"otc:{party.replace(' ', '_')}:{kind}:{stamp}")
 
 
 def _text(node: Element | None) -> str:
@@ -153,8 +194,14 @@ class NportAdapter(SourceAdapter):
             try:
                 subject = holding_subject(cusip=cusip, isin=isin)
             except ValueError:
-                # Unidentifiable holdings are skipped, never guessed at.
-                continue
+                # No instrument identifier. An OTC derivative legitimately
+                # has none, and is keyed by what does identify it — its
+                # counterparty and terms. Anything else is genuinely
+                # unidentifiable and is skipped, never guessed at.
+                try:
+                    subject = _derivative_subject_for(holding)
+                except ValueError:
+                    continue
 
             # `holding_subject` is bound as a default argument, not captured:
             # a late-binding closure would attribute every fact to the *last*
@@ -194,4 +241,97 @@ class NportAdapter(SourceAdapter):
                     raw = _text(debt.find(f"n:{field}", NPORT_NS))
                     emit(field, None if raw in ("", "N/A") else raw)
 
+            _emit_derivative(holding, emit)
+
         return ParsedBatch(provenance=(provenance,), facts=tuple(facts))
+
+
+#: Counterparty identification on a derivative holding. Ingested because a
+#: swap's counterparty *is* half of what the position is: notional against an
+#: unnamed counterparty describes market risk and says nothing about who owes
+#: it.
+_COUNTERPARTY_FIELDS: tuple[str, ...] = ("counterpartyName", "counterpartyLei")
+
+#: Numeric facts on a derivative. `notionalAmt` is deliberately NOT stored
+#: under the same field as a cash holding's `valUSD`: a swap's notional is
+#: its size, not its worth, and a screen that summed the two would report a
+#: book many times larger than it is.
+_DERIVATIVE_NUMERIC: tuple[str, ...] = (
+    "notionalAmt",
+    "unrealizedAppr",
+    "upfrontPmnt",
+    "upfrontRcpt",
+)
+
+#: Text and date facts describing the contract itself.
+_DERIVATIVE_TEXT: tuple[str, ...] = (
+    "derivCat",
+    "payOffProf",
+    "swapFlag",
+    "pmntCurCd",
+    "rcptCurCd",
+    "floatingPmntDesc",
+    "fixedOrFloating",
+)
+
+
+def _derivative_subject_for(holding: Element) -> TUID:
+    """The OTC key for a derivative holding, or raise if it is not one."""
+    info = holding.find("n:derivativeInfo", NPORT_NS)
+    if info is None:
+        raise ValueError("not a derivative holding")
+    contracts = [child for child in info if child.tag.rsplit("}", 1)[-1].endswith("Deriv")]
+    if not contracts:
+        raise ValueError("derivative block names no contract type")
+    contract = contracts[0]
+    return derivative_subject(
+        counterparty=_text(contract.find(".//n:counterpartyName", NPORT_NS)),
+        kind=contract.tag.rsplit("}", 1)[-1],
+        termination=_text(contract.find(".//n:terminationDt", NPORT_NS)),
+    )
+
+
+def _emit_derivative(holding: Element, emit: Any) -> None:
+    """Derivative terms and counterparties, where the holding is one.
+
+    **These were being dropped entirely.** Thirteen holdings per filing in
+    the stored payloads carry a `derivativeInfo` block — swaps with named
+    counterparties, notionals, unrealised appreciation and termination dates
+    — and none of it reached the store. The data was already in the payload
+    store; only the parser was not reading it.
+
+    Every field is prefixed `deriv:` so nothing here can be mistaken for a
+    cash holding's equivalent. The one that matters most is `notionalAmt`:
+    it is the contract's *size*, and a screen that added it to `valUSD`
+    across a portfolio would report a book several times larger than it is.
+    """
+    info = holding.find("n:derivativeInfo", NPORT_NS)
+    if info is None:
+        return
+    # The contract type is the wrapper element's own name — `swapDeriv`,
+    # `fwdDeriv`, `futrDeriv`. Read from the tag rather than guessed from
+    # which fields happen to be present.
+    contracts = [child for child in info if child.tag.rsplit("}", 1)[-1].endswith("Deriv")]
+    if not contracts:
+        return
+    contract = contracts[0]
+    emit("deriv:kind", contract.tag.rsplit("}", 1)[-1])
+
+    for party in contract.findall(".//n:counterpartyName/..", NPORT_NS) or [contract]:
+        for field in _COUNTERPARTY_FIELDS:
+            raw = _text(party.find(f".//n:{field}", NPORT_NS))
+            if raw not in ("", "N/A"):
+                emit(f"deriv:{field}", raw)
+        break  # one counterparty per contract in this schema
+
+    for field in _DERIVATIVE_NUMERIC:
+        raw = _text(contract.find(f".//n:{field}", NPORT_NS))
+        if raw not in ("", "N/A"):
+            emit(f"deriv:{field}", float(raw))
+    for field in _DERIVATIVE_TEXT:
+        raw = _text(contract.find(f".//n:{field}", NPORT_NS))
+        if raw not in ("", "N/A"):
+            emit(f"deriv:{field}", raw)
+    termination = _text(contract.find(".//n:terminationDt", NPORT_NS))
+    if termination not in ("", "N/A"):
+        emit("deriv:terminationDt", date.fromisoformat(termination[:10]))

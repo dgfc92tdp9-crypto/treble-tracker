@@ -122,3 +122,141 @@ class TestParse:
         bad = RawPayload(data=b"<root/>", source_uri="x", fetched_at=FETCHED)
         with pytest.raises(ValueError):
             adapter.parse(bad, payload_hash(bad.data))
+
+
+class TestPlaceholderIdentifiersAreNotIdentifiers:
+    """A defect found on 2026-08-06, and it had been there all along.
+
+    N-PORT filers write `cusip=N/A` for holdings with no CUSIP — chiefly OTC
+    derivatives. `holding_subject` accepted that literal string, so **every
+    unidentified holding in every filing keyed to the same subject**:
+    `cusip:N/A` carried 2,110 facts across 26 fields on the live store, each
+    position overwriting the last. The parser's comment said unidentifiable
+    holdings were skipped; the guard had never fired.
+    """
+
+    @pytest.mark.parametrize("placeholder", ["N/A", "n/a", " N/A ", "000000000", "0", "", "NONE"])
+    def test_a_placeholder_cusip_is_refused(self, placeholder: str) -> None:
+        with pytest.raises(ValueError, match="neither CUSIP nor ISIN"):
+            holding_subject(cusip=placeholder, isin="")
+
+    @pytest.mark.parametrize("placeholder", ["N/A", "000000000", ""])
+    def test_a_placeholder_isin_is_refused(self, placeholder: str) -> None:
+        with pytest.raises(ValueError, match="neither CUSIP nor ISIN"):
+            holding_subject(cusip="", isin=placeholder)
+
+    def test_a_real_identifier_still_keys(self) -> None:
+        """The guard must not have made the ordinary case stricter."""
+        assert holding_subject(cusip="912810UT3", isin="") == "cusip:912810UT3"
+        assert holding_subject(cusip="912810UT3", isin="US912810UT36") == "isin:US912810UT36"
+
+    def test_no_holding_lands_on_a_placeholder_subject(self, adapter: NportAdapter) -> None:
+        """The end-to-end form: nothing may be keyed to a subject whose
+        identifier is a filer's way of saying there isn't one."""
+        raw = payload()
+        facts = adapter.parse(raw, payload_hash(raw.data)).facts
+        keys = {str(fact.subject).split(":", 1)[1].upper() for fact in facts}
+        assert not keys & {"N/A", "000000000", "", "NONE"}
+
+
+#: A minimal filing carrying one OTC swap. Synthetic and obviously so: the
+#: recorded fixture holds no derivatives, and editing a recorded payload to
+#: add one would make it no longer a recording.
+_SWAP_DOC = """<?xml version="1.0"?>
+<edgarSubmission xmlns="http://www.sec.gov/edgar/nport">
+  <formData><genInfo><repPdDate>2026-03-31</repPdDate></genInfo>
+  <invstOrSecs>
+    <invstOrSec>
+      <name>N/A</name><cusip>N/A</cusip>
+      <valUSD>1000.00</valUSD><pctVal>0.01</pctVal><balance>0</balance>
+      <derivativeInfo><swapDeriv>
+        <counterparties>
+          <counterpartyName>BANK OF AMERICA, N.A.</counterpartyName>
+          <counterpartyLei>B4TYDEB6GKMZO031MB27</counterpartyLei>
+        </counterparties>
+        <notionalAmt>250000000.00</notionalAmt>
+        <unrealizedAppr>-1234567.00</unrealizedAppr>
+        <terminationDt>2031-06-20</terminationDt>
+      </swapDeriv></derivativeInfo>
+    </invstOrSec>
+  </invstOrSecs></formData>
+</edgarSubmission>
+"""
+
+
+def _swap_facts(adapter: NportAdapter):  # type: ignore[no-untyped-def]
+    data = _SWAP_DOC.encode()
+    raw = RawPayload(data=data, source_uri="https://example.invalid/d", fetched_at=FETCHED)
+    return adapter.parse(raw, payload_hash(data)).facts
+
+
+class TestDerivativesAreKeyedByWhatIdentifiesThem:
+    """An OTC swap has no CUSIP. What identifies it is its counterparty and
+    terms, so that is its subject — rather than the shared `cusip:N/A` every
+    such holding used to collapse onto."""
+
+    def test_a_swap_is_kept_rather_than_skipped(self, adapter: NportAdapter) -> None:
+        facts = _swap_facts(adapter)
+        assert facts, "the swap was dropped entirely"
+        assert all(str(f.subject).startswith("otc:") for f in facts)
+
+    def test_the_counterparty_and_terms_are_recorded(self, adapter: NportAdapter) -> None:
+        """Notional against an unnamed counterparty describes market risk and
+        says nothing about who owes it."""
+        values = {f.field: f.value for f in _swap_facts(adapter)}
+        assert values["nport:deriv:counterpartyName"] == "BANK OF AMERICA, N.A."
+        assert values["nport:deriv:counterpartyLei"] == "B4TYDEB6GKMZO031MB27"
+        assert values["nport:deriv:notionalAmt"] == pytest.approx(250_000_000.0)
+        assert values["nport:deriv:unrealizedAppr"] == pytest.approx(-1_234_567.0)
+        assert values["nport:deriv:terminationDt"] == date(2031, 6, 20)
+        assert values["nport:deriv:kind"] == "swapDeriv"
+
+    def test_notional_is_not_stored_as_a_value(self, adapter: NportAdapter) -> None:
+        """A swap's notional is its size, not its worth. A screen summing
+        `notionalAmt` with `valUSD` across a book would report it several
+        times larger, and every number in that sum would be one the filer
+        actually reported."""
+        values = {f.field: f.value for f in _swap_facts(adapter)}
+        assert values["nport:deriv:notionalAmt"] != values.get("nport:valUSD")
+        assert values.get("nport:valUSD") == pytest.approx(1000.0)
+
+    def test_two_counterparties_do_not_collapse(self) -> None:
+        from treble.ingest.nport import derivative_subject
+
+        first = derivative_subject(
+            counterparty="BANK OF AMERICA, N.A.", kind="swapDeriv", termination="2031-06-20"
+        )
+        second = derivative_subject(
+            counterparty="GOLDMAN SACHS INTERNATIONAL", kind="swapDeriv", termination="2031-06-20"
+        )
+        assert first != second
+        assert first.startswith("otc:")
+
+    def test_the_same_contract_keys_the_same_way(self) -> None:
+        """Stable across filings, or a fund's position would look like a new
+        contract every quarter."""
+        from treble.ingest.nport import derivative_subject
+
+        args = {
+            "counterparty": "Barclays Bank PLC",
+            "kind": "fwdDeriv",
+            "termination": "2027-01-15",
+        }
+        assert derivative_subject(**args) == derivative_subject(**args)
+
+    def test_an_unnamed_counterparty_is_refused(self) -> None:
+        """This is the situation being replaced, not a variation on it: a
+        contract with no counterparty and no identifier cannot be told apart
+        from another one."""
+        from treble.ingest.nport import derivative_subject
+
+        for name in ("", "N/A", "   "):
+            with pytest.raises(ValueError, match="names no counterparty"):
+                derivative_subject(counterparty=name, kind="swapDeriv", termination="")
+
+    def test_an_open_ended_contract_still_keys(self) -> None:
+        from treble.ingest.nport import derivative_subject
+
+        assert derivative_subject(
+            counterparty="CITIBANK N.A.", kind="swapDeriv", termination=""
+        ).endswith(":open")

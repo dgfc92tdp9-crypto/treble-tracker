@@ -78,7 +78,7 @@ phase_1:
 # separate work-package plan to track against, and inventing one would put a
 # second set of numbers beside the gate's own.
 phase_2:
-  P2_1:  {done: 0.78, name: "ticker plant — conflated display, unconflated TPIPE",
+  P2_1:  {done: 0.8, name: "ticker plant — conflated display, unconflated TPIPE",
           basis: "the conflation split, current-state cache, sequence-gap
                   detection and bounded TPIPE buffer ship and are
                   mutation-verified. TGN and TCMP composites now ship too
@@ -143,8 +143,26 @@ phase_2:
                   attach one instrument's reference data to another's
                   subject. 16 reference facts on the live store, and a
                   document with no recognised fields raises rather than
-                  storing whatever still parsed. Outstanding: the Redpanda
-                  and NATS transports"}
+                  storing whatever still parsed. Extending the N-PORT
+                  parser to read derivative holdings surfaced a data-
+                  integrity defect that predates this work: filers write
+                  cusip=N/A for holdings with none, holding_subject accepted
+                  that literal string, and every unidentified holding in
+                  every filing therefore keyed to one shared subject —
+                  cusip:N/A held 2,110 facts across 26 fields and
+                  cusip:000000000 another 932, each position overwriting the
+                  last. The parser's own comment said such holdings were
+                  skipped; the guard had never fired. Placeholder identifiers
+                  are now refused, OTC derivatives are keyed by what actually
+                  identifies them (counterparty, contract type, termination),
+                  and the merged subjects were cleared and the payloads
+                  replayed — no network, which is what I5 exists for. The
+                  recovered data is real counterparty exposure: 16 contracts
+                  across 12 counterparties, roughly USD 3.3bn notional, with
+                  notional deliberately not stored under valUSD because a
+                  swap's notional is its size and a screen summing the two
+                  would report a book several times larger than it is.
+                  Outstanding: the Redpanda and NATS transports"}
   P2_2:  {done: 1.0, name: "ALLQ correct-when-empty; contribution API",
           basis: "both halves ship. Correct-when-empty: expired quotes leave
                   the book empty rather than stale, it records when it last

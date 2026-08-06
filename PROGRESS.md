@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 51.38%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 51.44%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -337,7 +337,7 @@ checked that the mechanism was still switched on.**
 > these don't come up as often if not at all. Also adjust for code errors that keep coming up
 > and the general way they come up so that you learn from your mistakes."
 
-Every mistake made on this project so far falls into five classes. They are recorded by
+Every mistake made on this project so far falls into six classes. They are recorded by
 *class* rather than as a list of incidents, because the same shape keeps recurring in new
 material — a note about one incident would not have prevented the next one. Each class names
 the mechanism that now catches it, and says honestly whether that mechanism is enforced by
@@ -416,6 +416,29 @@ app unopenable offline. An icon set with the `.icns` but no `.png`. An HTTP serv
   manual run, and failed on every clean checkout. When a mechanism's effect is a generated or
   downloaded artefact, verify it on a fresh clone, not on the working tree that already has
   one.
+
+### C(ii). A guard whose condition never matched — 1 occurrence
+
+`treble/ingest/nport.py` keyed every holding by CUSIP or ISIN, and skipped
+those with neither: *"Unidentifiable holdings are skipped, never guessed at."*
+N-PORT filers write `cusip=N/A` for holdings that have no CUSIP — chiefly OTC
+derivatives — and `holding_subject` accepted that literal string as an
+identifier. The skip had therefore never happened. Every unidentified holding
+across every filing keyed to the **same** subject: `cusip:N/A` carried 2,110
+facts across 26 fields on the live store, and `cusip:000000000` another 932,
+each position silently overwriting the last one's fields.
+
+This is class C — a check that could not fail — with the twist that the check
+*existed and read correctly*. Nothing about the code said the guard was inert;
+the placeholder simply was not on the list of things that count as absent.
+
+- **Enforced:** `_NULL_IDENTIFIERS` and `_identifier()`, with tests
+  parametrised over `N/A`, `n/a`, ` N/A `, `000000000`, `0`, `NONE` and the
+  empty string, plus an end-to-end assertion that no parsed holding lands on
+  a subject whose identifier is one of them.
+- **Rule:** a sentinel is not a value. When a source writes "there isn't one"
+  as a string, the parser must be told which strings those are — and the test
+  must use the source's own spelling, not a guessed one.
 
 ### E. An explanation recorded as fact, never tested — 1 occurrence
 
