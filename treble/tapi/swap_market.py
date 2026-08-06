@@ -40,6 +40,13 @@ from treble.store.duck import DuckStore
 DISCOUNT_CURVE = "EUR-ESTR-OIS"
 FORECAST_CURVE = "EUR-EURIBOR-6M"
 INDEX_TENOR = "6M"
+
+#: The second forecast tenor. Built when the day carries it, and omitted
+#: when it does not — a tenor basis needs two real curves, and inventing the
+#: shorter one by interpolating the longer would make the basis a function of
+#: the interpolator rather than of the market.
+SHORT_FORECAST_CURVE = "EUR-EURIBOR-3M"
+SHORT_INDEX_TENOR = "3M"
 CALENDAR = Market.TARGET
 
 #: A curve needs enough nodes to be a curve. Below this the screen says so
@@ -100,6 +107,7 @@ def build_swap_market(store: DuckStore, *, as_of: datetime) -> SwapMarket:
     """The most recent day on which both curves can be built together."""
     discount_days = _curve_quotes(store, DISCOUNT_CURVE, as_of=as_of)
     forecast_days = _curve_quotes(store, FORECAST_CURVE, as_of=as_of)
+    short_days = _curve_quotes(store, SHORT_FORECAST_CURVE, as_of=as_of)
     shared_days = sorted(set(discount_days) & set(forecast_days), reverse=True)
     if not shared_days:
         raise SwapMarketUnavailableError(
@@ -117,8 +125,19 @@ def build_swap_market(store: DuckStore, *, as_of: datetime) -> SwapMarket:
         if len(tenors) < MIN_NODES:
             failures.append(f"{report_date}: only {len(tenors)} shared tenors")
             continue
+        short_rates = short_days.get(report_date)
+        short_tenors = (
+            sorted(set(tenors) & set(short_rates), key=_tenor_years) if short_rates else []
+        )
         try:
-            curves = _build(report_date, tenors, discount_rates, forecast_rates)
+            curves = _build(
+                report_date,
+                tenors,
+                discount_rates,
+                forecast_rates,
+                short_rates if len(short_tenors) >= MIN_NODES else None,
+                short_tenors,
+            )
         except CurveBuildError as error:  # a bad day is skipped, not fatal
             failures.append(f"{report_date}: {error}")
             continue
@@ -141,6 +160,8 @@ def _build(
     tenors: list[str],
     discount_rates: dict[str, float],
     forecast_rates: dict[str, float],
+    short_rates: dict[str, float] | None = None,
+    short_tenors: list[str] | None = None,
 ) -> CurveSet:
     discount_config = CurveConfig(
         name=DISCOUNT_CURVE,
@@ -172,8 +193,36 @@ def _build(
             CurveSpec(
                 discount_config, {(InstrumentKind.OIS, t): discount_rates[t] for t in tenors}
             ),
+            *_short_specs(short_rates, short_tenors),
         ],
     )
+
+
+def _short_specs(
+    short_rates: dict[str, float] | None, short_tenors: list[str] | None
+) -> list[CurveSpec]:
+    """The 3M forecast curve, when the day carries enough of it.
+
+    Returned as a list so its absence is structural rather than a `None` a
+    caller has to remember to handle: a day with no 3M prints simply yields a
+    CurveSet without that curve, and asking for it raises `UnknownCurveError`
+    naming what is present. A 3M curve interpolated from 6M quotes would make
+    the tenor basis a property of the interpolator.
+    """
+    if not short_rates or not short_tenors:
+        return []
+    config = CurveConfig(
+        name=SHORT_FORECAST_CURVE,
+        currency="EUR",
+        calendar=CALENDAR,
+        index_tenor=SHORT_INDEX_TENOR,
+        discount_basis=DISCOUNT_CURVE,
+        swap_fixed_frequency=1,
+        fixed_leg_day_count=DayCount.THIRTY_360,
+        float_leg_day_count=DayCount.ACT_360,
+        instruments=tuple(InstrumentSpec(kind=InstrumentKind.SWAP, tenor=t) for t in short_tenors),
+    )
+    return [CurveSpec(config, {(InstrumentKind.SWAP, t): short_rates[t] for t in short_tenors})]
 
 
 __all__ = [
@@ -181,6 +230,7 @@ __all__ = [
     "DISCOUNT_CURVE",
     "FORECAST_CURVE",
     "MIN_NODES",
+    "SHORT_FORECAST_CURVE",
     "SwapMarket",
     "SwapMarketUnavailableError",
     "build_swap_market",

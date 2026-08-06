@@ -349,7 +349,7 @@ phase_2:
                   by an assertion that the maximum sits at the longest
                   maturity, so it cannot double as a hiding place. Also
                   outstanding: the older IBOR grids are not wired"}
-  P2_6:  {done: 0.92, name: "SWPM multi-curve CSA-aware discounting",
+  P2_6:  {done: 0.94, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
                   bootstrapped against an exogenous discount curve (never
@@ -424,7 +424,33 @@ phase_2:
                   test is deliberate: a reader who can see the two agree can
                   see the compounding is right instead of trusting it. The
                   caption names what is not modelled — no lookback, lockout
-                  or payment delay, which a real SOFR trade sets"}
+                  or payment delay, which a real SOFR trade sets.
+                  Tenor basis swaps are the second product off the §12.1
+                  list (treble/analytics/derivatives/basis.py). Each leg is
+                  built by the vanilla pricer's own float-leg routine rather
+                  than reimplemented, so the same 6M cash flows cannot be
+                  worth one thing in a basis swap and another in a vanilla
+                  one — a test pins the two agreeing to 1e-12. Both legs
+                  discount on the CSA curve: self-discounting each on its own
+                  forecast curve makes every leg worth N x (D(0)-D(T)) and
+                  collapses the basis, which is the single-curve error the
+                  framework exists to prevent, and a test asserts neither leg
+                  equals that figure. Which leg carries the spread is the
+                  trade's, so swapping the legs flips the sign. Validated on
+                  live DTCC curves: swap_market now also builds
+                  EUR-EURIBOR-3M when the day carries it (omitted rather than
+                  interpolated from the 6M quotes, which would make the basis
+                  a property of the interpolator), and the 10Y EURIBOR 3M/6M
+                  spread comes out at +10.68bp with PV at par exactly zero.
+                  Cross-checked independently against the two curves' input
+                  quotes: the spread is 0.97x the quote difference at 2Y, 5Y
+                  and 10Y alike, that ratio being the fixed-to-floating
+                  annuity ratio. Two defects found while testing: both legs
+                  were merged into one cashflow tuple where both read
+                  'float', losing which side each row belonged to; and
+                  BasisSwapSpec defaulted to a different calendar from
+                  SwapSpec, so the same leg priced 0.03 apart on 35.6m in the
+                  two. Both fixed and pinned"}
   P2_7:  {done: 0.95, name: "Canvas with FDC3 context propagation",
           basis: "the criterion's named semantic ships and is
                   mutation-verified 6/6. Colour-group context propagation
