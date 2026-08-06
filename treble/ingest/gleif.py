@@ -111,7 +111,7 @@ class GleifAdapter(SourceAdapter):
         if isinstance(records, dict):
             records = [records]
         provenance = Provenance(
-            source_system="gleif",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.API,
@@ -234,7 +234,7 @@ class GleifRelationshipAdapter(SourceAdapter):
             raise ValueError("not an RR-CDF document: no RelationshipRecords element")
 
         provenance = Provenance(
-            source_system="gleif-rr",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.BULK_FILE,

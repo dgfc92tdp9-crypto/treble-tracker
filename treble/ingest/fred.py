@@ -84,7 +84,7 @@ class FredAdapter(SourceAdapter):
             raise ValueError(f"unrecognised fredgraph header: {header!r}")
         series_id = header[1].strip()
         provenance = Provenance(
-            source_system="fred",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.API,

@@ -178,7 +178,7 @@ class NportAdapter(SourceAdapter):
         period_end = date.fromisoformat(period_raw)
 
         provenance = Provenance(
-            source_system="sec-nport",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.XBRL,

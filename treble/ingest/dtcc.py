@@ -489,7 +489,7 @@ class DtccSdrRatesAdapter(SourceAdapter):
         report_date = report_date_from_uri(payload.source_uri)
         rows = _rows_from_zip(payload.data)
         provenance = Provenance(
-            source_system="dtcc-sdr",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.API,

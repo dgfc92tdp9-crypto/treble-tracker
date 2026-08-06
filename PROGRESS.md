@@ -475,6 +475,38 @@ E is the worst of the three and the most recently learned. A and C produce a che
 fail; E produces a *belief* that cannot fail, because nothing in the repository is capable of
 disagreeing with a sentence.
 
+## What each source publishes versus what we read (audited 2026-08-06)
+
+Auditing a parser against its *own output* cannot find a field it never
+looked at. Comparing the stored payload's keys against the fields actually
+written found derivative holdings being dropped from every N-PORT filing —
+and, through that, the `cusip:N/A` subject collapse. The inventory below is
+the same comparison across every source, kept so the gaps are a decision
+rather than an oversight.
+
+| source | published | read | notes |
+| --- | ---: | ---: | --- |
+| `dtcc-sdr` | 110 | 4 | the whole CFTC Part 43 tape reduced to par rates: asset class, action type, block-trade election, notionals and option premiums all unread |
+| `treasury-auctions` | 128 | 16 | bid-to-cover, competitive/noncompetitive tendered and accepted, accrued interest per 100/1000 |
+| `sec-nport` | 137 | 33 | fund-level borrowings and the monthly return/flow series (`mon1..mon3`), which are the *fund's* numbers rather than per-holding |
+| `gleif` | 73 | 7 | address detail and relationship records beyond the Level 2 parent link |
+| `edgar-submissions` | 57 | 1 | `accessionNumber`, `acceptanceDateTime`, addresses, former names |
+| `edgar-companyfacts` | 816 | 2,498 | reads more fields than one payload publishes — the 816 is one filer's tags, the 2,498 the union across filers |
+| `ecb-fx` | 32 | 1 | SDMX metadata (collection, decimals, unit multiplier) around the observation |
+| `coinbase-products` | 18 | 8 | order-type flags: `limit_only`, `post_only`, `cancel_only`, `margin_enabled` |
+| `openfigi` | 15 | 9 | envelope keys rather than data |
+| `fred`, `coinbase`, `frenchdata` | — | — | read in full |
+
+**None of these are bugs.** They are unread fields, and the point of writing
+them down is that "we chose not to read this" and "nobody looked" are
+different states that look identical in a codebase. The two that would repay
+work first are `dtcc-sdr` — a real swap tape, currently used only to fit
+curves — and `treasury-auctions`, where bid-to-cover is a standard measure
+this system could compute and does not.
+
+**Rule:** when adding an adapter, record what of the payload it ignores.
+Auditing what a parser produces cannot reveal what it never read.
+
 ## Continuous verification (standing requirement, Jack 2026-07-26)
 
 "Make sure holes are always found, even after their creation." Write-time checks are not

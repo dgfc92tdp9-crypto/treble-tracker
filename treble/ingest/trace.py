@@ -159,7 +159,7 @@ class TraceApiAdapter(SourceAdapter):
         if reader.fieldnames is None or "tradeDate" not in reader.fieldnames:
             raise ValueError("not a TRACE treasuryDailyAggregates payload")
         provenance = Provenance(
-            source_system="finra-trace",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.API,

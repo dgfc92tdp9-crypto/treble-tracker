@@ -105,7 +105,7 @@ class OpenFigiAdapter(SourceAdapter):
         if jobs is None or results is None or len(jobs) != len(results):
             raise ValueError("not an OpenFIGI request/response envelope")
         provenance = Provenance(
-            source_system="openfigi",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.API,

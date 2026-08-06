@@ -162,7 +162,20 @@ phase_2:
                   notional deliberately not stored under valUSD because a
                   swap's notional is its size and a screen summing the two
                   would report a book several times larger than it is.
-                  Outstanding: the Redpanda and NATS transports"}
+                  Outstanding: the Redpanda and NATS transports.
+                  A provenance defect was found and fixed alongside: six of
+                  fifteen adapters stamped a source_system differing from
+                  their own meta.source_id, and three separate EDGAR adapters
+                  all collapsed to 'edgar', so a value's provenance could not
+                  say whether it came from companyfacts, submissions or the
+                  bulk file — three extraction paths with three parser
+                  versions, and SPTR renders that chain. It also silently
+                  broke any join from the ingest log to the facts a source
+                  produced, which reads as 'this adapter ingested nothing'.
+                  Every adapter now stamps self.meta.source_id, enforced by
+                  an AST check over every discovered adapter (a literal is
+                  refused) plus a test that no two adapters share an id;
+                  verified to fail against the previous code"}
   P2_2:  {done: 1.0, name: "ALLQ correct-when-empty; contribution API",
           basis: "both halves ship. Correct-when-empty: expired quotes leave
                   the book empty rather than stale, it records when it last

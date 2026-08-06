@@ -164,7 +164,7 @@ class EdgarBulkFinancialsAdapter(SourceAdapter):
 
     def parse(self, payload: RawPayload, payload_hash: PayloadHash) -> ParsedBatch:
         provenance = Provenance(
-            source_system="edgar",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.BULK_FILE,

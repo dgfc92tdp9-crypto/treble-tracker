@@ -127,7 +127,7 @@ class EdgarCompanyFactsAdapter(SourceAdapter):
             raise ValueError("not a companyfacts document: no cik")
         subject = cik_subject(cik)
         provenance = Provenance(
-            source_system="edgar",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.XBRL,
@@ -225,7 +225,7 @@ class EdgarSubmissionsAdapter(SourceAdapter):
             raise ValueError("not a submissions document")
         subject = cik_subject(cik)
         provenance = Provenance(
-            source_system="edgar",
+            source_system=self.meta.source_id,
             source_uri=payload.source_uri,
             retrieved_at=payload.fetched_at,
             method=ExtractionMethod.API,
