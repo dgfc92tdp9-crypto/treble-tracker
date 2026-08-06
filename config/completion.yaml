@@ -491,9 +491,23 @@ phase_2:
                   kept because it is independently right for EUR and JPY and
                   is defined at or below a zero forward where Black is not.
                   Two explanations eliminated, the anomaly open, and it is
-                  recorded as open. So the vol *block* is dissolved and the
-                  surface is unbuilt — building one on nine trades nobody has
-                  explained would be the wrong move. Basis,
+                  recorded as open. The surface itself now ships
+                  (treble/analytics/vol/surface.py), built from the
+                  near-the-money prints only, which does not require the wing
+                  question answered. It refuses the three things that would
+                  make a grid dishonest: nothing is interpolated, so an
+                  unobserved node returns None rather than a neighbour that
+                  would look identical on screen; every node carries its
+                  observation count and the dispersion of the prints behind
+                  it; and trades excluded for moneyness or for matching no
+                  grid point are counted on the surface rather than dropped
+                  silently. Run on one day of the live EUR tape it gives 8
+                  nodes at 14% grid coverage, several with dispersion above
+                  100% — prints at one point disagreeing by more than the
+                  level. That is not yet a usable market surface, and the
+                  object says so through its own fields rather than through a
+                  caveat somebody has to remember. What it needs is more
+                  days: the machinery is done and the sample is one file. Basis,
                   cross-currency, asset swaps and total return need curves,
                   FX or a price series, all of which exist — those are
                   unbuilt rather than blocked. The OIS trade is reachable
