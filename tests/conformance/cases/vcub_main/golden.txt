@@ -1,0 +1,22 @@
+VOLATILITY CUBE · EUR SWAPTIONS · NORMAL VOL (bp)
+────────────────────────────────────────────────────────────────────────────
+Implied from transacted premiums on the CFTC tape — paid, not quoted.
+EFF is the effective print count after decay; THIN is under three.
+
+EXPIRY  TENOR    VOL bp    OBS    EFF   DISP%
++------------------------------------------------------------------------------+
+|[table_scroll:sys:vcub_grid]                                                  |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+METHOD tab · an absent node is absent, never interpolated.

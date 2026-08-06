@@ -272,6 +272,8 @@ class LocalTapi:
         "sys:tval_curves",
         "sys:tval_values",
         "sys:tval_method",
+        "sys:vcub_grid",
+        "sys:vcub_method",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -506,6 +508,8 @@ class LocalTapi:
             return self._port(binding, as_of=as_of)
         if binding in ("sys:tval_curves", "sys:tval_values", "sys:tval_method"):
             return self._tval(binding, as_of=as_of)
+        if binding in ("sys:vcub_grid", "sys:vcub_method"):
+            return self._vcub(binding, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -676,6 +680,59 @@ class LocalTapi:
             ("PV (pay fixed)", round(priced.pv, 2)),
             ("Annuity", round(priced.annuity, 2)),
             ("DV01 (+1bp)", round(dv01, 2)),
+        )
+
+    def _vcub(
+        self, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """The two `VCUB` panes, off one fitted surface (spec §11.3)."""
+        from treble.analytics.vol.surface import (
+            DEFAULT_HALF_LIFE_DAYS,
+            DEFAULT_MONEYNESS_BAND,
+            MIN_OBSERVATIONS_FOR_CONFIDENT,
+        )
+        from treble.tapi.vol_surface import (
+            VolSurfaceUnavailableError,
+            build_vol_surface,
+        )
+
+        try:
+            built = build_vol_surface(self._store, as_of=as_of)
+        except VolSurfaceUnavailableError as error:
+            return ((f"no volatility surface: {error}",),)
+
+        surface = built.surface
+        if binding == "sys:vcub_grid":
+            return tuple(
+                (
+                    f"{node.expiry_years:g}Y",
+                    f"{node.tenor_years:g}Y",
+                    round(node.volatility * 1e4, 1),
+                    node.observations,
+                    round(node.effective_observations, 1),
+                    round(node.dispersion * 100, 0),
+                    "" if node.is_confident else "thin",
+                )
+                for node in surface.nodes
+            )
+
+        return (
+            ("As of", surface.as_of.isoformat()),
+            ("Currency", surface.currency),
+            ("Quoted in", "normal (Bachelier) vol, basis points"),
+            ("Prints read", built.prints_read),
+            ("Prints solved", f"{built.prints_solved} ({built.solve_rate:.0%})"),
+            ("Days used", built.days_used),
+            ("Days without curves", built.days_without_curves),
+            ("Each day priced on", "its own curve, never another day's"),
+            ("Pooled over", f"{surface.pooled_days} day(s)"),
+            ("Decay half-life", f"{DEFAULT_HALF_LIFE_DAYS:g} days"),
+            ("Moneyness band", f"±{DEFAULT_MONEYNESS_BAND:.0%}"),
+            ("Excluded off-money", surface.excluded_off_the_money),
+            ("Excluded off-grid", surface.excluded_no_bucket),
+            ("Grid coverage", f"{surface.coverage:.0%}"),
+            ("Confident needs", f"{MIN_OBSERVATIONS_FOR_CONFIDENT} effective prints"),
+            ("Nothing is interpolated", "an absent node is absent, not guessed"),
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------

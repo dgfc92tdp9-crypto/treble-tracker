@@ -1,0 +1,71 @@
+{
+  "fields": {},
+  "series": {
+    "sys:vcub_method": [
+      [
+        "As of",
+        "2026-07-31"
+      ],
+      [
+        "Currency",
+        "EUR"
+      ],
+      [
+        "Quoted in",
+        "normal (Bachelier) vol, basis points"
+      ],
+      [
+        "Prints read",
+        2200
+      ],
+      [
+        "Prints solved",
+        "1462 (66%)"
+      ],
+      [
+        "Days used",
+        15
+      ],
+      [
+        "Days without curves",
+        0
+      ],
+      [
+        "Each day priced on",
+        "its own curve, never another day's"
+      ],
+      [
+        "Pooled over",
+        "15 day(s)"
+      ],
+      [
+        "Decay half-life",
+        "2 days"
+      ],
+      [
+        "Moneyness band",
+        "\u00b110%"
+      ],
+      [
+        "Excluded off-money",
+        214
+      ],
+      [
+        "Excluded off-grid",
+        432
+      ],
+      [
+        "Grid coverage",
+        "79%"
+      ],
+      [
+        "Confident needs",
+        "3 effective prints"
+      ],
+      [
+        "Nothing is interpolated",
+        "an absent node is absent, not guessed"
+      ]
+    ]
+  }
+}

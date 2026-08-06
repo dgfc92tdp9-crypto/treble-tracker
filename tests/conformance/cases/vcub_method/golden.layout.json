@@ -1,0 +1,143 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "VOLATILITY CUBE · WHAT THIS RESTS ON"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Every input, assumption and exclusion behind the grid."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Each day is priced on its own curve; a stale forward misplaces moneyness."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "VCUB",
+  "panes": [
+    {
+      "binding": "sys:vcub_method",
+      "data": [
+        [
+          "As of",
+          "2026-07-31"
+        ],
+        [
+          "Currency",
+          "EUR"
+        ],
+        [
+          "Quoted in",
+          "normal (Bachelier) vol, basis points"
+        ],
+        [
+          "Prints read",
+          2200
+        ],
+        [
+          "Prints solved",
+          "1462 (66%)"
+        ],
+        [
+          "Days used",
+          15
+        ],
+        [
+          "Days without curves",
+          0
+        ],
+        [
+          "Each day priced on",
+          "its own curve, never another day's"
+        ],
+        [
+          "Pooled over",
+          "15 day(s)"
+        ],
+        [
+          "Decay half-life",
+          "2 days"
+        ],
+        [
+          "Moneyness band",
+          "±10%"
+        ],
+        [
+          "Excluded off-money",
+          214
+        ],
+        [
+          "Excluded off-grid",
+          432
+        ],
+        [
+          "Grid coverage",
+          "79%"
+        ],
+        [
+          "Confident needs",
+          "3 effective prints"
+        ],
+        [
+          "Nothing is interpolated",
+          "an absent node is absent, not guessed"
+        ]
+      ],
+      "region": [
+        4,
+        0,
+        16,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "method"
+}

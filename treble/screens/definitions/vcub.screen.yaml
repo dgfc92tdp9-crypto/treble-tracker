@@ -1,0 +1,90 @@
+# VCUB — Volatility Cube (spec §11.3).
+#
+# A swaption volatility grid implied from transacted premiums on the CFTC
+# Part 43 tape — the same tape this system already reads for its curves.
+#
+# **These are implied from prints, not quoted.** No free source quotes
+# swaption volatility. What the tape gives is premiums, strikes, exercise
+# dates and underlier maturities on trades that happened, and a volatility
+# solved from a premium is a number somebody paid rather than one somebody
+# indicated. It is also one counterparty at one moment, which is why every
+# node shows how many prints stand behind it.
+#
+# **Normal (Bachelier) vol, in basis points.** EUR swaptions are quoted
+# normal, and Bachelier is defined at or below a zero forward where Black is
+# not. The unit is stated on the screen because 130 is a plausible number in
+# basis points and an implausible one in percent.
+#
+# **Nothing is interpolated.** A node exists where trades happened. An
+# interpolated node looks identical to an observed one on a screen, and this
+# grid's whole claim is that its numbers were paid.
+#
+# **EFF is the effective print count** after decay weighting: twenty prints
+# of which nineteen are stale is worth about one, and the raw count would
+# call it twenty. A node with fewer than three effective prints is marked
+# THIN rather than hidden — one trade is still the only thing the market
+# said about that point.
+mnemonic: VCUB
+title: Volatility Cube
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "VOLATILITY CUBE · EUR SWAPTIONS · NORMAL VOL (bp)"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Implied from transacted premiums on the CFTC tape — paid, not quoted."
+        attrs: [label]
+      - kind: static
+        at: {row: 3, col: 0}
+        text: "EFF is the effective print count after decay; THIN is under three."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 5, col: 0}
+        text: "EXPIRY  TENOR    VOL bp    OBS    EFF   DISP%"
+        attrs: [label, emphasis]
+      - kind: pane
+        region: {row: 6, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:vcub_grid"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "METHOD tab · an absent node is absent, never interpolated."
+        attrs: [label]
+
+  - name: method
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "VOLATILITY CUBE · WHAT THIS RESTS ON"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Every input, assumption and exclusion behind the grid."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:vcub_method"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Each day is priced on its own curve; a stale forward misplaces moneyness."
+        attrs: [label]

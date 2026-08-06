@@ -1,0 +1,22 @@
+VOLATILITY CUBE · WHAT THIS RESTS ON
+────────────────────────────────────────────────────────────────────────────
+Every input, assumption and exclusion behind the grid.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:vcub_method]                                                |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Each day is priced on its own curve; a stale forward misplaces moneyness.

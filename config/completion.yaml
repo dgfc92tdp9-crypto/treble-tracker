@@ -398,7 +398,7 @@ phase_2:
                   by an assertion that the maximum sits at the longest
                   maturity, so it cannot double as a hiding place. Also
                   outstanding: the older IBOR grids are not wired"}
-  P2_6:  {done: 0.96, name: "SWPM multi-curve CSA-aware discounting",
+  P2_6:  {done: 0.97, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
                   bootstrapped against an exogenous discount curve (never
@@ -551,6 +551,19 @@ phase_2:
                   at all. Nodes carry a Kish effective sample size so twenty
                   prints of which nineteen have decayed read as worth one,
                   and `is_confident` uses that rather than the raw count.
+                  VCUB now ships, so the surface is reachable rather than
+                  merely implemented: two tabs on both surfaces from one
+                  definition with a conformance case each, showing 44 nodes
+                  at 79% coverage from 1,462 solved prints over 15 days. The
+                  grid carries the raw count, the effective count after decay
+                  and the dispersion on every row, so a node held up by stale
+                  trades reads as thin rather than as evidence. The METHOD
+                  tab states the unit (normal vol in basis points, because
+                  130 is plausible in bp and absurd in percent), the solve
+                  rate (66% of prints read), that each day is priced on its
+                  own curve, and that nothing is interpolated. §12.1's
+                  swaption/CMS/cancellable products are still unbuilt — what
+                  ships here is the volatility they need, not the products.
                   Basis,
                   cross-currency, asset swaps and total return need curves,
                   FX or a price series, all of which exist — those are
