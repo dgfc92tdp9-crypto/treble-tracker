@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 49.53%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 50.00%** — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
@@ -59,7 +59,7 @@ Then, in rough order of what is unblocked:
 - **`PORT` / TFM3** — model and screen both ship. What remains is per-name equity coverage
     (still absent), and the factor breadth §16.2 describes.
 - **`CDSW` to 1.0** — needs ISDA's published test cases.
-- **Ticker plant to 1.0** — venue adapters, TGN/TCMP composites, Redpanda and NATS transports.
+- **Ticker plant to 1.0** — more venues (only Coinbase crypto is reachable free), security master enrichment, Redpanda and NATS transports.
 
 Deferred deliberately, not forgotten: EDGAR Exhibit 21 / OpenCorporates (spec §9.5 breadth).
 
@@ -114,7 +114,7 @@ plan, and inventing one would put a second set of numbers beside the gate's own.
 
 | Criterion | State | What is outstanding |
 |---|---|---|
-| Ticker plant (conflated / TPIPE) | 0.45 | venue adapters, security master enrichment, Redpanda + NATS transports |
+| Ticker plant (conflated / TPIPE) | 0.60 | **a real venue feeds it** — Coinbase `matches` over WebSocket, sequenced on `trade_id`. Crypto only; plus security master enrichment, Redpanda + NATS |
 | `ALLQ` correct-when-empty | **1.00** | complete for this phase — the only limitation left is the loopback binding, which is §22.1 and out of scope until Phase 5 |
 | `PORT` with TFM3 v1 | 0.60 | **screen ships** — three tabs off 1.34M ingested return facts; equal-weight 49-industry template at 16.48% vol, 97.6% factor. Six factors not 1,500; still no per-name panel |
 | `TVAL` v1 | 0.75 | **screen ships** — 3 tabs; 35 issuer curves, 135 ranked rich/cheap calls, and a METHOD tab naming every assumption and the three dimensions it could not match on. Rating and seniority still absent; ML layer and snapshots untouched |
@@ -169,7 +169,7 @@ ordinary.
 > |---|---|
 > | `PORT` / TFM3 | **partial** — factor returns come from Ken French (below); per-name equity history still absent |
 > | `TVAL` Prong 2 | **partial, and narrower than recorded** — the issuer-curve half needs only issuer, maturity and price, all present: 35 curves fit on live marks. The similarity half still lacks rating and seniority and reports them as missing rather than dropping them. `nport:issuerCat` is an N-PORT category, not a sector classification |
-> | Ticker plant | **hard** — no trade or tick data. (`TRADE_COUNT` in the store is the DTCC adapter's own metadata about how many prints backed a curve node, not prints) |
+> | Ticker plant | **partial, and narrower than recorded** — 'no free trade or tick data' is true of equities and every consolidated tape, and false in general: Coinbase publishes its own matches over an unauthenticated WebSocket, live and correctly sequenced. Crypto only. (`TRADE_COUNT` in the store remains the DTCC adapter's metadata about how many prints backed a curve node, not prints) |
 > | `SWPM` breadth | **hard** — swaptions/CMS need a `VCUB` vol surface; no swaption vol data |
 > | `CDSW` | external — ISDA's published test cases |
 > | **Canvas** | **none** — renderer wiring only |

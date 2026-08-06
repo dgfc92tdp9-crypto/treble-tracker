@@ -78,7 +78,7 @@ phase_1:
 # separate work-package plan to track against, and inventing one would put a
 # second set of numbers beside the gate's own.
 phase_2:
-  P2_1:  {done: 0.45, name: "ticker plant — conflated display, unconflated TPIPE",
+  P2_1:  {done: 0.6, name: "ticker plant — conflated display, unconflated TPIPE",
           basis: "the conflation split, current-state cache, sequence-gap
                   detection and bounded TPIPE buffer ship and are
                   mutation-verified. TGN and TCMP composites now ship too
@@ -90,8 +90,31 @@ phase_2:
                   P2_2, whose 0.95 rests on the ALLQ screen and the
                   contribution API — the composites were listed as
                   outstanding on this criterion and are credited once.
-                  Outstanding: venue adapters, security master enrichment,
-                  and the Redpanda and NATS transports"}
+                  A real venue adapter now ships (treble/plant/venues.py),
+                  which was recorded as blocked and was not. The note said
+                  venue adapters need live trade feeds no free source
+                  provides; that is true of equities and of every
+                  consolidated tape, and false in general — crypto exchanges
+                  publish their own matches over an unauthenticated
+                  WebSocket, and this repository already read Coinbase for
+                  daily candles. Coinbase's `matches` channel now feeds the
+                  plant: 40 frames recorded live on 2026-08-06 back every
+                  test, so CI never opens a socket and the parser is not
+                  untested in the place that matters. The one choice that
+                  inspection cannot check was measured rather than assumed:
+                  Coinbase sends both `sequence` and `trade_id`, both
+                  increasing integers, and `sequence` is the channel counter
+                  — consecutive BTC-USD trades ran 133829171610, 133829172196,
+                  133829172676, so feeding it would raise GapDetectedError on
+                  every tick. `trade_id` is contiguous per product
+                  (1067577991, 992, 993) and is what the plant needs. A test
+                  publishes the recorded stream with the channel sequence and
+                  asserts the gap detector fires, so the adapter rests on a
+                  mechanism shown to work rather than on the parser having
+                  looked right. Outstanding: this is one venue and crypto
+                  only — no equity or bond venue is reachable this way and
+                  none is claimed; plus security master enrichment and the
+                  Redpanda and NATS transports"}
   P2_2:  {done: 1.0, name: "ALLQ correct-when-empty; contribution API",
           basis: "both halves ship. Correct-when-empty: expired quotes leave
                   the book empty rather than stale, it records when it last
