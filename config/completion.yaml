@@ -561,7 +561,7 @@ phase_2:
                   its baseline matches, which is also what caught the USD
                   grid at 0.3185 against 0.3244. Also outstanding: the older
                   IBOR grids are not wired"}
-  P2_6:  {done: 0.97, name: "SWPM multi-curve CSA-aware discounting",
+  P2_6:  {done: 0.98, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
                   bootstrapped against an exogenous discount curve (never
@@ -590,7 +590,7 @@ phase_2:
                   product set this does not yet cover: OIS legs (daily
                   compounding), cross-currency with notional exchange and
                   MtM resets, inflation, swaptions/caps/floors, CMS, asset
-                  swaps, cancellable and extendible, total return.
+                  swaps, cancellable and extendible, total return. Caps and floors now ship (treble/analytics/derivatives/capfloor.py), built on the swaption pricers rather than restating them: a caplet IS a one-period payer swaption, so the annuity is that period's accrual times its discount factor and Black/Bachelier are called unchanged. Two copies of Black drift — one gets an edge-case fix, the other does not — and the symptom is a cap and a swaption disagreeing about the same option. Writing the tests corrected a claim in them: put-call parity was billed as catching a wrong accrual, and it cannot. The annuity multiplies the caplet values and the strike leg alike, so it cancels; hard-coding accrual to a constant left all 27 assertions green, including an irregular schedule written specifically to catch that. The annuity is now pinned directly and the absolute level anchored to the closed-form ATM Bachelier price computed outside the pricer — those four fail under the same mutation. Parity is kept beside them, narrowed to what it does check: a dropped period, a mis-paired one, or an option priced on the wrong side.
                   The SWPM *screen* now ships: three tabs (valuation, curve
                   environment, cash flow schedule) rendering on both
                   surfaces from one definition, with conformance cases per
