@@ -44,6 +44,7 @@ dependencies = [
   "typer>=0.12",
   "rich>=13.8",
   "nats-py>=2.9.0",
+  "aiokafka>=0.12.0",
   "grpcio>=1.83.0",
   "grpcio-tools>=1.83.0",
 ]
@@ -119,7 +120,7 @@ ignore_errors = true
 follow_imports = "skip"
 
 [[tool.mypy.overrides]]
-module = ["QuantLib.*", "xlwings.*", "lightgbm.*", "scipy.*", "pyarrow.*", "grpc.*"]
+module = ["QuantLib.*", "xlwings.*", "lightgbm.*", "scipy.*", "pyarrow.*", "grpc.*", "aiokafka.*"]
 ignore_missing_imports = true
 # xlwings re-exports its decorators (`func`, `arg`, `ret`) implicitly, which
 # strict mode rejects. Relaxed for this dependency only rather than

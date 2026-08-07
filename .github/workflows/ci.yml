@@ -25,8 +25,23 @@ jobs:
           uv python install 3.12
           uv venv --python 3.12
           uv pip install -e ".[dev]"
-      # The transport tests refuse to skip when the broker is absent
-      # (tests/plant/conftest.py), so CI must have it or `make check` fails
+      # The Kafka broker is a JVM process. Pinned rather than inherited:
+      # ubuntu-latest's default JDK is not a promise, and an unstated
+      # environment assumption is how `make proto` stayed broken on every
+      # clean checkout.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      # ~120MB of broker binaries, pinned by version, so the cache key is
+      # exact and a version bump misses rather than serving a stale broker.
+      - name: Cache brokers
+        uses: actions/cache@v4
+        with:
+          path: .tools
+          key: brokers-${{ runner.os }}-nats2.14.4-kafka3.9.1
+      # The transport tests refuse to skip when a broker is absent
+      # (tests/plant/conftest.py), so CI must have them or `make check` fails
       # loudly. That is the intended behaviour: a transport suite that
       # silently degrades to an in-process fake has verified nothing.
       - name: Broker binaries

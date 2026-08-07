@@ -78,7 +78,7 @@ phase_1:
 # separate work-package plan to track against, and inventing one would put a
 # second set of numbers beside the gate's own.
 phase_2:
-  P2_1:  {done: 0.9, name: "ticker plant — conflated display, unconflated TPIPE",
+  P2_1:  {done: 1.0, name: "ticker plant — conflated display, unconflated TPIPE",
           basis: "the conflation split, current-state cache, sequence-gap
                   detection and bounded TPIPE buffer ship and are
                   mutation-verified. TGN and TCMP composites now ship too
@@ -202,13 +202,48 @@ phase_2:
                   wildcard this design does not yet use, and the checks that
                   can actually fail are the property tests in
                   TestSubjectEncoding, verified by removing it.
-                  Outstanding: Redpanda/Kafka. It is not implemented and not
-                  exercised anywhere here, so the spec's two-broker topology
-                  (§713 durable log, §625 fanout) is one broker doing both
-                  jobs. The seam is what a Kafka implementation would be
-                  written against; nothing has tested the partitioned
-                  multi-consumer case that is the actual reason the spec
-                  names it.
+                  The Kafka/Redpanda transport now ships too
+                  (treble/plant/kafka.py), so the spec's two-broker topology
+                  (§713 durable log, §625 fanout) is two brokers, and the
+                  conformance suite runs three implementations rather than
+                  two. It is tested against a real Apache Kafka 3.9.1 broker
+                  in KRaft mode — no ZooKeeper, no Docker, started per
+                  session by tests/plant/conftest.py. Kafka rather than
+                  Redpanda for a stated reason: Redpanda publishes no broker
+                  binary for either platform (its releases carry only rpk,
+                  the CLI), so running it needs Docker, which this machine
+                  does not have. The two speak one wire protocol, so the
+                  adapter under test is the same adapter; what is NOT claimed
+                  is that Redpanda itself was ever run here. It was not.
+                  Kafka 3.9.1 rather than 4.x because 4.x requires Java 17+
+                  and the dev machine has 16 — pinned so the suite does not
+                  depend on whichever JDK a contributor happens to have, with
+                  CI pinning temurin 17 explicitly rather than inheriting the
+                  runner's default. What Kafka adds over JetStream, and the
+                  reason the spec names it, is keyed partitioning: ticks are
+                  keyed by instrument, so one instrument lands on one
+                  partition and stays ordered while many consumers read in
+                  parallel. Verified by mutation — remove the key and the
+                  ordering test fails with [3, 4, 5, 6, 7, 9, ...] against
+                  [1..12]. Getting that demonstration honest required a
+                  design fix: the first version filtered a per-instrument
+                  subscription on the Kafka record key, which is also what
+                  picks the partition, so removing the key broke delivery
+                  outright and the ordering test failed with an empty list —
+                  passing for a reason that had not touched partitioning at
+                  all. Filtering now reads the decoded tick's subject, and
+                  the key is purely a routing decision. Two smaller checks
+                  were strengthened the same way: the partition-count test
+                  asserted only that a module constant exceeded one (true of
+                  an integer regardless of the topic) and now asks the broker
+                  via describe_topics; and create_topics caught Exception,
+                  the identical shape as the NATS connect() bug, now
+                  TopicAlreadyExistsError only. One real semantic difference
+                  is recorded rather than hidden behind a symmetric-looking
+                  interface: Kafka has no server-side subject filter, so
+                  per-instrument subscription discards bytes that already
+                  crossed the wire, and subscribe(None) is the efficient call
+                  on this transport where subscribe(one) is not.
                   A provenance defect was found and fixed alongside: six of
                   fifteen adapters stamped a source_system differing from
                   their own meta.source_id, and three separate EDGAR adapters

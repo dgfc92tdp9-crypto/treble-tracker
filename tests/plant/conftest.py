@@ -15,6 +15,7 @@ rather than something the fixture invented.
 from __future__ import annotations
 
 import contextlib
+import shutil
 import socket
 import subprocess
 import time
@@ -25,6 +26,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 NATS_BINARY = REPO / ".tools" / "nats-server"
+KAFKA_HOME = REPO / ".tools" / "kafka"
 
 
 def _free_port() -> int:
@@ -73,3 +75,83 @@ def nats_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
         with contextlib.suppress(subprocess.TimeoutExpired):
             process.wait(timeout=10)
         process.kill()
+
+
+@pytest.fixture(scope="session")
+def kafka_bootstrap(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
+    """A single-node Kafka broker in KRaft mode, for the session.
+
+    Kafka rather than Redpanda because Redpanda ships no broker binary for
+    either platform — its releases carry only `rpk` — so running it needs
+    Docker. The two speak one wire protocol, so the adapter under test is the
+    same; what is not claimed is that Redpanda itself was run here.
+
+    KRaft, so there is no ZooKeeper to start and stop. Startup is ~20s
+    against the NATS server's millisecond, which is why this is
+    session-scoped and why the broker binaries are cached rather than
+    fetched per run.
+    """
+    start = KAFKA_HOME / "bin" / "kafka-server-start.sh"
+    if not start.exists():
+        raise RuntimeError(
+            f"{KAFKA_HOME} is missing, so the Kafka transport tests would be testing "
+            "nothing. Run `make tools`. An error rather than a skip, for the same "
+            "reason the NATS fixture raises: a transport verified only against an "
+            "in-process fake has not been verified."
+        )
+    if shutil.which("java") is None:
+        raise RuntimeError(
+            "java is required to run the Kafka broker. Stated as an error rather than "
+            "skipped: an unstated environment assumption is how `make proto` stayed "
+            "broken on every clean checkout."
+        )
+
+    port, controller = _free_port(), _free_port()
+    data = tmp_path_factory.mktemp("kraft")
+    config = data / "kraft.properties"
+    config.write_text(
+        "process.roles=broker,controller\n"
+        "node.id=1\n"
+        f"controller.quorum.voters=1@127.0.0.1:{controller}\n"
+        f"listeners=PLAINTEXT://127.0.0.1:{port},CONTROLLER://127.0.0.1:{controller}\n"
+        "inter.broker.listener.name=PLAINTEXT\n"
+        f"advertised.listeners=PLAINTEXT://127.0.0.1:{port}\n"
+        "controller.listener.names=CONTROLLER\n"
+        "listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT\n"
+        f"log.dirs={data / 'logs'}\n"
+        "offsets.topic.replication.factor=1\n"
+        "transaction.state.log.replication.factor=1\n"
+        "transaction.state.log.min.isr=1\n"
+        "num.partitions=3\n"
+    )
+    storage = KAFKA_HOME / "bin" / "kafka-storage.sh"
+    cluster = subprocess.run(  # noqa: S603
+        [str(storage), "random-uuid"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    subprocess.run(  # noqa: S603
+        [str(storage), "format", "-t", cluster, "-c", str(config), "--standalone"],
+        capture_output=True,
+        check=True,
+    )
+
+    log = (data / "server.log").open("wb")
+    process = subprocess.Popen([str(start), str(config)], stdout=log, stderr=log)  # noqa: S603
+    deadline = time.monotonic() + 120.0
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f"kafka exited during startup:\n{(data / 'server.log').read_text()}")
+        with contextlib.suppress(OSError), socket.create_connection(("127.0.0.1", port), 0.25):
+            break
+        time.sleep(0.25)
+    else:
+        process.kill()
+        raise RuntimeError(f"kafka did not accept connections on {port} within 120s")
+
+    try:
+        yield f"127.0.0.1:{port}"
+    finally:
+        process.terminate()
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            process.wait(timeout=30)
+        process.kill()
+        log.close()

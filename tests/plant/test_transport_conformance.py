@@ -20,6 +20,7 @@ import pytest
 
 from treble.core.identifiers import TUID
 from treble.plant.conflation import Tick
+from treble.plant.kafka import KafkaTickTransport
 from treble.plant.natsjs import NatsTickTransport
 from treble.plant.transport import (
     InProcessTransport,
@@ -128,10 +129,18 @@ class TestSubjectEncoding:
 # --------------------------------------------------------------------------
 
 
-@pytest.fixture(params=["in-process", "nats"])
-async def transport(request: pytest.FixtureRequest, nats_url: str) -> AsyncIterator[TickTransport]:
+@pytest.fixture(params=["in-process", "nats", "kafka"])
+async def transport(
+    request: pytest.FixtureRequest, nats_url: str, kafka_bootstrap: str
+) -> AsyncIterator[TickTransport]:
     if request.param == "in-process":
         made: TickTransport = InProcessTransport()
+    elif request.param == "kafka":
+        # A fresh topic per test. Kafka has no server-side subject filter, so
+        # a shared topic would leave `subscribe(None)` reading every earlier
+        # test's ticks, and the wildcard test asserts an exact set.
+        safe = request.node.name.replace("[", ".").replace("]", "")
+        made = await KafkaTickTransport.connect(kafka_bootstrap, topic=f"conf.{safe}")
     else:
         # One stream, not one per test: JetStream refuses two streams whose
         # subjects overlap, and every transport here publishes under

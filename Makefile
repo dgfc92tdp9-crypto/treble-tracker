@@ -9,10 +9,13 @@ setup: tools          ## create the venv and install everything
 # is absent (tests/plant/conftest.py). nats-server is a single Apache-2.0
 # binary, ~6MB, so fetching it is cheaper than vendoring it or than accepting
 # a transport suite that only ever exercises an in-process fake.
-tools: .tools/nats-server  ## fetch the broker binaries the tests need
+tools: .tools/nats-server .tools/kafka  ## fetch the broker binaries the tests need
 
 .tools/nats-server:
 	@scripts/fetch-nats.sh
+
+.tools/kafka:
+	@scripts/fetch-kafka.sh
 
 lint:
 	uv run ruff check .
