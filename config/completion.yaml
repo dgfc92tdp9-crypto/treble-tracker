@@ -483,10 +483,34 @@ phase_2:
                   issuer's name ('American Express Co', 'Bayer US Finance
                   LLC') and not an instrument description. The N-PORT schema
                   has no seniority field at all.
+                  The ratings route is now characterised rather than
+                  merely 'not established'. SEC Rule 17g-7(b), effective
+                  2015-06-15, REQUIRES every NRSRO to publish its credit
+                  rating history — every rating outstanding since 2012-06-15
+                  plus subsequent upgrades, downgrades and withdrawals — as a
+                  public XBRL file under the Record of Credit Ratings
+                  Taxonomy. So ratings history is legally mandated to be
+                  public, free and machine-readable, which is the opposite of
+                  what 'not established' implied.
+                  What blocks it is not availability. Rule 17g-7(b) requires
+                  each NRSRO to host the file on its OWN website and merely
+                  link to it from Exhibit 1 of Form NRSRO; the SEC publishes
+                  no central mirror. So the obstacle is per-vendor terms —
+                  S&P, Moody's and Fitch each impose their own, and this
+                  repository does not automate a source whose terms it has
+                  not read and satisfied. The tractable next step is the
+                  smaller NRSROs (KBRA, Egan-Jones, Morningstar DBRS), whose
+                  terms are unread rather than known-prohibitive, and Exhibit
+                  1 of each Form NRSRO is where the file location is stated.
+                  Recorded now because the previous entry would have sent the
+                  next attempt looking for a source that does not exist
+                  centrally, rather than at the terms question that actually
+                  decides it.
                   Outstanding, and why this is not higher: (a)
                   rating and seniority remain absent — seniority now known to
                   be absent from the only free source this repository has,
-                  rather than merely not yet found — so the similarity metric
+                  and ratings known to be mandated-public but hosted per-NRSRO
+                  behind unread terms — so the similarity metric
                   is incomplete by construction and says so on screen;
                   (b) §15.4's ML residual layer and §15.5's multi-time
                   bid/mid/ask snapshots are untouched"}
