@@ -35,16 +35,28 @@ from datetime import datetime
 
 from treble.core.identifiers import TUID
 from treble.core.provenance import ProvenanceId
+from treble.ingest.registry import restricted_source_ids
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadHash, PayloadStore
 
-#: Sources whose payloads may not be redistributed. Kept here rather than
-#: read from the adapter classes because `tapi` must not import `ingest`
-#: (I7) — the layering contract puts them on separate paths, and a service
-#: reaching into an adapter to ask about a licence would be the first crack
-#: in that.
-RESTRICTED_SOURCES = frozenset({"twelvedata", "dtcc-sdr", "frenchdata"})
+
+#: Sources whose payloads may not be redistributed, read from the adapters'
+#: own `SourceMeta.redistribution_restricted` via the registry.
+#:
+#: This was a hardcoded set, justified in a comment claiming `tapi` must not
+#: import `ingest`. That claim was false — `tapi/export.py` has imported
+#: `restricted_source_ids` since the export guard was built, and `ingest` is
+#: not in the layered contract at all. So the duplication bought nothing and
+#: cost the thing duplication always costs: a second list to forget. It
+#: already disagreed with the registry, listing three sources where the
+#: adapters declare more.
+#:
+#: One source of truth, and it is the adapter, because that is where the
+#: licence was read.
+def restricted_sources() -> frozenset[str]:
+    """Source ids whose payloads may not leave this install."""
+    return restricted_source_ids()
 
 
 class DocumentUnavailableError(RuntimeError):
@@ -91,6 +103,7 @@ def documents_for(store: DuckStore, subject: TUID, *, as_of: datetime) -> list[D
     for fact in facts:
         counts[fact.provenance_id] = counts.get(fact.provenance_id, 0) + 1
 
+    restricted = restricted_sources()
     refs: list[DocumentRef] = []
     seen: set[str] = set()
     for provenance_id, count in counts.items():
@@ -109,7 +122,7 @@ def documents_for(store: DuckStore, subject: TUID, *, as_of: datetime) -> list[D
                 source_uri=record.source_uri,
                 retrieved_at=record.retrieved_at,
                 fact_count=count,
-                redistribution_restricted=record.source_system in RESTRICTED_SOURCES,
+                redistribution_restricted=record.source_system in restricted,
             )
         )
     return sorted(refs, key=lambda r: r.retrieved_at, reverse=True)
@@ -155,10 +168,10 @@ def ingest_history(log: IngestLog, *, source: str | None = None) -> list[dict[st
 
 
 __all__ = [
-    "RESTRICTED_SOURCES",
     "DocumentRef",
     "DocumentUnavailableError",
     "document_bytes",
     "documents_for",
     "ingest_history",
+    "restricted_sources",
 ]

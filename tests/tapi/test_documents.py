@@ -24,6 +24,7 @@ from treble.tapi.documents import (
     document_bytes,
     documents_for,
     ingest_history,
+    restricted_sources,
 )
 
 EARLY = datetime(2026, 7, 1, 9, 0, tzinfo=UTC)
@@ -141,6 +142,15 @@ class TestRedistributionTravels:
         make the guard decorative."""
         _write(store, payloads, body=b"x", source="twelvedata", when=LATE, fields=("A",))
         assert documents_for(store, SUBJECT, as_of=datetime.now(UTC))[0].redistribution_restricted
+
+    def test_the_flag_comes_from_the_adapter_not_a_copy(self) -> None:
+        """It was a hardcoded set of three, justified by a false claim that
+        tapi cannot import ingest. The registry derives it from each
+        adapter SourceMeta, which is where the licence was actually read."""
+        from treble.ingest.registry import restricted_source_ids
+
+        assert restricted_sources() == restricted_source_ids()
+        assert "twelvedata" in restricted_sources()
 
     def test_an_unrestricted_source_is_not_flagged(
         self, store: DuckStore, payloads: PayloadStore

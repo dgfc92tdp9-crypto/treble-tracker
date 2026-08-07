@@ -171,6 +171,52 @@ def fit_residual_model(observations: Sequence[ResidualObservation]) -> ResidualM
     )
 
 
+@model(
+    model_id="tval.explained_residual",
+    version="1.0",
+    spec_section="§15.4",
+    summary="Residual left after applying a model that beat the null",
+)
+def explained_residual_bp(
+    fitted: ResidualModel | None, raw_residual_bp: float
+) -> tuple[float, str]:
+    """The part of a residual the model claims to explain, and why.
+
+    **This is the function that makes `is_useful` mean something.** The
+    model shipped with a skill measurement that nothing consulted, which is
+    the same shape as a flag that is set and never read — and this project
+    has now fixed two of those in one day. A gate nobody passes through is
+    not a gate.
+
+    Returns the residual left after subtracting what the model explains,
+    together with a reason a screen can show. Three outcomes, and two of
+    them subtract nothing:
+
+    - No model fitted: the raw residual stands.
+    - Fitted but not useful: the raw residual stands, and the reason says
+      the model was measured and rejected rather than absent. Those are
+      different states and a screen that showed them alike would hide that
+      somebody had looked.
+    - Useful: the residual is scaled by the model's skill, so a model that
+      beats the null by 12% moves the number by 12% of it rather than
+      claiming the whole thing. Skill is fractional error reduction, not a
+      per-bond prediction, and treating it as one would overstate what a
+      cross-validated average licenses.
+    """
+    if fitted is None:
+        return raw_residual_bp, "no residual model fitted"
+    if not fitted.is_useful:
+        return raw_residual_bp, (
+            f"residual model rejected: {fitted.skill:+.1%} skill against the null "
+            f"over {fitted.observations} bonds, below the {MIN_SKILL:.0%} bar"
+        )
+    explained = raw_residual_bp * fitted.skill
+    return raw_residual_bp - explained, (
+        f"residual model applied: {fitted.skill:.1%} skill over "
+        f"{fitted.observations} bonds, {explained:+.1f}bp explained"
+    )
+
+
 __all__ = [
     "FOLDS",
     "MIN_OBSERVATIONS",
@@ -178,5 +224,6 @@ __all__ = [
     "ResidualModel",
     "ResidualModelUnavailableError",
     "ResidualObservation",
+    "explained_residual_bp",
     "fit_residual_model",
 ]
