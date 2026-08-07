@@ -38,7 +38,12 @@ from treble.tapi.swap_market import DISCOUNT_CURVE, SwapMarket, build_swap_marke
 #: rather than silently priced off a default: a cross-currency basis of
 #: zero is not a neutral assumption, it is a claim that the basis is zero.
 UNFED_PRODUCTS: dict[str, str] = {
-    "inflation": "no inflation index is ingested; the ECB HICP series would feed it",
+    "inflation": (
+        "ECB HICP is now ingested (ingest/ecb_hicp.py), so the index exists. What "
+        "is still missing is the projected index at maturity: a breakeven curve, "
+        "which no free source publishes and which this cannot invent from spot "
+        "levels without assuming the very thing the swap prices"
+    ),
     "crosscurrency": (
         "ECB supplies spot but no cross-currency basis is ingested, and a basis of "
         "zero is a claim rather than a default"
