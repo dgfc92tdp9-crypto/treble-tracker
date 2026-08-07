@@ -15,7 +15,40 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 54.56%** — computed by `python scripts/completion.py`, never written by hand.
+**Completion: 54.56%**
+
+### Phase 2 gate audit (2026-08-07)
+
+Every criterion in CLAUDE.md §8 Phase 2 audited against test evidence, on a
+green `make gate` (1,704 tests, 89% coverage, no module unmeasured).
+
+| Criterion | Tests | Status |
+|---|---|---|
+| Ticker plant, conflated + unconflated TPIPE | 131 | met |
+| `ALLQ` correct-when-empty; contribution API | 28 | met |
+| `PORT` with TFM3 v1; validation tests passing | 66 | met |
+| `TVAL` v1 with score and transparency drill-down | 60 | met |
+| `CDSW` against ISDA published test cases | 65 | met |
+| `SWPM` multi-curve CSA-aware discounting | 242 | met |
+| Canvas with FDC3 context propagation | 55 | met |
+| gRPC + Arrow Flight transports | 54 | met |
+
+**All eight gate criteria are met.** The ledger fractions below 1.00 track a
+wider scope than the gate: the spec's full §12.1 product list, §15.4/§15.5,
+layout gestures, `ems`. That gap is deliberate and worth stating plainly —
+the checklist is the phase gate, and the ledger is what the spec asks for in
+total. Reporting the phase as incomplete because the ledger is would
+misstate the gate; reporting it as finished because the gate is would
+misstate the spec.
+
+Remaining ledger items, none of which is a gate criterion:
+
+- **P2_4 §15.5** multi-time bid/mid/ask snapshots — data-blocked, no free
+  intraday quote source.
+- **P2_7** drag/resize gestures in the Tauri shell (renderer wiring onto
+  `render/layout.py`), and FDC3 federation, which needs a real desktop agent.
+- **P2_8 `ems`** — Phase 3 by the spec (§23.3 puts FIX connectivity there).
+ — computed by `python scripts/completion.py`, never written by hand.
 
 > **The figure is generated, not stated.** `config/completion.yaml` is the ledger: fixed phase
 > weights (P1 30 / P2 25 / P3 15 / P4 20 / P5 10) and a fraction per work package. The script
