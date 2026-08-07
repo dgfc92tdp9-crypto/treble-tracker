@@ -29,5 +29,7 @@ stage "tests + coverage"  "$VENV/pytest" -q
 stage "module coverage"    "$VENV/python" scripts/check_module_coverage.py
 # The class of defect that manual sweeps kept finding and nothing failed on.
 stage "unread members"    "$VENV/python" scripts/check_unread_members.py
+# Tested and never called: what the two gates above cannot see.
+stage "reachability"      "$VENV/python" scripts/check_unreachable_modules.py
 
 printf '\nGATE GREEN — safe to commit\n'
