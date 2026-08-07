@@ -78,7 +78,7 @@ phase_1:
 # separate work-package plan to track against, and inventing one would put a
 # second set of numbers beside the gate's own.
 phase_2:
-  P2_1:  {done: 0.8, name: "ticker plant — conflated display, unconflated TPIPE",
+  P2_1:  {done: 0.9, name: "ticker plant — conflated display, unconflated TPIPE",
           basis: "the conflation split, current-state cache, sequence-gap
                   detection and bounded TPIPE buffer ship and are
                   mutation-verified. TGN and TCMP composites now ship too
@@ -162,7 +162,53 @@ phase_2:
                   notional deliberately not stored under valUSD because a
                   swap's notional is its size and a screen summing the two
                   would report a book several times larger than it is.
-                  Outstanding: the Redpanda and NATS transports.
+                  The NATS JetStream transport now ships
+                  (treble/plant/natsjs.py) behind a broker-agnostic seam
+                  (treble/plant/transport.py), with an in-process
+                  implementation of the same protocol for the local-only
+                  install, and one conformance suite run against both — the
+                  discipline render/ uses for renderers, because a transport
+                  exercised only in-process has never had its wire format
+                  tested and the symptom is a tick that arrives subtly wrong
+                  rather than an exception. The NATS half runs against a real
+                  nats-server subprocess (Apache-2.0, pinned v2.14.4, ~6MB,
+                  fetched by `make tools`); a missing binary is an error, not
+                  a skip, because a skipped transport test is a check that
+                  cannot fail and this project has shipped two of those.
+                  test_the_broker_is_real asserts the server greets with a
+                  NATS INFO line, since every other test would also pass
+                  against a fixture that quietly returned a fake. JetStream
+                  carries the durable-log role too, so replay() rebuilds a
+                  tape published before any subscriber existed (I5 for the
+                  live path) and a replayed tape still trips the plant's own
+                  gap detector, which is what carrying `sequence` over the
+                  wire is for. Four defects were found by writing it rather
+                  than by review: subscribe() was an async generator, so
+                  nothing registered with the broker until the first read and
+                  a publish in between was accepted, retained and never
+                  delivered — both implementations hung, and subscription is
+                  now an awaited fact; connect() caught Exception around
+                  add_stream and so translated JetStream's real 'subjects
+                  overlap with an existing stream' into a misleading 'stream
+                  not found'; a test caught Exception around plant.publish
+                  and turned a misspelled method name into a plausible error
+                  string it then asserted on; and the end-to-end dotted-id
+                  test claimed to guard the subject escaping and does not —
+                  removing the escaping leaves it passing, because publish
+                  and subscribe build the same exact subject and the
+                  all-instruments pattern is ticks.>, which matches any
+                  depth. That claim is corrected in place rather than
+                  deleted: the escaping is defensive against a single-level
+                  wildcard this design does not yet use, and the checks that
+                  can actually fail are the property tests in
+                  TestSubjectEncoding, verified by removing it.
+                  Outstanding: Redpanda/Kafka. It is not implemented and not
+                  exercised anywhere here, so the spec's two-broker topology
+                  (§713 durable log, §625 fanout) is one broker doing both
+                  jobs. The seam is what a Kafka implementation would be
+                  written against; nothing has tested the partitioned
+                  multi-consumer case that is the actual reason the spec
+                  names it.
                   A provenance defect was found and fixed alongside: six of
                   fifteen adapters stamped a source_system differing from
                   their own meta.source_id, and three separate EDGAR adapters

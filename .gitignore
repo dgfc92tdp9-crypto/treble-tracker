@@ -27,3 +27,6 @@ mutants/
 # Never committed: a committed stub can silently diverge from the proto
 # beside it — it keeps compiling and keeps serving a schema nobody declared.
 treble/tapi/_generated/
+
+# Broker binaries fetched by `make tools` (Apache-2.0, not vendored).
+.tools/

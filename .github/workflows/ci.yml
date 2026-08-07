@@ -25,6 +25,12 @@ jobs:
           uv python install 3.12
           uv venv --python 3.12
           uv pip install -e ".[dev]"
+      # The transport tests refuse to skip when the broker is absent
+      # (tests/plant/conftest.py), so CI must have it or `make check` fails
+      # loudly. That is the intended behaviour: a transport suite that
+      # silently degrades to an in-process fake has verified nothing.
+      - name: Broker binaries
+        run: make tools
       - name: Check
         run: make check
       - name: Dependency audit (spec §22.4)

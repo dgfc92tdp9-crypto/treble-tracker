@@ -1,9 +1,18 @@
-.PHONY: app audit check clean completion conformance deep desktop desktop-install drift gate golden imports lint mutate mutation proto setup test tui types web
+.PHONY: app audit check clean completion conformance deep desktop desktop-install drift gate golden imports lint mutate mutation proto setup test tools tui types web
 
-setup:                ## create the venv and install everything
+setup: tools          ## create the venv and install everything
 	uv venv --python 3.12
 	uv pip install -e ".[dev]"
 	uv run pre-commit install
+
+# The transport tests run against a real broker, and refuse to skip when it
+# is absent (tests/plant/conftest.py). nats-server is a single Apache-2.0
+# binary, ~6MB, so fetching it is cheaper than vendoring it or than accepting
+# a transport suite that only ever exercises an in-process fake.
+tools: .tools/nats-server  ## fetch the broker binaries the tests need
+
+.tools/nats-server:
+	@scripts/fetch-nats.sh
 
 lint:
 	uv run ruff check .
@@ -51,7 +60,7 @@ web:                   ## compile the shared TS renderer (a renderer under confo
 proto:                 ## regenerate the gRPC stubs from proto/tapi.proto
 	./scripts/gen_proto.sh
 
-check: proto lint types imports web test   ## everything CI runs
+check: proto tools lint types imports web test   ## everything CI runs
 
 tui:
 	uv run treble tui

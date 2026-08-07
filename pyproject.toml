@@ -43,6 +43,7 @@ dependencies = [
   # cli
   "typer>=0.12",
   "rich>=13.8",
+  "nats-py>=2.9.0",
   "grpcio>=1.83.0",
   "grpcio-tools>=1.83.0",
 ]
