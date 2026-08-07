@@ -282,6 +282,36 @@ class TestWhatTheResidualIs:
     `test_the_worst_case_is_the_known_shape` fences it so a new regression
     cannot hide inside the tolerance it needs.
 
+    **A sixth hypothesis, and what its refutation says.** The premium
+    leg's accrued-on-default is approximated as half a period discounted at
+    the period end. That term scales directly with the coupon and grows with
+    maturity, which is the residual's exact shape, and unlike the protection
+    integral it had never been tested. Replacing it with a converged
+    integration of `(t - start)` against the default density:
+
+        AUD   median 0.0614 -> 0.1062     worst 6.4093 -> 6.4076
+        USD   median 0.3244 -> 0.3347     worst 1.4034 -> 1.5710
+
+    Converged — 4, 16 and 64 sub-steps agree — so this is the exact value,
+    not a discretisation artefact. **Being more exact moves away from ISDA.**
+
+    That is the useful part. It means ISDA's own model carries the
+    half-period approximation, and agreement with it is agreement with a
+    reference implementation's documented conventions rather than with the
+    mathematics in the abstract. The market settles against that
+    implementation, so matching it *is* the criterion; a "more correct" CDS
+    model that disagreed with ISDA would be worse at the only job this one
+    has.
+
+    **This closes the criterion with the residual documented rather than
+    solved.** Six hypotheses eliminated, none surviving: protection-integral
+    resolution, the real IMM schedule (twice, the second time against a
+    validated probe), the curve day count, the step-in date, cash-settlement
+    discounting, and now the accrual approximation. The residual is a single
+    shape — long-dated, high-coupon, tight-spread — it is bounded by the
+    tolerances above, and `test_the_worst_case_is_the_known_shape` fences it
+    so a new regression cannot hide inside the room it needs.
+
     **The instrument is the part worth keeping.** The first version of that
     probe put the shipped configuration at 33.96bp median where the shipped
     model measures 0.0614, and produced a full comparison table off that

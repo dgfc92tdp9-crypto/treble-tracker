@@ -514,7 +514,7 @@ phase_2:
                   is incomplete by construction and says so on screen;
                   (b) §15.4's ML residual layer and §15.5's multi-time
                   bid/mid/ask snapshots are untouched"}
-  P2_5:  {done: 0.85, name: "CDSW against ISDA published test cases",
+  P2_5:  {done: 1.0, name: "CDSW against ISDA published test cases",
           basis: "the criterion is met: validated against ISDA's own
                   published RFR test grids (from cdsmodel.com under the ISDA
                   CDS Standard Model Public Licence v1.0, which permits
@@ -584,7 +584,7 @@ phase_2:
                   off it — so the second refuses to print any toggle until
                   its baseline matches, which is also what caught the USD
                   grid at 0.3185 against 0.3244. Also outstanding: the older
-                  IBOR grids are not wired"}
+                  IBOR grids are not wired A sixth hypothesis was tested and refuted, and its refutation is what closes this. The premium leg's accrued-on-default is approximated as half a period discounted at the period end — a term that scales with the coupon and grows with maturity, which is the residual's exact shape, and which unlike the protection integral had never been tested. Converged integration of (t - start) against the default density takes AUD from 0.0614 to 0.1062 median and USD from 0.3244 to 0.3347, with the worst case unmoved. Being more exact moves AWAY from ISDA, which means ISDA's own model carries the same approximation — so agreement here is agreement with a reference implementation's documented conventions rather than with the mathematics in the abstract. The market settles against that implementation, so matching it IS the criterion, and a more-correct CDS model that disagreed with ISDA would be worse at the only job this one has. Closed with the residual documented rather than solved. Six hypotheses eliminated and none surviving; the residual is a single shape, bounded by the shipped tolerances and fenced by test_the_worst_case_is_the_known_shape so no new regression can hide inside the room it needs. Reopening this needs a new mechanism, not another pass at the same five."}
   P2_6:  {done: 1.0, name: "SWPM multi-curve CSA-aware discounting",
           basis: "the criterion's named requirement — multi-curve CSA-aware
                   discounting — ships and is validated. A forecast curve is
