@@ -798,7 +798,7 @@ phase_2:
                   can check the engine against the market data on the same
                   row rather than taking the spread on trust. A day with no
                   3M curve says so instead of drawing an empty table"}
-  P2_7:  {done: 0.95, name: "Canvas with FDC3 context propagation",
+  P2_7:  {done: 0.98, name: "Canvas with FDC3 context propagation",
           basis: "the criterion's named semantic ships and is
                   mutation-verified 6/6. Colour-group context propagation
                   (§5.3): a broadcast reaches every component on the
@@ -883,8 +883,7 @@ phase_2:
                   by a field name would have left the desktop client drawing
                   nothing while every renderer test stayed green.
                   Outstanding, and why this is not 1.0: layouts are
-                  configured rather than authored — no in-app drag, resize
-                  or save — and FDC3 interop is modelled against the
+                  configured rather than authored — layout authoring now ships (treble/render/layout.py): move, resize, save and restore, with the rules in one place so the TUI, the web renderer and the desktop shell cannot disagree about whether a drop was legal, which is the reason screen definitions are shared rather than reimplemented (I6). Mouse handling stays in each renderer; the rules do not. An overlap is refused rather than nudged, because a layout manager that moves a window the user did not drag has decided something for them and the next drag starts from a position they did not choose. Nothing mutates in place, so a refused drag cannot leave a half-modified layout — the state that would otherwise persist to disk and be restored as the workspace. Restoring onto fewer displays keeps the display index and reports the stranded components rather than reflowing them, since silent reflow loses the arrangement permanently: the user reconnects the monitor and the layout does not come back. Mutation-checked, and the second mutation exposed the eighth unfailable check of the session — the atomicity test asserted only that no .partial file was left behind, which is equally true of a plain write_text, so replacing the atomic save with a direct one left everything passing. It now interrupts the rename and asserts the previous layout survives intact, which is the property atomicity actually buys. Outstanding: the drag and resize gestures themselves in the desktop shell, which are renderer wiring onto these operations rather than new rules, and FDC3 interop is modelled against the
                   standard's context shape without a real desktop agent to
                   federate with"}
   P2_8:  {done: 0.98, name: "gRPC + Arrow Flight transports",
