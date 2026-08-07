@@ -59,8 +59,6 @@ AWAITING_WIRING: dict[str, str] = {
     ),
     "treble.analytics.derivatives.assetswap": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.derivatives.cancellable": "§12.1 pricer; no screen calls it yet.",
-    "treble.analytics.derivatives.capfloor": "§12.1 pricer; no screen calls it yet.",
-    "treble.analytics.derivatives.cms": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.derivatives.crosscurrency": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.derivatives.inflation": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
@@ -70,6 +68,10 @@ AWAITING_WIRING: dict[str, str] = {
     ),
     "treble.analytics.tval.residual": (
         "TVAL §15.4. explained_residual_bp exists and no evaluated-price path calls it."
+    ),
+    "treble.tapi.products": (
+        "§12.1 product pricing off the stored curves. Gives capfloor and cms their "
+        "first callers; the SWPM product tab is what will call this."
     ),
     "treble.tapi.documents": "The docs service; no screen binds it yet.",
     "treble.tapi.evaluated": "Contributed-price evaluation; no screen binds it yet.",
