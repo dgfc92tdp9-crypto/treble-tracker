@@ -60,10 +60,6 @@ class Bar:
     #: has not, and its close is not a close.
     complete: bool
 
-    @property
-    def is_priceable(self) -> bool:
-        return self.trades > 0
-
 
 class NoTicksError(ValueError):
     """No ticks to aggregate.

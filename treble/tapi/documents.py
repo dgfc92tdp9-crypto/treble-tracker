@@ -78,12 +78,6 @@ class DocumentRef:
     #: Whether the source forbids redistributing the payload.
     redistribution_restricted: bool
 
-    @property
-    def size_unknown(self) -> bool:
-        """The store is asked for bytes only on request, so size is not
-        known from the descriptor alone."""
-        return True
-
 
 def documents_for(store: DuckStore, subject: TUID, *, as_of: datetime) -> list[DocumentRef]:
     """Every source document behind a subject's facts, newest first.

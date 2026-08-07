@@ -60,11 +60,3 @@ class FixedBondSpec(BaseModel):
             if starts != sorted(starts):
                 raise ValueError("exercise schedule not monotonic in date")
         return self
-
-    @property
-    def is_callable(self) -> bool:
-        return bool(self.calls)
-
-    @property
-    def is_putable(self) -> bool:
-        return bool(self.puts)

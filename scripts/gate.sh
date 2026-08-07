@@ -27,5 +27,7 @@ stage "web renderer"      ./scripts/build_web.sh
 stage "tests + coverage"  "$VENV/pytest" -q
 # After pytest, so it reads the data this run produced rather than the last.
 stage "module coverage"    "$VENV/python" scripts/check_module_coverage.py
+# The class of defect that manual sweeps kept finding and nothing failed on.
+stage "unread members"    "$VENV/python" scripts/check_unread_members.py
 
 printf '\nGATE GREEN — safe to commit\n'
