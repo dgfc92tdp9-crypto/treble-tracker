@@ -25,6 +25,7 @@ from treble.tapi.factor_model import (
     RISK_FREE,
     FactorModelUnavailableError,
     build_factor_model,
+    equity_returns,
     template_portfolio,
 )
 
@@ -184,3 +185,75 @@ class TestTheTemplatePortfolio:
         refuse — correctly, but for a portfolio this module built itself."""
         fitted = build_factor_model(_store(tmp_path), as_of=AS_OF)
         assert set(template_portfolio(fitted)) <= set(fitted.exposures.assets)
+
+
+class TestPricesBecomeReturns:
+    """The bridge from the Twelve Data adapter to the model.
+
+    ADJ_CLOSE is already a total return -- split- and dividend-adjusted,
+    established by measurement -- so a price relative is the return and no
+    dividend term is added. Adding one would double-count it.
+    """
+
+    @staticmethod
+    def _write_prices(store: DuckStore, prices: dict[date, float], symbol: str = "IBM") -> None:
+        prov = Provenance(
+            source_system="twelvedata",
+            source_uri="https://api.twelvedata.com/time_series?symbol=IBM&interval=1day",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.API,
+            extractor_version="1",
+            payload_hash="0" * 64,
+        )
+        store.write_provenance([prov])
+        store.write_facts(
+            [
+                Fact(
+                    subject=f"equity:{symbol}",
+                    field="ADJ_CLOSE",
+                    value=price,
+                    effective_from=day,
+                    effective_to=day,
+                    knowledge_from=KNOWN,
+                    provenance_id=prov.id,
+                )
+                for day, price in prices.items()
+            ]
+        )
+
+    def test_a_price_series_becomes_one_fewer_return(self, tmp_path: Path) -> None:
+        """N prices bound N-1 returns. A series that produced N would have
+        invented a return for the first observation, out of nothing."""
+        store = DuckStore(tmp_path / "t.db")
+        self._write_prices(
+            store,
+            {date(2026, 7, 1): 100.0, date(2026, 7, 2): 110.0, date(2026, 7, 3): 99.0},
+        )
+        series = equity_returns(store, as_of=datetime.now(UTC))["IBM"]
+        assert len(series) == 2
+        assert series[date(2026, 7, 2)] == pytest.approx(0.10)
+        assert series[date(2026, 7, 3)] == pytest.approx(-0.10)
+
+    def test_a_gap_gives_one_return_not_an_interpolated_pair(self, tmp_path: Path) -> None:
+        """Filling the hole would invent an observation and then compute two
+        returns from it, both fabricated. The gap stays visible in the dates."""
+        store = DuckStore(tmp_path / "t.db")
+        self._write_prices(store, {date(2026, 7, 1): 100.0, date(2026, 7, 10): 120.0})
+        series = equity_returns(store, as_of=datetime.now(UTC))["IBM"]
+        assert set(series) == {date(2026, 7, 10)}
+        assert series[date(2026, 7, 10)] == pytest.approx(0.20)
+
+    def test_a_non_positive_price_yields_no_return(self, tmp_path: Path) -> None:
+        """A data error, not a company worth nothing. Dividing by it would
+        produce a number that reads as a -100% day."""
+        store = DuckStore(tmp_path / "t.db")
+        self._write_prices(
+            store,
+            {date(2026, 7, 1): 100.0, date(2026, 7, 2): 0.0, date(2026, 7, 3): 105.0},
+        )
+        store = DuckStore(tmp_path / "t.db")
+        assert equity_returns(store, as_of=datetime.now(UTC)).get("IBM", {}) == {}
+
+    def test_no_prices_means_no_asset_rather_than_an_empty_one(self, tmp_path: Path) -> None:
+        store = DuckStore(tmp_path / "t.db")
+        assert equity_returns(store, as_of=datetime.now(UTC)) == {}

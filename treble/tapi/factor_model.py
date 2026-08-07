@@ -26,6 +26,7 @@ job and screens must not reach past it (I7). The estimation is still
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -107,12 +108,60 @@ def _series(store: DuckStore, namespace: str, *, as_of: datetime) -> dict[str, d
     return out
 
 
+#: Namespace the Twelve Data adapter writes prices under.
+EQUITY_NS = "equity"
+
+
+def equity_returns(store: DuckStore, *, as_of: datetime) -> dict[str, dict[date, float]]:
+    """Daily returns derived from stored `ADJ_CLOSE` prices.
+
+    The bridge between the price adapter and the model. `ADJ_CLOSE` is a
+    total return already — split- and dividend-adjusted, established by
+    measurement rather than by the vendor's say-so — so a simple
+    price relative *is* the total return for the day and no dividend term is
+    added. Adding one here would double-count it.
+
+    **Consecutive stored days, not calendar days.** A return is computed
+    between adjacent observations in the series, whatever the gap: over a
+    weekend that is correct, and over a missing day it is a two-day return
+    labelled with one date. The alternative is worse — interpolating a price
+    to fill the hole would invent an observation and then compute two
+    returns from it, both fabricated. The gap is left visible in the dates
+    instead, and `ReturnPanel.aligned` drops any date the factors do not
+    also have.
+
+    **A non-positive price yields no return.** It is a data error, not a
+    company worth nothing, and `log`/division would either raise or produce
+    a number that looks like a -100% day.
+    """
+    out: dict[str, dict[date, float]] = {}
+    for subject in store.subjects_with_prefix(f"{EQUITY_NS}:", as_of=as_of):
+        name = str(subject).split(":", 1)[1]
+        prices = sorted(
+            (fact.effective_from, float(fact.value))
+            for fact in store.read(TUID(str(subject)), "ADJ_CLOSE", as_of=as_of)
+            if isinstance(fact.value, float | int)
+        )
+        series = {
+            day: (price / previous) - 1.0
+            for (_, previous), (day, price) in itertools.pairwise(prices)
+            if previous > 0.0 and price > 0.0
+        }
+        if series:
+            out[name] = series
+    return out
+
+
 def build_factor_model(
     store: DuckStore, *, as_of: datetime, window_days: int = WINDOW_DAYS
 ) -> PortfolioModel:
     """Fit the model on the most recent `window_days` of stored returns."""
     factors = _series(store, FACTOR_NS, as_of=as_of)
-    assets = _series(store, ASSET_NS, as_of=as_of)
+    # Contributed portfolio series first, then equities derived from stored
+    # prices. Contributed wins on a name collision: a series somebody stated
+    # outranks one this system inferred, and silently preferring the derived
+    # one would overwrite an input with a calculation.
+    assets = {**equity_returns(store, as_of=as_of), **_series(store, ASSET_NS, as_of=as_of)}
 
     missing = [name for name in (*FACTORS, RISK_FREE) if name not in factors]
     if missing:
@@ -122,7 +171,8 @@ def build_factor_model(
         )
     if not assets:
         raise FactorModelUnavailableError(
-            f"no assets under `{ASSET_NS}:`; there is nothing to hold, let alone to decompose"
+            f"no assets under `{ASSET_NS}:` and no prices under `{EQUITY_NS}:`; there is "
+            "nothing to hold, let alone to decompose"
         )
 
     risk_free = factors[RISK_FREE]
@@ -188,6 +238,7 @@ def template_portfolio(model: PortfolioModel) -> dict[str, float]:
 
 __all__ = [
     "ASSET_NS",
+    "EQUITY_NS",
     "FACTORS",
     "FACTOR_NS",
     "RISK_FREE",
@@ -195,5 +246,6 @@ __all__ = [
     "FactorModelUnavailableError",
     "PortfolioModel",
     "build_factor_model",
+    "equity_returns",
     "template_portfolio",
 ]
