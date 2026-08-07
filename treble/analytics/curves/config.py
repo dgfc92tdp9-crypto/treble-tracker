@@ -85,6 +85,20 @@ class CurveConfig(BaseModel):
     # Futures convexity adjustment (spec §11.1.2): displayed, not buried.
     # None = no futures in the selection; a float = Hull-White mean reversion
     # parameter used by the adjustment when futures arrive (Phase 2 widens this).
+    #: Hull-White mean reversion for the convexity adjustment.
+    #:
+    #: **Declared, hashed, and not yet read by any bootstrap.** Found by
+    #: sweeping for computed members with no reader. It enters
+    #: `content_hash` like every other field, so two configs differing only
+    #: in this value hash differently and build identically — a false cache
+    #: miss, and a false "different model" claim in the I3 envelope.
+    #:
+    #: Latent rather than live, because it defaults to None and nothing in
+    #: this repository sets it. It becomes a real defect the moment somebody
+    #: does. Left in place rather than deleted because removing a field
+    #: changes every stored curve hash, which is a migration and not a
+    #: cleanup; `tests/analytics/curves/test_config.py` pins the situation
+    #: so the next person meets it deliberately.
     convexity_mean_reversion: float | None = None
     discount_basis: str = "self"  # "self" = single-curve; a curve name = multi-curve
     #: The index tenor this curve forecasts ("3M", "6M"), or None for a

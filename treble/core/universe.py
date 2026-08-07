@@ -67,6 +67,25 @@ class UniverseSpec(BaseModel):
 
 
 class RateLimits(BaseModel):
+    """Rate limits, **documented here and enforced by the adapters**.
+
+    A sweep for computed-but-never-consulted members found these had no
+    reader at all: every adapter declares its own
+    `SourceMeta.rate_limit_per_second`, and the token bucket is built from
+    that. Editing this config changes nothing.
+
+    They agree today, so nothing is currently wrong — which is exactly why
+    it went unnoticed, and exactly the state that breaks silently the first
+    time somebody lowers a limit here to be polite to a source and gets the
+    adapter's hardcoded value anyway.
+
+    `core` cannot import `ingest` to derive them (core is the bottom of the
+    layering contract), so the two are tied by
+    `tests/core/test_universe_rate_limits.py`, which fails when they
+    diverge. The adapter stays authoritative because that is where the
+    source's published limit was read.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     edgar_per_second: float = 10.0
