@@ -42,13 +42,11 @@ ENTRY_POINTS: dict[str, str] = {
 #: the backlog. Each line is work someone can pick up, and the reason says
 #: what wiring is missing rather than pretending none is.
 AWAITING_WIRING: dict[str, str] = {
-    "treble.core.master": (
-        "The security master. tapi/local.py resolves through a TickerIndex and its own "
-        "comment says descriptor-based resolution 'needs a security-master ... unbuilt "
-        "lookup'. WP7 is counted complete in the ledger and its output is consulted by "
-        "nothing at runtime."
+    "treble.core.entity_graph": (
+        "Parent/subsidiary graph. core.master is now reachable through "
+        "tapi/security_master.py; this is the half still waiting, since no "
+        "screen asks who owns whom."
     ),
-    "treble.core.entity_graph": "Parent/subsidiary graph; same gap as core.master.",
     "treble.analytics.credit.cds": (
         "CDSW's pricer, validated against ISDA's published grids across six currencies. "
         "There is no CDSW screen, so nothing calls it outside tests."

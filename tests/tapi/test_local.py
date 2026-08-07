@@ -8,12 +8,14 @@ what the TAPI returns is what a screen would actually render.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
+from treble.core.facts import Fact
 from treble.core.identifiers import SecurityQuery, YellowKey
+from treble.core.provenance import ExtractionMethod, Provenance
 from treble.ingest.base import RawPayload
 from treble.ingest.edgar import EdgarCompanyFactsAdapter
 from treble.store.duck import DuckStore
@@ -158,3 +160,61 @@ class TestTickerIndex:
     def test_lookup_is_case_insensitive(self) -> None:
         index = TickerIndex({"IBM": 51143})
         assert index.cik("ibm") == index.cik("IBM") == 51143
+
+
+class TestTheSecurityMasterResolves:
+    """WP7's master was built, tested, and consulted by nothing. This
+    module's own comment said descriptor-based resolution "needs a
+    security-master ... unbuilt lookup" while the lookup sat one import
+    away. The reachability gate surfaced it; this is the path that uses it.
+    """
+
+    @staticmethod
+    def _store_with_mapping(tmp_path: Path) -> DuckStore:
+        store = DuckStore(tmp_path / "m.db")
+        prov = Provenance(
+            source_system="openfigi",
+            source_uri="https://api.openfigi.com/v3/mapping",
+            retrieved_at=datetime(2026, 3, 1, tzinfo=UTC),
+            method=ExtractionMethod.API,
+            extractor_version="1",
+            payload_hash="0" * 64,
+        )
+        store.write_provenance([prov])
+        store.write_facts(
+            [
+                Fact(
+                    subject="figi:BBG000BLNNH6",
+                    field=field,
+                    value=value,
+                    effective_from=date(2026, 1, 1),
+                    effective_to=date(2026, 1, 1),
+                    knowledge_from=datetime(2026, 3, 1, tzinfo=UTC),
+                    provenance_id=prov.id,
+                )
+                for field, value in (
+                    ("openfigi:mapped:ID_CUSIP", "037833100"),
+                    ("openfigi:name", "APPLE INC"),
+                )
+            ]
+        )
+        return store
+
+    def test_a_cusip_with_no_subject_resolves_through_the_master(self, tmp_path: Path) -> None:
+        """Nothing wrote under cusip:037833100, but OpenFIGI mapped it to a
+        FIGI that has facts. Before the master was wired in, this reported
+        "that CUSIP has not been ingested" for an instrument the system
+        could resolve."""
+        tapi = LocalTapi(self._store_with_mapping(tmp_path))
+        resolved = tapi.resolve(
+            SecurityQuery(ticker="037833100", key=YellowKey.CORP, venue=None, descriptor=None)
+        )
+        assert str(resolved) == "figi:BBG000BLNNH6"
+
+    def test_an_unmapped_cusip_still_reports_honestly(self, tmp_path: Path) -> None:
+        """The fallback must not turn a genuine miss into a resolution."""
+        tapi = LocalTapi(self._store_with_mapping(tmp_path))
+        with pytest.raises(SecurityNotFoundError, match="not been ingested"):
+            tapi.resolve(
+                SecurityQuery(ticker="999999999", key=YellowKey.CORP, venue=None, descriptor=None)
+            )

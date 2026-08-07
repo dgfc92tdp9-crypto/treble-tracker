@@ -32,6 +32,7 @@ from treble.store.duck import DuckStore
 from treble.tapi.contribution import ContributionService
 from treble.tapi.factor_model import FACTORS
 from treble.tapi.fields import FIELDS, FieldDef, FieldDictionary
+from treble.tapi.security_master import SecurityMaster, build_security_master
 from treble.tapi.swap_market import SwapMarket
 from treble.tapi.types import FieldResult
 
@@ -171,8 +172,24 @@ class LocalTapi:
         # its correct-when-empty case, which is the Phase 2 criterion rather
         # than a placeholder for it.
         self._contributions = contributions or ContributionService()
+        # Built on first use rather than here: most resolutions never need
+        # it, and building it walks every mapping subject in the store.
+        self._master: SecurityMaster | None = None
 
     # -- resolution ----------------------------------------------------
+
+    def _security_master(self) -> SecurityMaster:
+        """The master, built once and reused.
+
+        Built lazily because most resolutions never need it — a ticker or
+        an already-ingested CUSIP answers from the store directly — and
+        building it walks every mapping subject. Cached because
+        `links_from_facts` is a pure function of the store: rebuilding per
+        lookup would repeat that walk for an identical answer.
+        """
+        if self._master is None:
+            self._master = build_security_master(self._store, as_of=datetime.now(UTC))
+        return self._master
 
     def resolve(self, security: SecurityQuery) -> TUID:
         """Security reference -> storage subject key.
@@ -201,11 +218,18 @@ class LocalTapi:
             # with no facts and render a screen of dashes indistinguishable
             # from a real bond nobody has data for.
             subject = TUID(f"cusip:{security.ticker.upper()}")
-            if not self._store.has_subject(subject):
-                raise SecurityNotFoundError(
-                    f"{security.display()!r}: that CUSIP has not been ingested"
-                )
-            return subject
+            if self._store.has_subject(subject):
+                return subject
+            # Nothing wrote under this CUSIP, but the security master may
+            # still know the instrument under another identifier: OpenFIGI
+            # maps CUSIP to FIGI, and the FIGI subject is where the facts
+            # live. Before this, WP7's master was built, tested and
+            # consulted by nothing, so a CUSIP the system could resolve
+            # reported as "not ingested".
+            resolved = self._security_master().resolve(subject)
+            if resolved is not None and self._store.has_subject(resolved):
+                return resolved
+            raise SecurityNotFoundError(f"{security.display()!r}: that CUSIP has not been ingested")
         if security.key == YellowKey.INDEX and security.venue is None:
             # Macro series are addressable as tickers (spec §7.4).
             return TUID(f"fred:{security.ticker.upper()}")
