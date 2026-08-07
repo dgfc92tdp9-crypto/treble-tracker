@@ -463,7 +463,20 @@ phase_2:
                   while the repository-wide floor passed comfortably, because
                   a floor is an average and an average cannot see one module
                   at zero. It has tests now, verified to fail when the filter
-                  is widened to admit ABS. Seniority itself is NOT
+                  is widened to admit ABS. That average is now closed as a
+                  class rather than a case: `scripts/check_module_coverage.py`
+                  runs after pytest in the gate and fails if any shipped
+                  module has no test touching it at all, with anything
+                  genuinely unmeasurable named in an allowlist alongside the
+                  reason (one entry: the xlwings UDFs, which need Excel).
+                  It found a second module the same way — tapi/vol_surface.py
+                  was also at 0% and now has tests at 92%. Verified by
+                  deleting both test files and watching it name both modules.
+                  It is a gate step rather than a test on purpose: the first
+                  version was a test, and pytest-cov writes .coverage when
+                  the session ends, so it validated the previous run and
+                  skipped outright on a clean checkout — a check that could
+                  not fail exactly where it mattered. Seniority itself is NOT
                   recoverable from N-PORT, and that is now a measured
                   negative rather than an assumption: 0 of 460 debt titles
                   carry any seniority token, because nport:title is the

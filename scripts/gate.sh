@@ -25,5 +25,7 @@ stage "types (strict)"    "$VENV/mypy" treble
 stage "architecture (I7)" "$VENV/lint-imports"
 stage "web renderer"      ./scripts/build_web.sh
 stage "tests + coverage"  "$VENV/pytest" -q
+# After pytest, so it reads the data this run produced rather than the last.
+stage "module coverage"    "$VENV/python" scripts/check_module_coverage.py
 
 printf '\nGATE GREEN — safe to commit\n'
