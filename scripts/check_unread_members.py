@@ -43,13 +43,6 @@ ALLOWED_UNREAD: dict[str, str] = {
         "Part of the serialised screen contract. Renderers read it out of the JSON "
         "payload rather than the Python object, so no source reference exists."
     ),
-    "WeightedObservation.age_days": (
-        "Transparency data on TVAL's contributed observations. The weighting uses a "
-        "decay computed from the same dates, so nothing reads this field — but a price "
-        "whose backing observations are 300 days old is a different claim from one "
-        "backed by yesterday's, and §15 says the drill-down states what it rests on. "
-        "Kept as a gap to close on the screen rather than deleted as dead."
-    ),
     "UniverseConfig.openfigi_jobs_per_request": (
         "Documents OpenFIGI's published batch size, which the adapter enforces from "
         "its own constant. Same shape as RateLimits and tied the same way once a "
