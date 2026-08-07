@@ -49,7 +49,13 @@ AWAITING_WIRING: dict[str, str] = {
     ),
     "treble.analytics.credit.cds": (
         "CDSW's pricer, validated against ISDA's published grids across six currencies. "
-        "There is no CDSW screen, so nothing calls it outside tests."
+        "Blocked on data, not on a screen: the store holds zero credit subjects and no "
+        "spread facts, so a CDSW screen would render empty. Probed 2026-08-07 -- the "
+        "DTCC CFTC tape serves CFTC_CUMULATIVE_RATES_<date>.zip (200) but the analogous "
+        "CREDIT filename 403s, and pddata.dtcc.com's cumulative listing API returns "
+        "empty for RATES and 400 for other asset-class tokens, so it cannot be used to "
+        "discover the real name. Finding the credit slice is the next step, and it is a "
+        "data question."
     ),
     "treble.analytics.derivatives.assetswap": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.derivatives.cancellable": "§12.1 pricer; no screen calls it yet.",
