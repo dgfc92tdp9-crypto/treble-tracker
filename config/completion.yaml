@@ -376,7 +376,7 @@ phase_2:
                   candidate is registration-gated (Tiingo, Alpha Vantage,
                   Twelve Data). That is a decision about accounts rather than
                   a modelling problem"}
-  P2_4:  {done: 0.75, name: "TVAL v1 with transparency drill-down",
+  P2_4:  {done: 0.8, name: "TVAL v1 with transparency drill-down",
           basis: "the criterion's two named requirements ship. Score: 1-10
                   from four published components — corroboration, timeliness,
                   firmness, agreement — each exposed rather than rolled into
@@ -441,9 +441,40 @@ phase_2:
                   contributes to this install, so a tab permanently reading
                   'no observations' would look like a broken screen rather
                   than an empty network — ALLQ already renders that state
-                  correctly. Outstanding, and why this is not higher: (a)
-                  rating and seniority remain absent, so the similarity
-                  metric is incomplete by construction and says so on screen;
+                  correctly. A defect in this criterion's own shipped
+                  output was found by going looking for seniority: issuer
+                  curves were being fitted over securitisations. The fitter
+                  read nport:issuerCat and never fetched nport:assetCat, and
+                  issuerCat cannot do that job — a securitisation vehicle IS
+                  a corporation, so filers classify it CORP. On the live
+                  store 90% of debt holdings read issuerCat=CORP while
+                  assetCat put 171 of 460 bonds (37%, across 36 LEIs) in
+                  ABS-O, ABS-MBS, ABS-CBDO or STIV. A CLO tranche's spread
+                  is about its collateral pool and its place in that deal's
+                  waterfall; a master trust's is about its receivables.
+                  Neither is a statement about the credit of the entity whose
+                  LEI the filing carries, which is what an issuer curve
+                  claims to measure, so the fit was a weighted average of two
+                  unrelated spread regimes and RICH/CHEAP was reported
+                  against it. Filtering to assetCat=DBT takes the fitted set
+                  from 35 curves to 27 — eight shipped curves were
+                  substantially securitisations. The module had no tests at
+                  all, which is how this survived: it sat at 0% coverage
+                  while the repository-wide floor passed comfortably, because
+                  a floor is an average and an average cannot see one module
+                  at zero. It has tests now, verified to fail when the filter
+                  is widened to admit ABS. Seniority itself is NOT
+                  recoverable from N-PORT, and that is now a measured
+                  negative rather than an assumption: 0 of 460 debt titles
+                  carry any seniority token, because nport:title is the
+                  issuer's name ('American Express Co', 'Bayer US Finance
+                  LLC') and not an instrument description. The N-PORT schema
+                  has no seniority field at all.
+                  Outstanding, and why this is not higher: (a)
+                  rating and seniority remain absent — seniority now known to
+                  be absent from the only free source this repository has,
+                  rather than merely not yet found — so the similarity metric
+                  is incomplete by construction and says so on screen;
                   (b) §15.4's ML residual layer and §15.5's multi-time
                   bid/mid/ask snapshots are untouched"}
   P2_5:  {done: 0.85, name: "CDSW against ISDA published test cases",

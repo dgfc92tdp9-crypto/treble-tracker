@@ -97,6 +97,26 @@ class IssuerCurveSet:
         )
 
 
+#: N-PORT asset categories a spread-to-Treasury issuer curve is meaningful
+#: for. Only corporate debt.
+#:
+#: `issuerCat` cannot do this job and reading it as if it could was the
+#: defect. Filers classify a securitisation vehicle as issuerCat=CORP — the
+#: trust *is* a corporation — so 90% of the debt universe reads CORP while
+#: `assetCat` says 37% of it (171 of 460 bonds, 36 LEIs) is ABS-O, ABS-MBS,
+#: ABS-CBDO or STIV. Those were being fitted into "issuer credit curves"
+#: alongside ordinary corporate bonds.
+#:
+#: They do not belong there, and not by a small margin. A CLO mezzanine
+#: tranche's spread reflects its collateral pool and its position in that
+#: deal's waterfall; a master trust's reflects the receivables behind it.
+#: Neither is a statement about the credit of the entity whose LEI the
+#: filing carries, which is what an issuer curve claims to measure. Fitting
+#: them together produces a curve that is a weighted average of two unrelated
+#: spread regimes, and then reports rich/cheap against it.
+CORPORATE_ASSET_CATEGORIES = frozenset({"DBT"})
+
+
 def _bond_rows(store: DuckStore, *, as_of: datetime) -> list[dict[str, object]]:
     """Every `isin:` bond with the fields a curve needs, point-in-time."""
     wanted = (
@@ -107,6 +127,7 @@ def _bond_rows(store: DuckStore, *, as_of: datetime) -> list[dict[str, object]]:
         "nport:valUSD",
         "nport:balance",
         "nport:issuerCat",
+        "nport:assetCat",
         "nport:name",
     )
     rows: list[dict[str, object]] = []
@@ -199,6 +220,11 @@ def build_issuer_curves(
             excluded.append(
                 (identifier, f"implied yield {solved * 100:.1f}% from a mark of {price:.2f}")
             )
+            continue
+
+        asset_category = row.get("nport:assetCat")
+        if asset_category not in CORPORATE_ASSET_CATEGORIES:
+            excluded.append((identifier, f"assetCat {asset_category!r} is not corporate debt"))
             continue
 
         category = row.get("nport:issuerCat")
