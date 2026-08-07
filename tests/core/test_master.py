@@ -6,18 +6,22 @@ returned.
 """
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-from treble.core.identifiers import TUID
+from treble.core.facts import Fact
+from treble.core.identifiers import PLACEHOLDER_IDENTIFIERS, TUID
 from treble.core.master import (
     REDISTRIBUTION_RESTRICTED_KINDS,
+    ConflictingLinkError,
+    conflicting_links,
     conflicts,
     figi_hierarchy,
     links_from_facts,
     resolve_instrument,
+    resolve_link,
 )
 from treble.ingest.base import RawPayload
 from treble.ingest.nport import NportAdapter
@@ -149,3 +153,93 @@ class TestConflicts:
 def test_subject_key_namespacing(prefix: str) -> None:
     # Keys are namespaced so an ISIN can never collide with a CUSIP.
     assert TUID(f"{prefix}X") != TUID(f"other:{prefix}X")
+
+
+class TestPlaceholdersNeverBecomeLinks:
+    """Measured on the live store before this guard existed: `nport:cusip`
+    of `000000000` was claimed by 246 unrelated subjects, and six subjects
+    carried both a real CUSIP and the placeholder.
+
+    `ingest/nport.py` already refused these when keying subjects. It did not
+    refuse them here, so the same values that could no longer collapse a
+    subject still linked every holding without a CUSIP to every other. The
+    set now lives in `core.identifiers` so there is one answer.
+    """
+
+    @staticmethod
+    def _fact(value: str) -> Fact:
+        return Fact(
+            subject="isin:US0000000001",
+            field="nport:cusip",
+            value=value,
+            effective_from=date(2026, 6, 30),
+            effective_to=date(2026, 6, 30),
+            knowledge_from=datetime(2026, 7, 1, tzinfo=UTC),
+            provenance_id="p" * 64,
+        )
+
+    @pytest.mark.parametrize("junk", ["000000000", "0", "N/A", "NA", "NONE", "", "  n/a  "])
+    def test_a_placeholder_produces_no_link(self, junk: str) -> None:
+        assert links_from_facts([self._fact(junk)]) == []
+
+    def test_a_real_identifier_still_produces_one(self) -> None:
+        links = links_from_facts([self._fact("037833100")])
+        assert len(links) == 1
+        assert str(links[0].to_key) == "cusip:037833100"
+
+    def test_the_two_layers_refuse_the_same_set(self) -> None:
+        """The defect was two definitions with different contents. A copy
+        that drifts is how this recurs."""
+        from treble.ingest.nport import _NULL_IDENTIFIERS
+
+        assert _NULL_IDENTIFIERS is PLACEHOLDER_IDENTIFIERS
+
+
+class TestConflictsAreReported:
+    """The module docstring has always said conflicts are reported and never
+    silently resolved. Nothing performed that check until now."""
+
+    @staticmethod
+    def _link(to: str, source: str) -> Fact:
+        return Fact(
+            subject="isin:US0000000001",
+            field="nport:lei",
+            value=to,
+            effective_from=date(2026, 6, 30),
+            effective_to=date(2026, 6, 30),
+            knowledge_from=datetime(2026, 7, 1, tzinfo=UTC),
+            provenance_id=source * 64,
+        )
+
+    def test_two_sources_disagreeing_is_reported(self) -> None:
+        links = links_from_facts(
+            [self._link("529900T8BM49AURSDO55", "a"), self._link("254900HROIFWPRGM1V77", "b")]
+        )
+        conflicts = conflicting_links(links)
+        assert len(conflicts) == 1
+        assert len(next(iter(conflicts.values()))) == 2
+
+    def test_agreement_is_not_a_conflict(self) -> None:
+        links = links_from_facts(
+            [self._link("529900T8BM49AURSDO55", "a"), self._link("529900T8BM49AURSDO55", "b")]
+        )
+        assert conflicting_links(links) == {}
+
+    def test_resolving_a_conflict_refuses_rather_than_choosing(self) -> None:
+        """Preferring the newest or the most-cited source is a judgement
+        this module is not entitled to make silently."""
+        links = links_from_facts(
+            [self._link("529900T8BM49AURSDO55", "a"), self._link("254900HROIFWPRGM1V77", "b")]
+        )
+        with pytest.raises(ConflictingLinkError, match="more than one"):
+            resolve_link(links, TUID("isin:US0000000001"), "lei")
+
+    def test_resolving_an_unambiguous_link_returns_it(self) -> None:
+        links = links_from_facts([self._link("529900T8BM49AURSDO55", "a")])
+        assert str(resolve_link(links, TUID("isin:US0000000001"), "lei")) == (
+            "lei:529900T8BM49AURSDO55"
+        )
+
+    def test_an_absent_mapping_is_a_key_error_not_a_conflict(self) -> None:
+        with pytest.raises(KeyError, match="no lei mapping"):
+            resolve_link([], TUID("isin:US0000000001"), "lei")

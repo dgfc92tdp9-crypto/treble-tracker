@@ -62,6 +62,27 @@ def _char_value(ch: str) -> int:
     return ord(ch) - ord("A") + 10
 
 
+#: Values filers write where an identifier does not exist. They are not
+#: identifiers and must never key a subject or form a link.
+#:
+#: Defined here rather than in an adapter because both layers need the same
+#: answer and they had different ones: `ingest/nport.py` refused these when
+#: keying subjects while `core/master.py` happily built entity-graph links
+#: from them, so 246 unrelated instruments were linked through
+#: `cusip:000000000`. Fixing the adapter fixed the instance; this fixes the
+#: class, by leaving one definition for anything that needs to ask.
+PLACEHOLDER_IDENTIFIERS: frozenset[str] = frozenset(
+    {"", "N/A", "NA", "N.A.", "NONE", "NULL", "UNKNOWN", "000000000", "0"}
+)
+
+
+def is_placeholder_identifier(text: object) -> bool:
+    """Whether a value is a filer's stand-in rather than an identifier."""
+    if not isinstance(text, str):
+        return text is None
+    return text.strip().upper() in PLACEHOLDER_IDENTIFIERS
+
+
 def figi_check_digit(first_eleven: str) -> int:
     """FIGI check digit: double the value at every even position (1-indexed),
     sum the decimal digits of all values, take (10 - sum mod 10) mod 10."""

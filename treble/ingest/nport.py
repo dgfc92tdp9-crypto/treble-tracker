@@ -36,7 +36,7 @@ import httpx
 from defusedxml.ElementTree import fromstring as safe_fromstring
 
 from treble.core.facts import Fact
-from treble.core.identifiers import TUID
+from treble.core.identifiers import PLACEHOLDER_IDENTIFIERS, TUID
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.ingest.base import (
     ParsedBatch,
@@ -78,7 +78,9 @@ _DEBT_TEXT_FIELDS = ("couponKind", "isDefault", "areIntrstPmntsInArrs", "isPaidK
 #: unidentifiable holdings were skipped; this is what makes that true.
 #: `000000000` is the same thing written numerically, and appeared on 932
 #: facts across 32 fields in the live store.
-_NULL_IDENTIFIERS: frozenset[str] = frozenset({"", "N/A", "NA", "NONE", "000000000", "0"})
+#: Kept as a module alias for readability; the set itself lives in
+#: `core.identifiers` so the entity graph refuses exactly what this does.
+_NULL_IDENTIFIERS = PLACEHOLDER_IDENTIFIERS
 
 
 def _identifier(raw: str) -> str:

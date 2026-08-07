@@ -34,7 +34,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from treble.core.facts import Fact
-from treble.core.identifiers import TUID
+from treble.core.identifiers import TUID, is_placeholder_identifier
 
 #: Fields the adapters emit that assert an identifier equivalence.
 #: Each maps a subject key prefix to the identifier kind it resolves to.
@@ -69,7 +69,13 @@ class IdentifierLink(BaseModel):
 
 
 class ConflictingLinkError(Exception):
-    """Two sources assert incompatible mappings for the same identifier."""
+    """Two sources assert incompatible mappings for the same identifier.
+
+    Raised only by :func:`resolve_link`, where a caller has asked for the
+    one answer. Extraction never raises: this module's contract is that
+    both mappings are stored with their provenance and the conflict is
+    *reported*, never silently resolved by preferring a source.
+    """
 
 
 def links_from_facts(facts: Iterable[Fact]) -> list[IdentifierLink]:
@@ -81,7 +87,15 @@ def links_from_facts(facts: Iterable[Fact]) -> list[IdentifierLink]:
     links: list[IdentifierLink] = []
     for fact in facts:
         kind = MAPPING_FIELDS.get(fact.field)
-        if kind is None or fact.value in (None, ""):
+        if kind is None:
+            continue
+        # A placeholder is not an assertion. Filers write 000000000 or N/A
+        # where a security has no CUSIP, and treating those as identifiers
+        # links every such holding to every other: measured on the live
+        # store, `cusip:000000000` was claimed by 246 unrelated subjects.
+        # `ingest/nport.py` already refused them when keying subjects; this
+        # is the same refusal one layer up, against the same set.
+        if is_placeholder_identifier(fact.value):
             continue
         links.append(
             IdentifierLink(
@@ -188,3 +202,47 @@ def conflicts(
         if len(candidates) > 1:
             found.append((key, sorted(candidates)))
     return found
+
+
+def conflicting_links(
+    links: Iterable[IdentifierLink],
+) -> dict[tuple[TUID, str], list[IdentifierLink]]:
+    """Where two sources map the same subject and kind to different keys.
+
+    Returns the disagreements rather than raising, because a bulk ingest
+    that aborted on the first conflict would leave the master empty over
+    one bad row. The caller decides what a conflict means: `SPTR` shows
+    both with their provenance, an export refuses, a screen marks the
+    field.
+
+    This is the check the module docstring has always promised and nothing
+    performed. Until now `links_from_facts` appended every mapping
+    unconditionally, so two sources disagreeing about which LEI a CUSIP
+    belongs to produced two links and no signal.
+    """
+    grouped: dict[tuple[TUID, str], list[IdentifierLink]] = {}
+    for link in links:
+        grouped.setdefault((link.from_key, link.kind), []).append(link)
+    return {
+        key: found for key, found in grouped.items() if len({link.to_key for link in found}) > 1
+    }
+
+
+def resolve_link(links: Iterable[IdentifierLink], from_key: TUID, kind: str) -> TUID:
+    """The single mapping for a subject and kind, or refuse.
+
+    Refuses rather than picking the newest or the most-cited. Preferring
+    one source is a judgement this module is not entitled to make silently,
+    and a resolver that guessed would put an instrument under an identifier
+    no source actually asserted for it.
+    """
+    candidates = {link.to_key for link in links if link.from_key == from_key and link.kind == kind}
+    if not candidates:
+        raise KeyError(f"no {kind} mapping for {from_key}")
+    if len(candidates) > 1:
+        listed = ", ".join(sorted(str(c) for c in candidates))
+        raise ConflictingLinkError(
+            f"{from_key} maps to more than one {kind}: {listed}. Both are stored with "
+            "their provenance; choosing between them is not this module's call"
+        )
+    return candidates.pop()
