@@ -888,7 +888,7 @@ phase_2:
                   or save — and FDC3 interop is modelled against the
                   standard's context shape without a real desktop agent to
                   federate with"}
-  P2_8:  {done: 0.95, name: "gRPC + Arrow Flight transports",
+  P2_8:  {done: 0.98, name: "gRPC + Arrow Flight transports",
           basis: "Arrow Flight ships: a FlightServerBase serving guarded
                   fact exports as Arrow tables with a fixed schema, reading
                   through the same store handle and the same point-in-time
@@ -963,6 +963,4 @@ phase_2:
                   was removed in the same change rather than shipped: once
                   next_batch existed it had no production caller, which is
                   the declared-but-unread pattern this repository keeps
-                  finding. Outstanding: `ems` needs an order path this system
-                  does not have, and `docs` needs a document store. Both
-                  remain absent rather than stubbed"}
+                  finding. The `docs` service now ships (treble/tapi/documents.py) and needed no new storage: every fact carries provenance, every provenance record names a payload hash, and the payload store already holds those bytes. Content-addressed, so a document served here is the one the facts were parsed from rather than a re-fetch that may since have been revised — the difference between provenance and a hyperlink, and it matters because EDGAR restates and vendors correct while a link resolves to today's version. Descriptors by default and bytes only on request, since one EDGAR bulk payload runs to hundreds of megabytes. The listing is point-in-time (I2) so a drill-down cannot disagree with the screen it was opened from, and a subject with no facts raises rather than returning an empty list because an unknown subject and a sourceless one render the same. redistribution_restricted travels onto the document and not only the fact: the payload is the most concentrated form of a source's data, so serving facts under a restriction while serving the document freely would make the guard decorative. ingest_history reads the log rather than the facts, because 'this adapter ingested nothing' and 'this adapter ingested a payload that produced no facts' render identically from facts alone and only the second is a parser problem. Mutation-checked: a hard-coded restriction flag fails 1 test, ignoring as_of fails 5, dropping the ordering fails 1. Outstanding: `ems` alone, and it is Phase 3 work rather than a gap here — the spec puts FIX connectivity in Phase 3 (§23.3), and an order path needs an execution venue this system has no connection to and no mandate to reach in Phase 2. Absent rather than stubbed"}
