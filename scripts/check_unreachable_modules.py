@@ -59,7 +59,6 @@ AWAITING_WIRING: dict[str, str] = {
         "data question."
     ),
     "treble.analytics.derivatives.assetswap": "§12.1 pricer; no screen calls it yet.",
-    "treble.analytics.derivatives.cancellable": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.derivatives.crosscurrency": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.derivatives.inflation": (
         "§12.1 pricer. No longer data-blocked -- ingest/ecb_hicp.py supplies euro-area "

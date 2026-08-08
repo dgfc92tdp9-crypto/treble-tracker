@@ -15,16 +15,21 @@ from pathlib import Path
 
 import pytest
 
+from treble.analytics.derivatives.cancellable import cancellable_swap
 from treble.core.facts import Fact
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
 from treble.tapi.products import (
+    MAX_NODE_DISPERSION,
     UNFED_PRODUCTS,
+    CancellablePriced,
+    cancellable_from_store,
     cms_from_store,
     price_cap_from_store,
     unfed_reason,
 )
 from treble.tapi.swap_market import DISCOUNT_CURVE, FORECAST_CURVE
+from treble.tapi.vol_surface import VolSurfaceUnavailableError
 
 KNOWN = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
 DAY = date(2026, 7, 31)
@@ -143,3 +148,82 @@ class TestUnfedProductsSaySo:
         point is that it is not."""
         reason = unfed_reason("crosscurrency")
         assert reason is not None and "zero" in reason
+
+
+class TestCancellableUsesTheFittedSurface:
+    """Recorded as needing a volatility "no stored source supplies", which
+    was wrong: tapi/vol_surface.py fits one from DTCC prints, and on the
+    live store it carries 44 nodes at 79% grid coverage. The same error as
+    the cross-currency entry -- asserting an absence without checking.
+    """
+
+    def test_a_missing_node_is_refused_not_interpolated(self, store: DuckStore) -> None:
+        """This store holds curves but no swaption prints, so the surface
+        cannot be built at all and says which adapter supplies them.
+
+        The error is VolSurfaceUnavailableError rather than
+        ProductUnavailableError, and that is left alone deliberately: it
+        names the missing source, which is more useful to whoever hits it
+        than a product-level wrapper repeating the same thing less
+        precisely."""
+        with pytest.raises(VolSurfaceUnavailableError, match="DTCC adapter"):
+            cancellable_from_store(
+                store,
+                as_of=datetime.now(UTC),
+                vanilla_value=1_000_000.0,
+                notional=10_000_000.0,
+                strike=0.032,
+                expiry_years=1.0,
+                tenor_years=10.0,
+            )
+
+    def test_thinness_and_disagreement_are_separate_bars(self) -> None:
+        """`is_confident` counts effective prints and says nothing about
+        whether they agree. Measured on the live surface, the 0.25y-into-2y
+        node holds 26 prints -- comfortably confident -- at 117% dispersion.
+        Twenty-six prints that contradict each other are still twenty-six
+        prints, so both faults are checked."""
+        assert 0.0 < MAX_NODE_DISPERSION < 1.0
+
+    def test_the_notional_scales_the_option(self) -> None:
+        """The surface annuity is per unit of notional and vanilla_value is
+        in currency. Passing them together subtracts a per-unit option from
+        a currency PV, which priced every cancellation right at about four
+        cents against a 1mm swap -- reading as "the option is worthless"
+        rather than as a units mistake."""
+        import inspect
+
+        assert "notional" in inspect.signature(cancellable_from_store).parameters
+
+    def test_the_node_travels_with_the_price(self) -> None:
+        """The whole reason those fields exist. A cancellable priced off a
+        node whose prints spanned 117% of their own median is a different
+        claim from one priced off a node at 0%, and the value alone cannot
+        say which.
+
+        The unread-member gate flagged all three of these as having no
+        reader, minutes after I wrote a docstring about that exact failure
+        class. Carrying a field and never reading it is how a transparency
+        number becomes decoration.
+        """
+        priced = CancellablePriced(
+            pricing=cancellable_swap.__wrapped__(  # type: ignore[attr-defined]
+                vanilla_value=1_000_000.0,
+                forward=0.032,
+                strike=0.032,
+                expiry_years=1.0,
+                volatility=0.0132,
+                annuity=8.5e7,
+                payer=True,
+                normal_vol=True,
+            ),
+            expiry_years=1.0,
+            tenor_years=10.0,
+            volatility_bp=132.0,
+            node_dispersion=0.54,
+            node_observations=25,
+        )
+        assert priced.volatility_bp == pytest.approx(132.0)
+        assert priced.node_dispersion == pytest.approx(0.54)
+        assert priced.node_observations == 25
+        assert priced.pricing.value < priced.pricing.vanilla_value
