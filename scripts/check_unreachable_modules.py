@@ -58,7 +58,11 @@ AWAITING_WIRING: dict[str, str] = {
         "discover the real name. Finding the credit slice is the next step, and it is a "
         "data question."
     ),
-    "treble.analytics.derivatives.crosscurrency": "§12.1 pricer; no screen calls it yet.",
+    "treble.analytics.derivatives.crosscurrency": (
+        "§12.1 pricer. Not data-blocked: ECB spot, EUR-ESTR-OIS and USD-SOFR-OIS "
+        "are all stored and current. Needs build_swap_market taught to build a "
+        "second curve under USD conventions; the basis is a caller input."
+    ),
     "treble.analytics.derivatives.inflation": (
         "§12.1 pricer. No longer data-blocked -- ingest/ecb_hicp.py supplies euro-area "
         "HICP levels -- so what remains is wiring it into tapi/products.py and a "

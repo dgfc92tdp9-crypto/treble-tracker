@@ -145,12 +145,21 @@ class TestUnfedProductsSaySo:
         assert unfed_reason("cap") is None
         assert unfed_reason("cms") is None
 
-    def test_crosscurrency_is_not_defaulted_to_a_zero_basis(self) -> None:
-        """A cross-currency basis of zero is not a neutral assumption; it
-        is a claim that the basis is zero, on an instrument whose whole
-        point is that it is not."""
+    def test_crosscurrency_names_the_wiring_not_a_missing_source(self) -> None:
+        """This entry was wrong in three ways and the test pinned its
+        wording rather than a property, so it failed on the correction
+        rather than on the code.
+
+        Measured 2026-08-08: ECB spot is stored (fx:USDEUR, 7,061
+        observations), and both legs' curves are stored (EUR-ESTR-OIS and
+        USD-SOFR-OIS). Only the basis is unsourced, and that is a caller
+        input here the way volatility is for caps -- not a blocker. What
+        remains is a second curve build under USD conventions.
+        """
         reason = unfed_reason("crosscurrency")
-        assert reason is not None and "zero" in reason
+        assert reason is not None
+        assert "basis" in reason
+        assert "USD-SOFR-OIS" in reason
 
 
 class TestCancellableUsesTheFittedSurface:

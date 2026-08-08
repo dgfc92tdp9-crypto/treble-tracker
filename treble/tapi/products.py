@@ -52,8 +52,14 @@ UNFED_PRODUCTS: dict[str, str] = {
         "levels without assuming the very thing the swap prices"
     ),
     "crosscurrency": (
-        "ECB supplies spot but no cross-currency basis is ingested, and a basis of "
-        "zero is a claim rather than a default"
+        "Not blocked on data, and this entry was wrong in three ways -- measured "
+        "2026-08-08. ECB spot IS stored (fx:USDEUR, 7,061 observations to 2026-07-31), "
+        "and both legs' curves are stored too (EUR-ESTR-OIS and USD-SOFR-OIS, 16 and 18 "
+        "tenors, same date). Only the basis is unsourced, and that is a required input "
+        "here the way volatility is for caps and CMS, not a blocker. What remains is "
+        "wiring: build_swap_market is hardcoded to the EUR discount curve, so pricing "
+        "the USD leg needs a second curve build with USD conventions rather than the "
+        "EUR ones guessed at"
     ),
     "totalreturn": "needs a reset price and financing spread from a trade, not a curve",
 }
