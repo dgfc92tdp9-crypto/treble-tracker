@@ -58,7 +58,6 @@ AWAITING_WIRING: dict[str, str] = {
         "discover the real name. Finding the credit slice is the next step, and it is a "
         "data question."
     ),
-    "treble.analytics.derivatives.assetswap": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.derivatives.crosscurrency": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.derivatives.inflation": (
         "§12.1 pricer. No longer data-blocked -- ingest/ecb_hicp.py supplies euro-area "
@@ -67,9 +66,6 @@ AWAITING_WIRING: dict[str, str] = {
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.equity.ratios": "Equity ratios; no screen binding reaches them.",
-    "treble.analytics.holdings.implied_price": (
-        "Implied marks from N-PORT holdings; tapi/issuer_curves.py computes its own."
-    ),
     "treble.analytics.tval.residual": (
         "TVAL §15.4. explained_residual_bp exists and no evaluated-price path calls it."
     ),

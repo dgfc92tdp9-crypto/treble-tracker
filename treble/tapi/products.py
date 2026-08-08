@@ -28,12 +28,16 @@ correct; what varies is whether anything in the store can feed them.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
+from treble.analytics.derivatives.assetswap import AssetSwapPricing, asset_swap_spread
 from treble.analytics.derivatives.cancellable import CancellablePricing, cancellable_swap
 from treble.analytics.derivatives.capfloor import Caplet, price_cap, price_floor
 from treble.analytics.derivatives.cms import cms_rate
+from treble.analytics.holdings.implied_price import AssetCategory, implied_price
 from treble.analytics.vol.surface import EXPIRY_BUCKETS, TENOR_BUCKETS, VolSurface
+from treble.core.identifiers import TUID
+from treble.store.duck import DuckStore
 from treble.tapi.swap_market import DISCOUNT_CURVE, SwapMarket, build_swap_market
 from treble.tapi.vol_surface import build_vol_surface
 
@@ -52,7 +56,6 @@ UNFED_PRODUCTS: dict[str, str] = {
         "zero is a claim rather than a default"
     ),
     "totalreturn": "needs a reset price and financing spread from a trade, not a curve",
-    "assetswap": "needs a bond price; YAS already computes the spread where one exists",
 }
 
 
@@ -328,12 +331,108 @@ def cancellable_from_store(
     )
 
 
+@dataclass(frozen=True)
+class AssetSwapPriced:
+    """An asset swap spread and the holding the price came from."""
+
+    spread: AssetSwapPricing
+    identifier: str
+    #: Price implied from the filer's own valUSD and par balance, per 100.
+    #: Carried because it is a *derived* mark rather than a traded level,
+    #: and a spread computed off an implied price is a weaker claim than one
+    #: off a print. §15 says the drill-down states what it rests on.
+    implied_price: float
+    coupon: float
+    swap_rate: float
+    maturity: str
+
+
+def assetswap_from_store(store: DuckStore, *, as_of: datetime, subject: TUID) -> AssetSwapPriced:
+    """The par-par asset swap spread for one stored bond.
+
+    Recorded as needing "a bond price" no stored source supplies. Wrong, and
+    the third such entry to be wrong the same way: the store holds 460 bonds
+    with maturity, coupon, par balance and USD value, and
+    `analytics/holdings/implied_price.py` turns the last two into a price.
+    Both that module and `derivatives/assetswap.py` were orphaned; this is
+    the caller for each.
+
+    **The price is implied, not traded, and the result says so.** A filer's
+    valUSD over par is a mark somebody reported at a quarter end, not a
+    level anyone dealt at. A spread built on it is a weaker claim than one
+    built on a print, and collapsing the two would let a quarterly
+    accounting mark be read as a market spread.
+    """
+    facts = {f.field: f.value for f in store.subject_facts(subject, as_of=as_of)}
+    maturity = facts.get("nport:maturityDt")
+    coupon = facts.get("nport:annualizedRt")
+    balance = facts.get("nport:balance")
+    val_usd = facts.get("nport:valUSD")
+    if not isinstance(maturity, date) or not isinstance(coupon, int | float):
+        raise ProductUnavailableError(
+            f"{subject}: no maturity or coupon stored, so there is no bond to swap"
+        )
+    if not isinstance(balance, int | float) or not isinstance(val_usd, int | float):
+        raise ProductUnavailableError(
+            f"{subject}: no par balance and value, so no price can be implied"
+        )
+    # `valUSD` is in USD; `balance` is par in the instrument's own currency.
+    # Dividing one by the other across currencies scales the price by the FX
+    # rate, and the result looks like a bond rather than like an error.
+    #
+    # Measured: the only stored bond this priced before the guard was
+    # isin:AU3CB0328482, an Australian issuer with no reported currency --
+    # 100,000 par against 68,836 USD, implying 68.84. At an AUD/USD near
+    # 0.67 the real level is about 103. A distressed price and a currency
+    # mistake render identically, and only one of them is a fact.
+    currency = facts.get("nport:curCd")
+    if currency != "USD":
+        raise ProductUnavailableError(
+            f"{subject}: reported currency is {currency!r}, and valUSD over a par "
+            "balance in another currency is a price scaled by the FX rate. Refused "
+            "rather than converted: this holds no FX rate for the filing's own date"
+        )
+
+    price: float = implied_price.__wrapped__(  # type: ignore[attr-defined]
+        float(balance), float(val_usd), AssetCategory.DEBT
+    )
+    market = build_swap_market(store, as_of=as_of)
+    curve = market.curves.curve(DISCOUNT_CURVE)
+    years = (maturity - market.report_date).days / 365.25
+    if years <= 0.0:
+        raise ProductUnavailableError(
+            f"{subject}: matures on or before the curve date, so there is nothing left to swap"
+        )
+    step = 1.0 / _CMS_FREQUENCY
+    annuity = sum(step * curve.discount(t) for t in _payment_times(0.0, years))
+    if annuity <= 0.0:
+        raise ProductUnavailableError(f"{subject}: the curve gives no annuity to that maturity")
+    swap_rate = (1.0 - curve.discount(years)) / annuity
+
+    spread = asset_swap_spread.__wrapped__(  # type: ignore[attr-defined]
+        price=price,
+        coupon=float(coupon) / 100.0 if float(coupon) > 1.0 else float(coupon),
+        swap_rate=swap_rate,
+        annuity=annuity,
+    )
+    return AssetSwapPriced(
+        spread=spread,
+        identifier=str(subject),
+        implied_price=price,
+        coupon=float(coupon),
+        swap_rate=swap_rate,
+        maturity=maturity.isoformat(),
+    )
+
+
 __all__ = [
     "MAX_NODE_DISPERSION",
     "UNFED_PRODUCTS",
+    "AssetSwapPriced",
     "CancellablePriced",
     "CapPricing",
     "ProductUnavailableError",
+    "assetswap_from_store",
     "cancellable_from_store",
     "cms_from_store",
     "price_cap_from_store",

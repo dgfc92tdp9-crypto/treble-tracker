@@ -17,12 +17,15 @@ import pytest
 
 from treble.analytics.derivatives.cancellable import cancellable_swap
 from treble.core.facts import Fact
+from treble.core.identifiers import TUID
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
 from treble.tapi.products import (
     MAX_NODE_DISPERSION,
     UNFED_PRODUCTS,
     CancellablePriced,
+    ProductUnavailableError,
+    assetswap_from_store,
     cancellable_from_store,
     cms_from_store,
     price_cap_from_store,
@@ -227,3 +230,110 @@ class TestCancellableUsesTheFittedSurface:
         assert priced.node_dispersion == pytest.approx(0.54)
         assert priced.node_observations == 25
         assert priced.pricing.value < priced.pricing.vanilla_value
+
+
+class TestAssetSwapUsesStoredHoldings:
+    """Recorded as needing "a bond price" no stored source supplies. Wrong,
+    and the third such entry to be wrong the same way: the store holds 460
+    bonds with maturity, coupon, par balance and USD value, and
+    holdings/implied_price.py turns the last two into a price. Both that
+    module and derivatives/assetswap.py were orphaned.
+    """
+
+    @staticmethod
+    def _bond(store: DuckStore, *, currency: str | None, balance: float, val: float) -> TUID:
+        prov = Provenance(
+            source_system="edgar-nport",
+            source_uri="https://example.invalid/primary_doc.xml",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.DOCUMENT,
+            extractor_version="1",
+            payload_hash="1" * 64,
+        )
+        store.write_provenance([prov])
+        subject = TUID("isin:US0000000001")
+        rows: list[tuple[str, object]] = [
+            ("nport:maturityDt", date(2031, 6, 30)),
+            ("nport:annualizedRt", 4.50),
+            ("nport:balance", balance),
+            ("nport:valUSD", val),
+        ]
+        if currency is not None:
+            rows.append(("nport:curCd", currency))
+        store.write_facts(
+            [
+                Fact(
+                    subject=str(subject),
+                    field=field,
+                    value=value,
+                    effective_from=DAY,
+                    effective_to=DAY,
+                    knowledge_from=KNOWN,
+                    provenance_id=prov.id,
+                )
+                for field, value in rows
+            ]
+        )
+        return subject
+
+    def test_a_usd_bond_prices_off_its_implied_mark(self, store: DuckStore) -> None:
+        subject = self._bond(store, currency="USD", balance=100_000.0, val=99_000.0)
+        priced = assetswap_from_store(store, as_of=datetime.now(UTC), subject=subject)
+        assert priced.implied_price == pytest.approx(99.0)
+        # A discount bond pays over the index through the price term.
+        assert priced.spread.price_bp > 0.0
+        assert priced.spread.spread_bp == pytest.approx(
+            priced.spread.price_bp + priced.spread.coupon_bp
+        )
+
+    @pytest.mark.parametrize("currency", ["AUD", "EUR", None])
+    def test_a_non_usd_holding_is_refused_not_converted(
+        self, store: DuckStore, currency: str | None
+    ) -> None:
+        """valUSD is in USD and balance is par in the instrument's own
+        currency, so dividing across currencies scales the price by the FX
+        rate -- and the result looks like a bond rather than an error.
+
+        Measured before this guard: the only stored bond that priced was an
+        Australian issuer with no reported currency, 100,000 par against
+        68,836 USD, implying 68.84. At an AUD/USD near 0.67 the real level
+        is about 103. A distressed price and a currency mistake render
+        identically, and only one of them is a fact.
+        """
+        subject = self._bond(store, currency=currency, balance=100_000.0, val=68_836.0)
+        with pytest.raises(ProductUnavailableError, match="reported currency"):
+            assetswap_from_store(store, as_of=datetime.now(UTC), subject=subject)
+
+    def test_a_matured_bond_is_refused(self, store: DuckStore) -> None:
+        prov = Provenance(
+            source_system="edgar-nport",
+            source_uri="https://example.invalid/x",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.DOCUMENT,
+            extractor_version="1",
+            payload_hash="2" * 64,
+        )
+        store.write_provenance([prov])
+        subject = TUID("isin:US0000000002")
+        store.write_facts(
+            [
+                Fact(
+                    subject=str(subject),
+                    field=field,
+                    value=value,
+                    effective_from=DAY,
+                    effective_to=DAY,
+                    knowledge_from=KNOWN,
+                    provenance_id=prov.id,
+                )
+                for field, value in (
+                    ("nport:maturityDt", date(2020, 1, 1)),
+                    ("nport:annualizedRt", 4.5),
+                    ("nport:balance", 100_000.0),
+                    ("nport:valUSD", 99_000.0),
+                    ("nport:curCd", "USD"),
+                )
+            ]
+        )
+        with pytest.raises(ProductUnavailableError, match="nothing left"):
+            assetswap_from_store(store, as_of=datetime.now(UTC), subject=subject)
