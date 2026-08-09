@@ -59,7 +59,13 @@ AWAITING_WIRING: dict[str, str] = {
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.tval.residual": (
-        "TVAL §15.4. explained_residual_bp exists and no evaluated-price path calls it."
+        "TVAL §15.4. Blocked on one small API change, identified 2026-08-08: a "
+        "sys:tval_residual panel needs per-bond residuals, and build_issuer_curves "
+        "returns IssuerCurve objects whose `bonds` are identifiers while the "
+        "IssuerBond objects it fitted are discarded. relative_value needs those "
+        "objects. Returning them alongside the curves is the change; it touches a "
+        "shipped signature, which is why it is written down rather than done at "
+        "the end of a session."
     ),
     "treble.render.layout": (
         "Layout authoring; the desktop shell's drag and resize gestures are the caller "
