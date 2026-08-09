@@ -63,13 +63,16 @@ AWAITING_WIRING: dict[str, str] = {
         "second curve under USD conventions; the basis is a caller input."
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
-    "treble.analytics.equity.ratios": "Equity ratios; no screen binding reaches them.",
     "treble.analytics.tval.residual": (
         "TVAL §15.4. explained_residual_bp exists and no evaluated-price path calls it."
     ),
     "treble.tapi.products": (
         "§12.1 product pricing off the stored curves. Gives capfloor and cms their "
         "first callers; the SWPM product tab is what will call this."
+    ),
+    "treble.tapi.equity_ratios": (
+        "§14.1 ratios from stored XBRL. Gives analytics/equity/ratios.py its first "
+        "caller; the FA drill-down is what will bind this."
     ),
     "treble.tapi.documents": "The docs service; no screen binds it yet.",
     "treble.tapi.evaluated": "Contributed-price evaluation; no screen binds it yet.",
