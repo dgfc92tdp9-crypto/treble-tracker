@@ -107,17 +107,31 @@ class TestAncestry:
             ancestry_of(store, CHILD, as_of=datetime(2026, 7, 1, tzinfo=UTC))
 
 
-class TestDescentRefusesAtScale:
-    def test_a_small_universe_is_answered(self, store: DuckStore) -> None:
+class TestDescent:
+    def test_children_are_found_by_reverse_query(self, store: DuckStore) -> None:
+        """A child asserts its parent on its own subject, so the subjects
+        returned are the children and the value matched is the parent."""
         _write(store, CHILD, [("IS_DIRECTLY_CONSOLIDATED_BY", DIRECT)])
-        found = children_of(store, TUID(f"lei:{DIRECT}"), as_of=LATER)
-        assert found == (CHILD,)
+        assert children_of(store, TUID(f"lei:{DIRECT}"), as_of=LATER) == (CHILD,)
 
-    def test_a_large_universe_is_refused_rather_than_scanned(self, store: DuckStore) -> None:
-        """The first version scanned and documented it as "this scans",
-        which understated it: a screen calling it on the live store's
-        373,125 subjects would appear to hang, and a docstring is not a
-        substitute for an operation that finishes."""
+    def test_an_entity_with_no_children_returns_empty(self, store: DuckStore) -> None:
+        """Empty rather than an error: an entity that owns nothing is a
+        fact about the world, unlike one nobody has filed for."""
         _write(store, CHILD, [("IS_DIRECTLY_CONSOLIDATED_BY", DIRECT)])
-        with pytest.raises(EntityUnknownError, match="no parent-to-child index"):
-            children_of(store, TUID(f"lei:{DIRECT}"), as_of=LATER, max_universe=0)
+        assert children_of(store, CHILD, as_of=LATER) == ()
+
+    def test_it_is_point_in_time(self, store: DuckStore) -> None:
+        _write(store, CHILD, [("IS_DIRECTLY_CONSOLIDATED_BY", DIRECT)])
+        assert (
+            children_of(store, TUID(f"lei:{DIRECT}"), as_of=datetime(2026, 7, 1, tzinfo=UTC)) == ()
+        )
+
+    def test_the_relationship_type_is_honoured(self, store: DuckStore) -> None:
+        """A fund manager is not a consolidating parent, and a screen that
+        conflated them would report an asset manager as owning its funds'
+        balance sheets."""
+        _write(store, CHILD, [("IS_FUND-MANAGED_BY", DIRECT)])
+        assert children_of(store, TUID(f"lei:{DIRECT}"), as_of=LATER) == ()
+        assert children_of(
+            store, TUID(f"lei:{DIRECT}"), as_of=LATER, relationship_type="IS_FUND-MANAGED_BY"
+        ) == (CHILD,)

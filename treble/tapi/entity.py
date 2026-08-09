@@ -31,18 +31,12 @@ from treble.core.entity_graph import (
     DIRECT_PARENT_TYPE,
     ULTIMATE_PARENT_TYPE,
     RelationshipEdge,
-    children,
     direct_parent,
     edges_from_facts,
     ultimate_parent,
 )
 from treble.core.identifiers import TUID
 from treble.store.duck import DuckStore
-
-#: Largest LEI universe `children_of` will scan. Past this it refuses:
-#: there is no parent-to-child index, so the answer costs one read per
-#: subject, and the live store holds 373,125 of them.
-MAX_SCAN_SUBJECTS = 5_000
 
 
 class EntityUnknownError(RuntimeError):
@@ -101,38 +95,24 @@ def children_of(
     *,
     as_of: datetime,
     relationship_type: str = DIRECT_PARENT_TYPE,
-    max_universe: int = MAX_SCAN_SUBJECTS,
 ) -> tuple[TUID, ...]:
     """Entities asserting `parent` as their parent of this type.
 
-    **Refuses at scale rather than scanning.** Facts are keyed by subject,
-    and a child asserts its parent on its own subject, so there is no index
-    from parent to child. Answering this means reading every LEI subject in
-    the store — 373,125 of them after the GLEIF backfill — one at a time.
+    Answered by one reverse query rather than by walking subjects. The
+    first version scanned every LEI subject and documented it as "this
+    scans"; the second refused above a threshold, having measured that the
+    live store's 373,125 subjects would make a screen appear to hang.
 
-    The first version of this function did exactly that and documented it
-    as "this scans", which understated it: a screen calling it would appear
-    to hang, and a docstring is not a substitute for an operation that
-    finishes. It now refuses above `max_universe` and names the missing
-    index, so the cost is met as an error a developer reads rather than as
-    a spinner a user watches.
+    Both were solving the wrong problem. The rows sit in one table and the
+    store can answer this directly — the expense was a Python loop, not a
+    missing index. `DuckStore.subjects_with_value` is that query, and the
+    threshold is gone because there is nothing left to guard against.
 
-    Below that threshold — a seeded install, a test, a filtered universe —
-    it answers normally, because there the scan is cheap and the answer is
-    real.
+    A child asserts its parent on its *own* subject, so the subjects this
+    returns are the children and the value matched is the parent.
     """
-    subjects = store.subjects_with_prefix("lei:", as_of=as_of)
-    if len(subjects) > max_universe:
-        raise EntityUnknownError(
-            f"{len(subjects)} LEI subjects is past the {max_universe} this can scan. "
-            "Facts are keyed by subject and a child asserts its own parent, so there is "
-            "no parent-to-child index; building one is the fix, not waiting longer"
-        )
-    found: list[TUID] = []
-    for subject in subjects:
-        edges = edges_from_facts(store.subject_facts(TUID(str(subject)), as_of=as_of))
-        found.extend(children(edges, parent, as_of=as_of, relationship_type=relationship_type))
-    return tuple(sorted(set(found)))
+    lei = str(parent).removeprefix("lei:")
+    return tuple(store.subjects_with_value(f"gleif:rr:{relationship_type}", lei, as_of=as_of))
 
 
 __all__ = [

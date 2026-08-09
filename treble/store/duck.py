@@ -337,6 +337,34 @@ class DuckStore:
         ).fetchall()
         return [TUID(row[0]) for row in rows]
 
+    def subjects_with_value(self, field: str, value: str, *, as_of: datetime) -> list[TUID]:
+        """Subjects asserting `value` for `field` — the reverse of a read.
+
+        Facts are keyed by subject, so every other read here starts from
+        one. Some questions run the other way: *who* claims this LEI as a
+        parent, *which* instruments map to this CUSIP. Answering those by
+        walking subjects costs one read each, and the entity graph made
+        that concrete — 373,125 LEI subjects, so `children_of` appeared to
+        hang and had to refuse rather than finish.
+
+        It does not need to. The rows are in one table and DuckDB will
+        answer this with a single scan of a column it already holds; the
+        expensive version was a Python loop, not a missing index. This is
+        the same query the loop was approximating, run where the data is.
+
+        Point-in-time like every other read (I2), and sorted so two runs of
+        one question return the same order.
+        """
+        if as_of.tzinfo is None:
+            raise ValueError("as_of must be timezone-aware")
+        rows = self._conn.execute(
+            "SELECT DISTINCT subject FROM facts "
+            "WHERE field = ? AND value_text = ? AND knowledge_from <= ? "
+            "ORDER BY subject",
+            [field, value, as_of],
+        ).fetchall()
+        return [TUID(row[0]) for row in rows]
+
     def read(self, subject: TUID, field: str, *, as_of: datetime) -> list[Fact]:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")
