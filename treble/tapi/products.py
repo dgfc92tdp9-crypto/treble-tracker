@@ -12,17 +12,25 @@ and give seven chances for two of them to disagree about which day they
 describe. `SWPM` gets a product tab instead.
 
 **What each product needs beyond the curves is stated, not defaulted.**
-Caps need a volatility, CMS needs one too, inflation needs an index level
-and its lag, cross-currency needs a spot rate and a basis. This repository
-holds curves and a swaption surface; it holds no inflation index, no FX
-basis. Rather than default those to something plausible and return a
-number, the priced entry points require them and :data:`UNFED_PRODUCTS`
-names the ones whose inputs no stored source supplies — so a screen can
-show "no data for this product" instead of a confident price built on an
-assumption nobody made.
+Caps and CMS need a volatility, inflation needs a projected index,
+cross-currency needs a basis. None of those is in the store and none is
+invented: each is a required argument, so the assumption sits with the
+caller who made it rather than inside a number that looks measured.
 
-That distinction is the whole reason this module is thin. The pricers are
-correct; what varies is whether anything in the store can feed them.
+**Six of the seven price from stored data, and that took correcting five
+claims that they could not.** capfloor, cms, cancellable, assetswap,
+inflation and crosscurrency were each recorded here as blocked on data —
+a swaption vol, a bond price, an FX rate, an index, a basis — and in every
+case the data was already in the store or the missing piece was an
+assumption a caller states. The entries were written without checking.
+:data:`UNFED_PRODUCTS` now holds one product, and the discipline that
+matters is not what it says but that each line was verified before it was
+believed.
+
+`totalreturn` is the one that survived: it needs a *trade*, a reset price
+and financing spread that belong to a position rather than to a market,
+and this repository has no position store. That is a different kind of
+absence from a missing quote.
 """
 
 from __future__ import annotations
@@ -57,9 +65,14 @@ from treble.tapi.swap_market import (
 )
 from treble.tapi.vol_surface import build_vol_surface
 
-#: Products whose inputs this repository has no stored source for. Named
-#: rather than silently priced off a default: a cross-currency basis of
-#: zero is not a neutral assumption, it is a claim that the basis is zero.
+#: Products no stored source can feed. One, and it is the only one of the
+#: seven whose gap is a *position* rather than a market input: a total
+#: return swap needs the trade's own reset price and financing spread.
+#:
+#: The other six were listed here at various points and every listing was
+#: wrong. `unfed_reason` is what a screen calls before offering a product,
+#: so an entry here removes a capability from a user — which is why the
+#: bar for adding one is a measurement rather than an impression.
 UNFED_PRODUCTS: dict[str, str] = {
     "totalreturn": "needs a reset price and financing spread from a trade, not a curve",
 }
