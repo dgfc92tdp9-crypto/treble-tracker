@@ -10,6 +10,8 @@ is `is_useful is False`.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import numpy as np
 import pytest
 
@@ -194,3 +196,38 @@ class TestTheSkillIsActuallyConsulted:
         fitted = _fit(_signal())
         left, _ = _explain(fitted, -40.0)
         assert left < 0.0
+
+
+class TestTheTvalBinding:
+    """`sys:tval_residual`. The panel exists to show a refusal as often as
+    a result: on the live store it reports -10.5% skill over 106 bonds and
+    says the curve stands alone."""
+
+    @staticmethod
+    def _rows(store: object) -> tuple[tuple[object, ...], ...]:
+        from treble.tapi.local import LocalTapi
+
+        return LocalTapi(store).series(  # type: ignore[arg-type]
+            None, "sys:tval_residual", as_of=datetime.now(UTC)
+        )
+
+    def test_an_empty_store_returns_the_reason(self) -> None:
+        """No curves to fit residuals against is a different state from a
+        model that measured badly, and a blank row would hide which."""
+        import tempfile
+        from pathlib import Path
+
+        from treble.store.duck import DuckStore
+
+        rows = self._rows(DuckStore(Path(tempfile.mkdtemp()) / "t.db"))
+        assert rows[0][1] is None
+        assert isinstance(rows[0][0], str)
+
+    def test_the_verdict_distinguishes_rejected_from_absent(self) -> None:
+        """ "Measured and rejected" and "not attempted" are different
+        claims about how much work was done on the reader's behalf."""
+        fitted = _fit(_noise())
+        left, why = _explain(fitted, 40.0)
+        assert left == 40.0
+        assert "rejected" in why
+        assert "no residual model" not in why

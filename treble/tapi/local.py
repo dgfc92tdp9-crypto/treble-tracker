@@ -304,6 +304,7 @@ class LocalTapi:
         "sys:swpm_products",
         "sys:sptr_documents",
         "sys:allq_evaluated",
+        "sys:tval_residual",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -550,6 +551,8 @@ class LocalTapi:
             return self._sptr_documents(security, as_of=as_of)
         if binding == "sys:allq_evaluated":
             return self._allq_evaluated(security, as_of=as_of)
+        if binding == "sys:tval_residual":
+            return self._tval_residual(as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -776,6 +779,79 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _tval_residual(
+        self, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """Whether the residual layer earns its place (§15.4).
+
+        The panel exists to show a *refusal* as often as a result. A
+        boosted tree on a couple of hundred bonds always fits the training
+        set and usually does worse out of sample, so "measured, rejected"
+        is a frequent and correct answer — and it differs from "not
+        attempted" in a way a blank row would hide.
+
+        Residuals come from `IssuerCurveSet.values_for`, which is the
+        method that already pairs each fitted bond with its curve. I
+        previously recorded this panel as blocked on an API change, having
+        confused `IssuerCurve.bonds` (identifiers) with
+        `IssuerCurveSet.bonds` (the fitted objects). Nothing needed
+        changing.
+        """
+        from treble.analytics.tval.residual import (
+            MIN_OBSERVATIONS,
+            MIN_SKILL,
+            ResidualModelUnavailableError,
+            ResidualObservation,
+            fit_residual_model,
+        )
+        from treble.tapi.issuer_curves import IssuerCurvesUnavailableError, build_issuer_curves
+
+        try:
+            fitted = build_issuer_curves(self._store, as_of=as_of)
+        except IssuerCurvesUnavailableError as error:
+            return ((str(error), None),)
+
+        observations: list[ResidualObservation] = []
+        for issuer in fitted.issuers:
+            count = len(fitted.bonds[issuer])
+            for call in fitted.values_for(issuer):
+                facts = {
+                    f.field: f.value
+                    for f in self._store.subject_facts(TUID(call.identifier), as_of=as_of)
+                }
+                coupon, size = facts.get("nport:annualizedRt"), facts.get("nport:valUSD")
+                if not isinstance(coupon, int | float) or not isinstance(size, int | float):
+                    continue
+                observations.append(
+                    ResidualObservation(
+                        identifier=call.identifier,
+                        residual=call.residual_bp / 1e4,
+                        coupon=float(coupon),
+                        size_usd=float(size),
+                        issuer_bond_count=count,
+                    )
+                )
+
+        try:
+            model = fit_residual_model.__wrapped__(observations)  # type: ignore[attr-defined]
+        except ResidualModelUnavailableError as error:
+            return (
+                (str(error), None),
+                ("BONDS WITH COUPON AND SIZE", len(observations)),
+                ("MINIMUM TO MEASURE ON", MIN_OBSERVATIONS),
+            )
+        return (
+            ("BONDS MEASURED", model.observations),
+            ("NULL MAE (bp)", round(model.null_mae_bp, 2)),
+            ("MODEL MAE (bp)", round(model.model_mae_bp, 2)),
+            ("SKILL vs NULL", f"{model.skill:+.1%}"),
+            ("BAR TO APPLY", f"{MIN_SKILL:.0%}"),
+            (
+                "VERDICT",
+                "applied" if model.is_useful else "measured and rejected — curve stands alone",
+            ),
+        )
 
     def _allq_evaluated(
         self, security: SecurityQuery | None, *, as_of: datetime
