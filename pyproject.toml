@@ -21,7 +21,6 @@ dependencies = [
   "arch>=7.0",
   "linearmodels>=6.0",
   "scikit-learn>=1.5",
-  "lightgbm>=4.5",
   "cvxpy>=1.5",
   "clarabel>=0.9",
   "osqp>=0.6",
@@ -120,7 +119,7 @@ ignore_errors = true
 follow_imports = "skip"
 
 [[tool.mypy.overrides]]
-module = ["QuantLib.*", "xlwings.*", "lightgbm.*", "scipy.*", "pyarrow.*", "grpc.*", "aiokafka.*", "sklearn.*"]
+module = ["QuantLib.*", "xlwings.*", "scipy.*", "pyarrow.*", "grpc.*", "aiokafka.*", "sklearn.*"]
 ignore_missing_imports = true
 # xlwings re-exports its decorators (`func`, `arg`, `ret`) implicitly, which
 # strict mode rejects. Relaxed for this dependency only rather than

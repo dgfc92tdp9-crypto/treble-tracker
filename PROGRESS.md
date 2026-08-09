@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 54.56%**
+**Completion: 54.72%**
 
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
@@ -684,6 +684,29 @@ never stressing price↔yield, the duration identity, or the I2 guarantee), and 
 target that had never worked.
 
 ## Data access findings (settled 2026-07-26 — do not re-derive)
+
+**Credit ratings: closed across every NRSRO whose terms can be read (measured 2026-08-09).**
+SEC Rule 17g-7(b) makes each NRSRO's full rating history legally public, free and XBRL —
+so availability was never the obstacle, and the SEC hosts no mirror, only a taxonomy and a
+publication guide. The obstacle is per-vendor terms, and all three smaller NRSROs previously
+recorded as "unread rather than known-prohibitive" have now been read:
+
+| NRSRO | File | Outcome |
+|---|---|---|
+| Egan-Jones | `egan-jones.io/17g-7` | host returns **403 to every non-browser client, including `robots.txt`** — the DTCC/Stooq line; not circumvented |
+| KBRA | two XBRL histories linked from `kbra.com/regulatory` (`/documents/report/2390`, `2392`) | Terms of Use prohibit "any robot, spider, scraper, crawler, data extraction tool, automated script, bot, or other automated means", and separately forbid storing content "in a database" |
+| Morningstar DBRS | `dbrs.morningstar.com/regulatory` | Terms prohibit "any automated device, program, tool, algorithm, process, or methodology … to access, acquire, copy, or monitor any portion of the Site" |
+
+**KBRA is the one to remember: `robots.txt` said yes and the terms said no.** It serves
+`User-agent: * / Allow: /` — an explicit, machine-readable grant — while its Terms of Use forbid
+precisely the access that grant appears to give. A permission check that read `robots.txt` alone
+would have returned "permitted", and would have been confidently wrong. **`robots.txt` states
+what a crawler may fetch; it is not the licence.** Read the terms — a machine-readable "yes" from
+the wrong document is worse than no answer, because it is actionable.
+
+This closes the rating dimension of TVAL's similarity metric as a *measured* negative rather than
+an open task, alongside seniority (0 of 460 N-PORT debt titles carry a seniority token; the
+schema has no such field). Both now say so on the METHOD tab.
 
 Probed with a real FINRA API account (Jack's, credentials in gitignored `.env`):
 
