@@ -43,9 +43,13 @@ ENTRY_POINTS: dict[str, str] = {
 #: what wiring is missing rather than pretending none is.
 AWAITING_WIRING: dict[str, str] = {
     "treble.core.entity_graph": (
-        "Parent/subsidiary graph. core.master is now reachable through "
-        "tapi/security_master.py; this is the half still waiting, since no "
-        "screen asks who owns whom."
+        "Parent/subsidiary graph. Measured 2026-08-08: the store holds 4 LEI subjects "
+        "and zero gleif:rr:* relationship facts, so there is nothing for it to walk. "
+        "That is a backfill rather than a blocker -- GleifRelationshipAdapter exists, "
+        "GLEIF publishes the RR-CDF file free and unrestricted, and nobody has run it. "
+        "Wiring it into tapi/security_master.py is the smaller half and should follow "
+        "the ingest, not precede it: a graph service over an empty graph is the "
+        "permanently-empty screen this project keeps refusing to build."
     ),
     "treble.analytics.credit.cds": (
         "CDSW's pricer, validated against ISDA's published grids across six currencies. "
