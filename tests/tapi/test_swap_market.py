@@ -190,3 +190,64 @@ class TestPointInTime:
         _write(store, discount=ESTR, forecast=EURIBOR, day=EARLIER)
         _write(store, discount=ESTR, forecast=EURIBOR, day=DAY)
         assert build_swap_market(store, as_of=AS_OF).report_date == DAY
+
+
+class TestTheUsdDiscountCurve:
+    """The dollar leg for cross-currency. Separate from `build_swap_market`
+    because that returns one *environment*, and an environment mixing a
+    euro forecast curve with a dollar discount curve is not something
+    anything is priced on."""
+
+    @staticmethod
+    def _write_usd(store: DuckStore, rates: dict[str, float]) -> None:
+        from treble.tapi.swap_market import USD_DISCOUNT_CURVE
+
+        provenance = Provenance(
+            source_system="dtcc-sdr",
+            source_uri="https://example.invalid/CFTC_CUMULATIVE_RATES.zip",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.BULK_FILE,
+            extractor_version="1",
+            payload_hash="0" * 64,
+        )
+        store.write_provenance([provenance])
+        store.write_facts(
+            [
+                Fact(
+                    subject=f"swap:{USD_DISCOUNT_CURVE}:{tenor}",
+                    field="PAR_RATE",
+                    value=rate,
+                    effective_from=DAY,
+                    effective_to=DAY,
+                    knowledge_from=KNOWN,
+                    provenance_id=provenance.id,
+                )
+                for tenor, rate in rates.items()
+            ]
+        )
+
+    def test_it_builds_from_stored_sofr_quotes(self, store: DuckStore) -> None:
+        from treble.tapi.swap_market import build_usd_discount_curve
+
+        self._write_usd(store, dict.fromkeys(("1Y", "2Y", "3Y", "5Y", "7Y", "10Y"), 0.043))
+        curve = build_usd_discount_curve(store, as_of=datetime.now(UTC), report_date=DAY)
+        assert 0.0 < curve.discount(10.0) < 1.0
+        assert curve.discount(10.0) < curve.discount(1.0)
+
+    def test_too_few_quotes_refuses_rather_than_substituting(self, store: DuckStore) -> None:
+        """A dollar leg cannot be discounted on a euro curve, so a thin day
+        is an error rather than an invitation to borrow the other one."""
+        from treble.tapi.swap_market import SwapMarketUnavailableError, build_usd_discount_curve
+
+        self._write_usd(store, {"1Y": 0.043, "2Y": 0.043})
+        with pytest.raises(SwapMarketUnavailableError, match="euro curve"):
+            build_usd_discount_curve(store, as_of=datetime.now(UTC), report_date=DAY)
+
+    def test_it_uses_the_us_calendar_not_target(self) -> None:
+        """A euro holiday is not a dollar holiday, and discounting USD flows
+        on a TARGET calendar shifts payment dates where the two disagree."""
+        from treble.analytics._ql import Market
+        from treble.tapi.swap_market import CALENDAR, USD_CALENDAR
+
+        assert USD_CALENDAR is Market.US_SETTLEMENT
+        assert USD_CALENDAR is not CALENDAR

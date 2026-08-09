@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from treble.analytics._ql import DayCount, Market
-from treble.analytics.curves.bootstrap import CurveBuildError
+from treble.analytics.curves.bootstrap import Curve, CurveBuildError, build_curve
 from treble.analytics.curves.config import CurveConfig, InstrumentKind, InstrumentSpec
 from treble.analytics.curves.multicurve import CurveSet, CurveSpec
 from treble.core.identifiers import TUID
@@ -48,6 +48,18 @@ INDEX_TENOR = "6M"
 SHORT_FORECAST_CURVE = "EUR-EURIBOR-3M"
 SHORT_INDEX_TENOR = "3M"
 CALENDAR = Market.TARGET
+
+#: The USD leg, for cross-currency. SOFR OIS against the US settlement
+#: calendar rather than TARGET — a euro holiday is not a dollar holiday,
+#: and discounting USD flows on a TARGET calendar shifts payment dates by
+#: days at exactly the points where the two calendars disagree.
+#:
+#: Discount-only: the store carries USD-SOFR-OIS and no USD forecast curve,
+#: so this builds the leg a cross-currency swap discounts on and does not
+#: pretend to a USD projection nobody ingested.
+USD_DISCOUNT_CURVE = "USD-SOFR-OIS"
+USD_CALENDAR = Market.US_SETTLEMENT
+
 
 #: A curve needs enough nodes to be a curve. Below this the screen says so
 #: rather than drawing a line through three points.
@@ -105,6 +117,36 @@ def _curve_quotes(store: DuckStore, curve: str, *, as_of: datetime) -> dict[date
                 continue
             by_date.setdefault(fact.effective_to, {})[tenor] = float(value)
     return by_date
+
+
+def build_usd_discount_curve(store: DuckStore, *, as_of: datetime, report_date: date) -> Curve:
+    """The USD SOFR discount curve for one report date.
+
+    Separate from `build_swap_market` rather than folded into it: that
+    function returns one *environment*, and an environment mixing a euro
+    forecast curve with a dollar discount curve is not a thing anything is
+    priced on. A cross-currency trade needs two environments and the rate
+    between them, and conflating them is how a leg gets discounted on the
+    wrong currency's curve.
+    """
+    quotes = _curve_quotes(store, USD_DISCOUNT_CURVE, as_of=as_of).get(report_date, {})
+    if len(quotes) < MIN_NODES:
+        raise SwapMarketUnavailableError(
+            f"{report_date}: {len(quotes)} {USD_DISCOUNT_CURVE} quotes, fewer than the "
+            f"{MIN_NODES} a curve needs. A dollar leg cannot be discounted on a "
+            "euro curve, so this refuses rather than substituting one"
+        )
+    config = CurveConfig(
+        name=USD_DISCOUNT_CURVE,
+        currency="USD",
+        calendar=USD_CALENDAR,
+        instruments=tuple(InstrumentSpec(kind=InstrumentKind.OIS, tenor=t) for t in quotes),
+    )
+    return build_curve(
+        config,
+        {(InstrumentKind.OIS, tenor): rate for tenor, rate in quotes.items()},
+        as_of=report_date,
+    )
 
 
 def build_swap_market(
