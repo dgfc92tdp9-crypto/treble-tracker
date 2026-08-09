@@ -14,10 +14,11 @@ from pathlib import Path
 import pytest
 
 from treble.core.facts import Fact
-from treble.core.identifiers import TUID
+from treble.core.identifiers import TUID, SecurityQuery, YellowKey
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
 from treble.tapi.entity import EntityUnknownError, ancestry_of, children_of
+from treble.tapi.local import LocalTapi
 
 KNOWN = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
 LATER = datetime(2026, 8, 8, 18, 0, tzinfo=UTC)
@@ -135,3 +136,89 @@ class TestDescent:
         assert children_of(
             store, TUID(f"lei:{DIRECT}"), as_of=LATER, relationship_type="IS_FUND-MANAGED_BY"
         ) == (CHILD,)
+
+
+class TestTheScreenBinding:
+    """`sys:entity_owners` and `sys:entity_children` on LocalTapi. Until
+    this, every service built in this stretch was reachable from another
+    service and from nothing a user could open."""
+
+    @staticmethod
+    def _tapi(store: DuckStore) -> LocalTapi:
+        return LocalTapi(store)
+
+    def _instrument_with_lei(self, store: DuckStore) -> None:
+        prov = Provenance(
+            source_system="edgar-nport",
+            source_uri="https://example.invalid/primary_doc.xml",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.DOCUMENT,
+            extractor_version="1",
+            payload_hash="1" * 64,
+        )
+        store.write_provenance([prov])
+        store.write_facts(
+            [
+                Fact(
+                    subject="cusip:037833100",
+                    field="nport:lei",
+                    value=str(CHILD).removeprefix("lei:"),
+                    effective_from=date(2026, 6, 30),
+                    effective_to=date(2026, 6, 30),
+                    knowledge_from=KNOWN,
+                    provenance_id=prov.id,
+                )
+            ]
+        )
+
+    def test_ownership_reaches_the_screen(self, store: DuckStore) -> None:
+        self._instrument_with_lei(store)
+        _write(
+            store,
+            CHILD,
+            [
+                ("IS_DIRECTLY_CONSOLIDATED_BY", DIRECT),
+                ("IS_ULTIMATELY_CONSOLIDATED_BY", ULTIMATE),
+            ],
+        )
+        rows = self._tapi(store).series(
+            SecurityQuery(ticker="037833100", key=YellowKey.CORP, venue=None, descriptor=None),
+            "sys:entity_owners",
+            as_of=LATER,
+        )
+        flat = {r[0]: r[1] for r in rows}
+        assert flat["DIRECT PARENT"] == f"lei:{DIRECT}"
+        assert flat["ULTIMATE PARENT"] == f"lei:{ULTIMATE}"
+        assert flat["PARENTS AGREE"].startswith("no")
+
+    def test_an_instrument_with_no_lei_says_so(self, store: DuckStore) -> None:
+        """An instrument with no filed issuer and one whose issuer is
+        unknown render alike and are not alike."""
+        prov = Provenance(
+            source_system="edgar-nport",
+            source_uri="https://example.invalid/x",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.DOCUMENT,
+            extractor_version="1",
+            payload_hash="2" * 64,
+        )
+        store.write_provenance([prov])
+        store.write_facts(
+            [
+                Fact(
+                    subject="cusip:037833100",
+                    field="nport:title",
+                    value="Some Bond",
+                    effective_from=date(2026, 6, 30),
+                    effective_to=date(2026, 6, 30),
+                    knowledge_from=KNOWN,
+                    provenance_id=prov.id,
+                )
+            ]
+        )
+        rows = self._tapi(store).series(
+            SecurityQuery(ticker="037833100", key=YellowKey.CORP, venue=None, descriptor=None),
+            "sys:entity_owners",
+            as_of=LATER,
+        )
+        assert "carries no LEI" in str(rows[0][0])

@@ -69,10 +69,6 @@ AWAITING_WIRING: dict[str, str] = {
         "§14.1 ratios from stored XBRL. Gives analytics/equity/ratios.py its first "
         "caller; the FA drill-down is what will bind this."
     ),
-    "treble.tapi.entity": (
-        "Entity graph service over the GLEIF backfill. Gives core/entity_graph.py "
-        "its first caller; PEOP or a DES ownership panel is what will bind it."
-    ),
     "treble.tapi.documents": "The docs service; no screen binds it yet.",
     "treble.tapi.evaluated": "Contributed-price evaluation; no screen binds it yet.",
     "treble.render.layout": (

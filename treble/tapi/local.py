@@ -298,6 +298,8 @@ class LocalTapi:
         "sys:tval_method",
         "sys:vcub_grid",
         "sys:vcub_method",
+        "sys:entity_owners",
+        "sys:entity_children",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -534,6 +536,8 @@ class LocalTapi:
             return self._tval(binding, as_of=as_of)
         if binding in ("sys:vcub_grid", "sys:vcub_method"):
             return self._vcub(binding, as_of=as_of)
+        if binding in ("sys:entity_owners", "sys:entity_children"):
+            return self._entity(security, binding, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -760,6 +764,65 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _entity(
+        self, security: SecurityQuery | None, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """Ownership for the security on screen (§9.5).
+
+        The LEI comes from the instrument's own stored facts rather than
+        from the resolver: an instrument's issuer is a fact somebody filed,
+        and inferring it from a ticker would attribute a bond to whichever
+        entity happens to share its name.
+
+        Direct and ultimate parent are shown as separate rows because GLEIF
+        states them separately and they disagree often — three of six
+        entities sampled from this store. A screen showing one "parent"
+        would have to pick, and picking is what `core/entity_graph.py`
+        refuses to do.
+        """
+        from treble.tapi.entity import EntityUnknownError, ancestry_of, children_of
+
+        if security is None:
+            return (("No security selected.", None),)
+        try:
+            subject = self.resolve(security)
+        except SecurityNotFoundError as error:
+            return ((str(error), None),)
+
+        leis = [
+            str(f.value)
+            for f in self._store.subject_facts(subject, as_of=as_of)
+            if f.field in ("nport:lei", "gleif:lei") and isinstance(f.value, str)
+        ]
+        if not leis:
+            return (
+                (
+                    f"{subject} carries no LEI, so no ownership can be shown. An "
+                    "instrument with no filed issuer and one whose issuer is unknown "
+                    "render alike and are not alike.",
+                    None,
+                ),
+            )
+        lei = TUID(f"lei:{leis[0]}")
+
+        if binding == "sys:entity_children":
+            kids = children_of(self._store, lei, as_of=as_of)
+            if not kids:
+                return ((f"{lei} consolidates no filed subsidiaries.", None),)
+            return tuple((str(k), None) for k in kids[:200])
+
+        try:
+            found = ancestry_of(self._store, lei, as_of=as_of)
+        except EntityUnknownError as error:
+            return ((str(error), None),)
+        return (
+            ("ENTITY", str(lei)),
+            ("DIRECT PARENT", str(found.direct_parent) if found.direct_parent else "—"),
+            ("ULTIMATE PARENT", str(found.ultimate_parent) if found.ultimate_parent else "—"),
+            ("PARENTS AGREE", "yes" if found.parents_agree else "no — see both above"),
+            ("EDGES FILED", len(found.edges)),
+        )
 
     def _tval(
         self, binding: str, *, as_of: datetime
