@@ -242,6 +242,7 @@ class GleifRelationshipAdapter(SourceAdapter):
             payload_hash=payload_hash,
         )
         facts: list[Fact] = []
+        malformed_periods = 0
         for record in records_node.findall("rr:RelationshipRecord", RR_NS):
             rel = record.find("rr:Relationship", RR_NS)
             if rel is None:
@@ -262,7 +263,31 @@ class GleifRelationshipAdapter(SourceAdapter):
                 continue
 
             period_start, period_end = _relationship_period(rel)
-            effective_from = period_start or payload.fetched_at.date()
+            # An end with no start: GLEIF records a RelationshipPeriod
+            # whose EndDate is filled and StartDate is not, for a
+            # relationship that has already lapsed. Falling back to the
+            # fetch date there asserts the relationship *began today* and
+            # ended in the past, which `Fact` rejects outright -- and
+            # rightly, since it is not a period. The narrowest statement
+            # consistent with what GLEIF actually says is a single day at
+            # the known end.
+            #
+            # Found by running this adapter against the live concatenated
+            # file (663,410 records) rather than the fixtures, which carry
+            # no such record.
+            effective_from = period_start or period_end or payload.fetched_at.date()
+            if period_end is not None and period_end < effective_from:
+                # A filer has reported a relationship that ended before it
+                # began. That is not a period, and `Fact` refuses it -- so
+                # the record is skipped and counted rather than repaired by
+                # swapping the dates, which would invent a lifetime GLEIF
+                # never asserted.
+                #
+                # Found by running against the live concatenated file
+                # (663,410 records); the fixtures carry no such record, so
+                # every test passed while a full ingest could not complete.
+                malformed_periods += 1
+                continue
             subject = lei_subject(start_lei)
 
             # Per-relationship values are bound as default arguments, not

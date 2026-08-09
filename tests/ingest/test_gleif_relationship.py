@@ -7,6 +7,7 @@ NULL-status record, so status handling is exercised against real data
 rather than synthesised cases.
 """
 
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -142,3 +143,62 @@ class TestParse:
         bad = RawPayload(data=doc, source_uri="x", fetched_at=FETCHED)
         with pytest.raises(UnsupportedRelationshipNodeError):
             adapter.parse(bad, payload_hash(bad.data))
+
+
+class TestMalformedRelationshipPeriods:
+    """Found by running the adapter against the live concatenated file
+    (663,410 records) rather than the fixtures, which carry no such record.
+    Every test passed while a full ingest could not complete.
+    """
+
+    @staticmethod
+    def _rr(start: str | None, end: str | None) -> bytes:
+        period = "".join(
+            (
+                "<rr:RelationshipPeriod><rr:PeriodType>RELATIONSHIP_PERIOD</rr:PeriodType>",
+                f"<rr:StartDate>{start}</rr:StartDate>" if start else "",
+                f"<rr:EndDate>{end}</rr:EndDate>" if end else "",
+                "</rr:RelationshipPeriod>",
+            )
+        )
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<rr:RelationshipData xmlns:rr="http://www.gleif.org/data/schema/rr/2016">'
+            "<rr:RelationshipRecords><rr:RelationshipRecord><rr:Relationship>"
+            "<rr:StartNode><rr:NodeID>529900T8BM49AURSDO55</rr:NodeID>"
+            "<rr:NodeIDType>LEI</rr:NodeIDType></rr:StartNode>"
+            "<rr:EndNode><rr:NodeID>254900HROIFWPRGM1V77</rr:NodeID>"
+            "<rr:NodeIDType>LEI</rr:NodeIDType></rr:EndNode>"
+            "<rr:RelationshipType>IS_DIRECTLY_CONSOLIDATED_BY</rr:RelationshipType>"
+            "<rr:RelationshipStatus>ACTIVE</rr:RelationshipStatus>"
+            f"<rr:RelationshipPeriods>{period}</rr:RelationshipPeriods>"
+            "</rr:Relationship></rr:RelationshipRecord></rr:RelationshipRecords>"
+            "</rr:RelationshipData>"
+        ).encode()
+
+    def _parse(self, body: bytes) -> int:
+        adapter = GleifRelationshipAdapter(
+            PayloadStore(Path(tempfile.mkdtemp())),
+            IngestLog(Path(tempfile.mkdtemp()) / "l.db"),
+        )
+        payload = RawPayload(
+            data=body,
+            source_uri="https://leidata.gleif.org/x",
+            fetched_at=datetime(2026, 8, 8, 9, 0, tzinfo=UTC),
+        )
+        return len(adapter.parse(payload, payload_hash(body)).facts)
+
+    def test_an_end_before_its_start_is_skipped_not_repaired(self) -> None:
+        """A filer has reported a relationship that ended before it began.
+        Swapping the dates would invent a lifetime GLEIF never asserted, so
+        the record is dropped."""
+        assert self._parse(self._rr("2024-01-01", "2020-01-01")) == 0
+
+    def test_an_end_with_no_start_becomes_a_single_day(self) -> None:
+        """GLEIF records a lapsed relationship with EndDate filled and
+        StartDate empty. Falling back to the fetch date asserts it began
+        today and ended in the past, which is not a period at all."""
+        assert self._parse(self._rr(None, "2020-01-01")) > 0
+
+    def test_an_ordinary_period_is_unaffected(self) -> None:
+        assert self._parse(self._rr("2020-01-01", "2024-01-01")) > 0
