@@ -19,6 +19,7 @@ from treble.analytics.derivatives.cancellable import cancellable_swap
 from treble.core.facts import Fact
 from treble.core.identifiers import TUID
 from treble.core.provenance import ExtractionMethod, Provenance
+from treble.ingest.ecb_hicp import SUBJECT as HICP_SUBJECT
 from treble.store.duck import DuckStore
 from treble.tapi.products import (
     MAX_NODE_DISPERSION,
@@ -28,6 +29,7 @@ from treble.tapi.products import (
     assetswap_from_store,
     cancellable_from_store,
     cms_from_store,
+    inflation_from_store,
     price_cap_from_store,
     unfed_reason,
 )
@@ -346,3 +348,92 @@ class TestAssetSwapUsesStoredHoldings:
         )
         with pytest.raises(ProductUnavailableError, match="nothing left"):
             assetswap_from_store(store, as_of=datetime.now(UTC), subject=subject)
+
+
+class TestInflationUsesTheStoredIndex:
+    """Recorded as blocked because the store holds no *projected* index.
+    That was the same reasoning error made about cross-currency and about
+    cancellable: the store holds no swaption volatility either, and no
+    cross-currency basis, and both are caller inputs here. A projection is
+    an assumption, and assumptions are stated rather than defaulted.
+    """
+
+    @staticmethod
+    def _with_hicp(store: DuckStore) -> DuckStore:
+        prov = Provenance(
+            source_system="ecb-hicp",
+            source_uri="https://data-api.ecb.europa.eu/service/data/ICP/x",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.API,
+            extractor_version="1",
+            payload_hash="1" * 64,
+        )
+        store.write_provenance([prov])
+        store.write_facts(
+            [
+                Fact(
+                    subject=str(HICP_SUBJECT),
+                    field="PX_LAST",
+                    value=level,
+                    effective_from=first,
+                    effective_to=last,
+                    knowledge_from=KNOWN,
+                    provenance_id=prov.id,
+                )
+                for level, first, last in (
+                    (128.0, date(2026, 3, 1), date(2026, 3, 31)),
+                    (129.0, date(2026, 4, 1), date(2026, 4, 30)),
+                    (130.0, date(2026, 7, 1), date(2026, 7, 31)),
+                )
+            ]
+        )
+        return store
+
+    def test_it_prices_off_the_stored_base_index(self, store: DuckStore) -> None:
+        priced = inflation_from_store(
+            self._with_hicp(store),
+            as_of=datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+            fixed_rate=0.02,
+            maturity_years=10.0,
+            projected_index=160.0,
+        )
+        assert priced.inflation_leg != 0.0
+        assert priced.index_lag_months == 3
+
+    def test_the_lag_selects_an_older_figure_than_the_latest(self, store: DuckStore) -> None:
+        """A three-month lag references the figure for three months ago.
+        Reading the latest published level would measure a different period
+        from the one the contract pays on -- which is the whole reason the
+        lag is a required field on the spec."""
+        lagged = inflation_from_store(
+            self._with_hicp(store),
+            as_of=datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+            fixed_rate=0.0,
+            maturity_years=1.0,
+            projected_index=130.0,
+            index_lag_months=3,
+        )
+        current = inflation_from_store(
+            self._with_hicp(store),
+            as_of=datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+            fixed_rate=0.0,
+            maturity_years=1.0,
+            projected_index=130.0,
+            index_lag_months=0,
+        )
+        # April (129.0) against July (130.0): different bases, so different
+        # breakevens off the same projection.
+        assert lagged.breakeven_rate != current.breakeven_rate
+
+    def test_no_observation_at_the_lag_is_refused(self, store: DuckStore) -> None:
+        """The index is published monthly and in arrears; a store with
+        nothing that old cannot start the ratio."""
+        with pytest.raises(ProductUnavailableError, match="HICP observation"):
+            inflation_from_store(
+                self._with_hicp(store),
+                as_of=datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+                fixed_rate=0.02,
+                maturity_years=10.0,
+                projected_index=160.0,
+                index_lag_months=60,
+            )

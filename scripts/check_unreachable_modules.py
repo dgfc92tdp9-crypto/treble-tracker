@@ -36,7 +36,6 @@ ENTRY_POINTS: dict[str, str] = {
     "treble.ingest.frenchdata": "Adapter run out of band by scripts/backfill_port.py.",
     "treble.ingest.twelvedata": "Adapter run out of band by scripts/backfill_port.py.",
     "treble.ingest.trace": "Adapter run out of band against a downloaded TRACE file.",
-    "treble.ingest.ecb_hicp": "Adapter run out of band; ECB SDMX, no key.",
 }
 
 #: Built, tested, and not yet reachable from a screen or service. This is
@@ -62,11 +61,6 @@ AWAITING_WIRING: dict[str, str] = {
         "§12.1 pricer. Not data-blocked: ECB spot, EUR-ESTR-OIS and USD-SOFR-OIS "
         "are all stored and current. Needs build_swap_market taught to build a "
         "second curve under USD conventions; the basis is a caller input."
-    ),
-    "treble.analytics.derivatives.inflation": (
-        "§12.1 pricer. No longer data-blocked -- ingest/ecb_hicp.py supplies euro-area "
-        "HICP levels -- so what remains is wiring it into tapi/products.py and a "
-        "screen, which is the smaller half."
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
     "treble.analytics.equity.ratios": "Equity ratios; no screen binding reaches them.",

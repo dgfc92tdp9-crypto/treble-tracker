@@ -28,15 +28,21 @@ correct; what varies is whether anything in the store can feed them.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from treble.analytics.derivatives.assetswap import AssetSwapPricing, asset_swap_spread
 from treble.analytics.derivatives.cancellable import CancellablePricing, cancellable_swap
 from treble.analytics.derivatives.capfloor import Caplet, price_cap, price_floor
 from treble.analytics.derivatives.cms import cms_rate
+from treble.analytics.derivatives.inflation import (
+    InflationSwapPricing,
+    InflationSwapSpec,
+    price_inflation_swap,
+)
 from treble.analytics.holdings.implied_price import AssetCategory, implied_price
 from treble.analytics.vol.surface import EXPIRY_BUCKETS, TENOR_BUCKETS, VolSurface
 from treble.core.identifiers import TUID
+from treble.ingest.ecb_hicp import SUBJECT as HICP_SUBJECT
 from treble.store.duck import DuckStore
 from treble.tapi.swap_market import DISCOUNT_CURVE, SwapMarket, build_swap_market
 from treble.tapi.vol_surface import build_vol_surface
@@ -45,12 +51,6 @@ from treble.tapi.vol_surface import build_vol_surface
 #: rather than silently priced off a default: a cross-currency basis of
 #: zero is not a neutral assumption, it is a claim that the basis is zero.
 UNFED_PRODUCTS: dict[str, str] = {
-    "inflation": (
-        "ECB HICP is now ingested (ingest/ecb_hicp.py), so the index exists. What "
-        "is still missing is the projected index at maturity: a breakeven curve, "
-        "which no free source publishes and which this cannot invent from spot "
-        "levels without assuming the very thing the swap prices"
-    ),
     "crosscurrency": (
         "Not blocked on data, and this entry was wrong in three ways -- measured "
         "2026-08-08. ECB spot IS stored (fx:USDEUR, 7,061 observations to 2026-07-31), "
@@ -431,6 +431,71 @@ def assetswap_from_store(store: DuckStore, *, as_of: datetime, subject: TUID) ->
     )
 
 
+def inflation_from_store(
+    store: DuckStore,
+    *,
+    as_of: datetime,
+    fixed_rate: float,
+    maturity_years: float,
+    projected_index: float,
+    notional: float = 1e7,
+    index_lag_months: int = 3,
+    discount_factor: float = 1.0,
+) -> InflationSwapPricing:
+    """Price a zero-coupon inflation swap off the stored HICP base index.
+
+    Recorded as blocked because the store holds no *projected* index at
+    maturity. That was the same reasoning error made about cross-currency
+    and about cancellable: the store holds no swaption volatility either,
+    and no cross-currency basis, and both are caller inputs here rather
+    than blockers. A projection is an assumption, and this module's rule is
+    that assumptions are stated by the caller rather than defaulted.
+
+    What the store *does* supply is the base index the contract fixed at,
+    and that is the half a repository can be authoritative about.
+
+    **The base index is read at the contract's lag, not at today.** A
+    three-month lag means a trade struck now references the figure for
+    three months ago, and reading the latest published level instead would
+    measure a different period from the one the contract pays on.
+    """
+    lagged = as_of.date() - timedelta(days=round(index_lag_months * 30.44))
+    # `store.read` for the series, not `subject_facts`: the latter returns
+    # the latest fact per field, so a monthly index collapses to whichever
+    # month is newest and every lagged read fails. The series API is what
+    # the factor model uses for the same reason.
+    facts = [
+        f for f in store.read(HICP_SUBJECT, "PX_LAST", as_of=as_of) if f.effective_from <= lagged
+    ]
+    if not facts:
+        raise ProductUnavailableError(
+            f"no HICP observation on or before {lagged} (a {index_lag_months}-month lag "
+            "from today). Run the ECB HICP adapter; the index is published monthly and "
+            "in arrears"
+        )
+    raw = max(facts, key=lambda f: f.effective_from).value
+    if not isinstance(raw, int | float):
+        raise ProductUnavailableError(
+            f"the HICP observation for {lagged} is not numeric; an index that cannot be "
+            "read as a level cannot start a ratio"
+        )
+    base = float(raw)
+
+    spec = InflationSwapSpec(
+        notional=notional,
+        fixed_rate=fixed_rate,
+        maturity_years=maturity_years,
+        index_lag_months=index_lag_months,
+    )
+    priced: InflationSwapPricing = price_inflation_swap.__wrapped__(  # type: ignore[attr-defined]
+        spec,
+        base_index=base,
+        projected_index=projected_index,
+        discount_factor=discount_factor,
+    )
+    return priced
+
+
 __all__ = [
     "MAX_NODE_DISPERSION",
     "UNFED_PRODUCTS",
@@ -441,6 +506,7 @@ __all__ = [
     "assetswap_from_store",
     "cancellable_from_store",
     "cms_from_store",
+    "inflation_from_store",
     "price_cap_from_store",
     "unfed_reason",
 ]
