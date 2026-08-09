@@ -302,6 +302,7 @@ class LocalTapi:
         "sys:entity_children",
         "sys:fa_ratios",
         "sys:swpm_products",
+        "sys:sptr_documents",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -544,6 +545,8 @@ class LocalTapi:
             return self._fa_ratios(security, as_of=as_of)
         if binding == "sys:swpm_products":
             return self._swpm_products(as_of=as_of)
+        if binding == "sys:sptr_documents":
+            return self._sptr_documents(security, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -770,6 +773,44 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _sptr_documents(
+        self, security: SecurityQuery | None, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """The source documents behind a subject's facts (§8.3).
+
+        `SPTR` already renders the provenance DAG — which model, which
+        inputs, which extraction. This is the step further down: the
+        document itself, content-addressed, so what is listed is the one
+        the facts were parsed from rather than whatever the URL serves
+        today. EDGAR restates and vendors correct.
+
+        The restricted flag is on the row. A payload from a personal-use
+        source is the most concentrated form of that source's data — the
+        whole document rather than the fields parsed out of it — and a user
+        about to export one should meet that before the export refuses.
+        """
+        from treble.tapi.documents import DocumentUnavailableError, documents_for
+
+        if security is None:
+            return (("No security selected.", None, None, None),)
+        try:
+            subject = self.resolve(security)
+        except SecurityNotFoundError as error:
+            return ((str(error), None, None, None),)
+        try:
+            refs = documents_for(self._store, subject, as_of=as_of)
+        except DocumentUnavailableError as error:
+            return ((str(error), None, None, None),)
+        return tuple(
+            (
+                ref.source_system,
+                ref.retrieved_at.date().isoformat(),
+                ref.fact_count,
+                "restricted" if ref.redistribution_restricted else "",
+            )
+            for ref in refs
+        )
 
     #: §12.1 products in the order `SWPM` lists them: label, what each
     #: needs beyond the curve environment, and the status a user reads.

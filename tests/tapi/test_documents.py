@@ -184,3 +184,91 @@ class TestIngestHistory:
         only = ingest_history(log, source="twelvedata")
         assert len(only) == 1
         assert only[0]["parser_version"] == "1"
+
+
+class TestTheSptrBinding:
+    """`sys:sptr_documents`. SPTR renders the provenance DAG; this is the
+    step further down -- the document itself, content-addressed, so what is
+    listed is the one the facts were parsed from rather than whatever the
+    URL serves today."""
+
+    @staticmethod
+    def _rows(store: DuckStore) -> tuple[tuple[object, ...], ...]:
+        from treble.core.identifiers import SecurityQuery, YellowKey
+        from treble.tapi.local import LocalTapi, TickerIndex
+
+        return LocalTapi(store, tickers=TickerIndex({"IBM": 51143})).series(
+            SecurityQuery(ticker="IBM", key=YellowKey.EQUITY, venue=None, descriptor=None),
+            "sys:sptr_documents",
+            as_of=datetime.now(UTC),
+        )
+
+    def test_documents_reach_the_screen_newest_first(
+        self, store: DuckStore, payloads: PayloadStore
+    ) -> None:
+        for source, when, fields in (
+            ("edgar-companyfacts", EARLY, ("A",)),
+            ("twelvedata", LATE, ("B", "C")),
+        ):
+            key = payloads.put(f"{source}-body".encode())
+            prov = Provenance(
+                source_system=source,
+                source_uri=f"https://example.invalid/{source}",
+                retrieved_at=when,
+                method=ExtractionMethod.API,
+                extractor_version="1",
+                payload_hash=str(key),
+            )
+            store.write_provenance([prov])
+            store.write_facts(
+                [
+                    Fact(
+                        subject="cik:0000051143",
+                        field=field,
+                        value=1.0,
+                        effective_from=date(2026, 6, 30),
+                        effective_to=date(2026, 6, 30),
+                        knowledge_from=when,
+                        provenance_id=prov.id,
+                    )
+                    for field in fields
+                ]
+            )
+        rows = self._rows(store)
+        assert [r[0] for r in rows] == ["twelvedata", "edgar-companyfacts"]
+        assert [r[2] for r in rows] == [2, 1]
+
+    def test_the_restricted_flag_is_on_the_row(
+        self, store: DuckStore, payloads: PayloadStore
+    ) -> None:
+        """A user about to export a personal-use payload should meet that
+        before the export refuses."""
+        key = payloads.put(b"x")
+        prov = Provenance(
+            source_system="twelvedata",
+            source_uri="https://example.invalid/x",
+            retrieved_at=LATE,
+            method=ExtractionMethod.API,
+            extractor_version="1",
+            payload_hash=str(key),
+        )
+        store.write_provenance([prov])
+        store.write_facts(
+            [
+                Fact(
+                    subject="cik:0000051143",
+                    field="A",
+                    value=1.0,
+                    effective_from=date(2026, 6, 30),
+                    effective_to=date(2026, 6, 30),
+                    knowledge_from=LATE,
+                    provenance_id=prov.id,
+                )
+            ]
+        )
+        assert self._rows(store)[0][3] == "restricted"
+
+    def test_a_subject_with_no_documents_returns_the_reason(self, store: DuckStore) -> None:
+        rows = self._rows(store)
+        assert rows[0][1] is None
+        assert "no facts" in str(rows[0][0])
