@@ -42,12 +42,6 @@ ENTRY_POINTS: dict[str, str] = {
 #: the backlog. Each line is work someone can pick up, and the reason says
 #: what wiring is missing rather than pretending none is.
 AWAITING_WIRING: dict[str, str] = {
-    "treble.core.entity_graph": (
-        "Parent/subsidiary graph. The backfill is done -- 1,326,770 relationship "
-        "facts across 373,125 LEI subjects -- and the graph walks: a live lookup "
-        "resolves both direct and ultimate parent. What remains is a service and "
-        "a screen, which is now worth building because there is a graph to show."
-    ),
     "treble.analytics.credit.cds": (
         "CDSW's pricer, validated against ISDA's published grids across six currencies. "
         "Blocked on data, not on a screen: the store holds zero credit subjects and no "
@@ -74,6 +68,10 @@ AWAITING_WIRING: dict[str, str] = {
     "treble.tapi.equity_ratios": (
         "§14.1 ratios from stored XBRL. Gives analytics/equity/ratios.py its first "
         "caller; the FA drill-down is what will bind this."
+    ),
+    "treble.tapi.entity": (
+        "Entity graph service over the GLEIF backfill. Gives core/entity_graph.py "
+        "its first caller; PEOP or a DES ownership panel is what will bind it."
     ),
     "treble.tapi.documents": "The docs service; no screen binds it yet.",
     "treble.tapi.evaluated": "Contributed-price evaluation; no screen binds it yet.",
