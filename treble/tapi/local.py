@@ -955,7 +955,7 @@ class LocalTapi:
         ("CANCELLABLE", "swaption vol", "priceable — vol from the fitted surface"),
         ("ASSET SWAP", "bond price", "priceable — price implied from N-PORT"),
         ("INFLATION ZC", "index + projection", "priceable — HICP stored, state a projection"),
-        ("CROSS-CURRENCY", "spot, curves, basis", "needs a USD curve build; basis is an input"),
+        ("CROSS-CURRENCY", "spot, curves, basis", "priceable — state a basis"),
         ("TOTAL RETURN", "a trade", "needs a trade: reset price and financing spread"),
     )
 

@@ -52,13 +52,6 @@ AWAITING_WIRING: dict[str, str] = {
         "discover the real name. Finding the credit slice is the next step, and it is a "
         "data question."
     ),
-    "treble.analytics.derivatives.crosscurrency": (
-        "§12.1 pricer. The prerequisite is done: tapi/swap_market.py now builds a "
-        "USD SOFR discount curve on the US settlement calendar, so both legs "
-        "discount on their own currency. What remains is assembling each leg float "
-        "PV and the notional exchange into the pricer, with the basis as a caller "
-        "input the way volatility is for caps."
-    ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
     "treble.render.layout": (
         "Layout authoring; the desktop shell's drag and resize gestures are the caller "

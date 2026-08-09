@@ -34,6 +34,11 @@ from treble.analytics.derivatives.assetswap import AssetSwapPricing, asset_swap_
 from treble.analytics.derivatives.cancellable import CancellablePricing, cancellable_swap
 from treble.analytics.derivatives.capfloor import Caplet, price_cap, price_floor
 from treble.analytics.derivatives.cms import cms_rate
+from treble.analytics.derivatives.crosscurrency import (
+    CrossCurrencyPricing,
+    CrossCurrencySpec,
+    price_cross_currency_swap,
+)
 from treble.analytics.derivatives.inflation import (
     InflationSwapPricing,
     InflationSwapSpec,
@@ -44,23 +49,18 @@ from treble.analytics.vol.surface import EXPIRY_BUCKETS, TENOR_BUCKETS, VolSurfa
 from treble.core.identifiers import TUID
 from treble.ingest.ecb_hicp import SUBJECT as HICP_SUBJECT
 from treble.store.duck import DuckStore
-from treble.tapi.swap_market import DISCOUNT_CURVE, SwapMarket, build_swap_market
+from treble.tapi.swap_market import (
+    DISCOUNT_CURVE,
+    SwapMarket,
+    build_swap_market,
+    build_usd_discount_curve,
+)
 from treble.tapi.vol_surface import build_vol_surface
 
 #: Products whose inputs this repository has no stored source for. Named
 #: rather than silently priced off a default: a cross-currency basis of
 #: zero is not a neutral assumption, it is a claim that the basis is zero.
 UNFED_PRODUCTS: dict[str, str] = {
-    "crosscurrency": (
-        "Not blocked on data, and this entry was wrong in three ways -- measured "
-        "2026-08-08. ECB spot IS stored (fx:USDEUR, 7,061 observations to 2026-07-31), "
-        "and both legs' curves are stored too (EUR-ESTR-OIS and USD-SOFR-OIS, 16 and 18 "
-        "tenors, same date). Only the basis is unsourced, and that is a required input "
-        "here the way volatility is for caps and CMS, not a blocker. What remains is "
-        "wiring: build_swap_market is hardcoded to the EUR discount curve, so pricing "
-        "the USD leg needs a second curve build with USD conventions rather than the "
-        "EUR ones guessed at"
-    ),
     "totalreturn": "needs a reset price and financing spread from a trade, not a curve",
 }
 
@@ -496,7 +496,84 @@ def inflation_from_store(
     return priced
 
 
+#: The ECB publishes its reference rates with the euro as base, so
+#: `fx:USDEUR` is *USD per EUR* — 1.1485 means one euro buys that many
+#: dollars. `price_cross_currency_swap` wants domestic units per foreign
+#: unit, and with EUR domestic against a USD leg that is the reciprocal.
+#:
+#: Named and inverted in one place rather than at each call site. A spot
+#: rate used the wrong way up produces a value that is wrong by the square
+#: of the rate and looks entirely ordinary.
+FX_SUBJECT = TUID("fx:USDEUR")
+
+
+def crosscurrency_from_store(
+    store: DuckStore,
+    *,
+    as_of: datetime,
+    domestic_notional: float,
+    maturity_years: float,
+    basis_spread: float,
+    receive_domestic: bool = True,
+) -> CrossCurrencyPricing:
+    """A EUR/USD cross-currency swap off both stored curves.
+
+    The euro leg discounts on EUR-ESTR-OIS and the dollar leg on
+    USD-SOFR-OIS, each on its own calendar. `basis_spread` is required, the
+    way volatility is for caps: no cross-currency basis is ingested, and a
+    basis of zero is a claim rather than a default on an instrument whose
+    entire purpose is that it is not zero.
+
+    The foreign notional is struck at spot, which is what makes the trade
+    par at inception — a notional chosen any other way would put a value on
+    a swap nobody has entered yet.
+    """
+    market = build_swap_market(store, as_of=as_of)
+    domestic = market.curves.curve(DISCOUNT_CURVE)
+    foreign = build_usd_discount_curve(store, as_of=as_of, report_date=market.report_date)
+
+    quotes = store.read(FX_SUBJECT, "PX_LAST", as_of=as_of)
+    usable = [q for q in quotes if q.effective_from <= market.report_date]
+    if not usable:
+        raise ProductUnavailableError(
+            f"no {FX_SUBJECT} fixing on or before {market.report_date}. The legs would "
+            "have to be converted at a rate from a different day than they are "
+            "discounted to"
+        )
+    raw = max(usable, key=lambda q: q.effective_from).value
+    if not isinstance(raw, int | float) or float(raw) <= 0.0:
+        raise ProductUnavailableError(f"{FX_SUBJECT} is not a usable rate")
+    spot = 1.0 / float(raw)  # EUR per USD, from the ECB's USD per EUR
+
+    # A par floating leg pays 1 - DF(T) in coupons per unit of notional;
+    # the notional itself is the DF(T) term the pricer takes separately.
+    domestic_df = domestic.discount(maturity_years)
+    foreign_df = foreign.discount(maturity_years)
+    step = 1.0 / _CMS_FREQUENCY
+    foreign_annuity = sum(step * foreign.discount(t) for t in _payment_times(0.0, maturity_years))
+    if foreign_annuity <= 0.0:
+        raise ProductUnavailableError("the USD curve gives no annuity to that maturity")
+
+    spec = CrossCurrencySpec(
+        domestic_notional=domestic_notional,
+        foreign_notional=domestic_notional / spot,
+        basis_spread=basis_spread,
+    )
+    priced: CrossCurrencyPricing = price_cross_currency_swap.__wrapped__(  # type: ignore[attr-defined]
+        spec,
+        spot=spot,
+        domestic_float_pv=1.0 - domestic_df,
+        foreign_float_pv=1.0 - foreign_df,
+        domestic_final_df=domestic_df,
+        foreign_final_df=foreign_df,
+        foreign_annuity=foreign_annuity,
+        receive_domestic=receive_domestic,
+    )
+    return priced
+
+
 __all__ = [
+    "FX_SUBJECT",
     "MAX_NODE_DISPERSION",
     "UNFED_PRODUCTS",
     "AssetSwapPriced",
@@ -506,6 +583,7 @@ __all__ = [
     "assetswap_from_store",
     "cancellable_from_store",
     "cms_from_store",
+    "crosscurrency_from_store",
     "inflation_from_store",
     "price_cap_from_store",
     "unfed_reason",

@@ -29,6 +29,7 @@ from treble.tapi.products import (
     assetswap_from_store,
     cancellable_from_store,
     cms_from_store,
+    crosscurrency_from_store,
     inflation_from_store,
     price_cap_from_store,
     unfed_reason,
@@ -147,21 +148,13 @@ class TestUnfedProductsSaySo:
         assert unfed_reason("cap") is None
         assert unfed_reason("cms") is None
 
-    def test_crosscurrency_names_the_wiring_not_a_missing_source(self) -> None:
-        """This entry was wrong in three ways and the test pinned its
-        wording rather than a property, so it failed on the correction
-        rather than on the code.
-
-        Measured 2026-08-08: ECB spot is stored (fx:USDEUR, 7,061
-        observations), and both legs' curves are stored (EUR-ESTR-OIS and
-        USD-SOFR-OIS). Only the basis is unsourced, and that is a caller
-        input here the way volatility is for caps -- not a blocker. What
-        remains is a second curve build under USD conventions.
-        """
-        reason = unfed_reason("crosscurrency")
-        assert reason is not None
-        assert "basis" in reason
-        assert "USD-SOFR-OIS" in reason
+    def test_crosscurrency_is_no_longer_unfed(self) -> None:
+        """This entry has been wrong twice and is now gone. It claimed no
+        FX source, when spot and both curves were stored; then it claimed a
+        missing USD curve build, which is done. Cross-currency prices from
+        the store with the basis as a caller input, so it is not in the
+        unfed set at all."""
+        assert unfed_reason("crosscurrency") is None
 
 
 class TestCancellableUsesTheFittedSurface:
@@ -493,3 +486,111 @@ class TestTheSwpmCatalogue:
             pytest.raises(RuntimeError, match="does not list"),
         ):
             tapi.series(None, "sys:swpm_products", as_of=datetime.now(UTC))
+
+
+class TestCrossCurrencyFromStore:
+    """Both legs discount on their own currency: EUR-ESTR-OIS and
+    USD-SOFR-OIS, each on its own calendar."""
+
+    @staticmethod
+    def _with_usd_and_fx(store: DuckStore) -> DuckStore:
+        from treble.tapi.products import FX_SUBJECT
+        from treble.tapi.swap_market import USD_DISCOUNT_CURVE
+
+        prov = Provenance(
+            source_system="ecb-fx",
+            source_uri="https://data-api.ecb.europa.eu/service/data/EXR/x",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.API,
+            extractor_version="1",
+            payload_hash="3" * 64,
+        )
+        store.write_provenance([prov])
+        facts = [
+            Fact(
+                subject=f"swap:{USD_DISCOUNT_CURVE}:{tenor}",
+                field="PAR_RATE",
+                value=0.043,
+                effective_from=DAY,
+                effective_to=DAY,
+                knowledge_from=KNOWN,
+                provenance_id=prov.id,
+            )
+            for tenor in ("1Y", "2Y", "3Y", "5Y", "7Y", "10Y")
+        ]
+        facts.append(
+            Fact(
+                subject=str(FX_SUBJECT),
+                field="PX_LAST",
+                value=1.1485,
+                effective_from=DAY,
+                effective_to=DAY,
+                knowledge_from=KNOWN,
+                provenance_id=prov.id,
+            )
+        )
+        store.write_facts(facts)
+        return store
+
+    def test_a_zero_basis_trade_is_worth_nothing_at_inception(self, store: DuckStore) -> None:
+        """The anchor. Notionals struck at spot and no basis means the legs
+        cancel exactly -- which they only do if the spot was inverted the
+        right way, the notional struck from it, and both float legs built
+        as `1 - DF`. One number checks all three."""
+        priced = crosscurrency_from_store(
+            self._with_usd_and_fx(store),
+            as_of=datetime.now(UTC),
+            domestic_notional=100_000_000.0,
+            maturity_years=5.0,
+            basis_spread=0.0,
+        )
+        assert priced.value == pytest.approx(0.0, abs=1e-6)
+        assert priced.domestic_leg == pytest.approx(priced.foreign_leg)
+
+    def test_a_negative_basis_favours_the_domestic_receiver(self, store: DuckStore) -> None:
+        priced = crosscurrency_from_store(
+            self._with_usd_and_fx(store),
+            as_of=datetime.now(UTC),
+            domestic_notional=100_000_000.0,
+            maturity_years=5.0,
+            basis_spread=-0.0020,
+        )
+        assert priced.value > 0.0
+        assert priced.basis_value < 0.0
+
+    def test_no_fx_fixing_is_refused(self, store: DuckStore) -> None:
+        """The legs would have to be converted at a rate from a different
+        day than they are discounted to."""
+        from treble.tapi.swap_market import USD_DISCOUNT_CURVE
+
+        prov = Provenance(
+            source_system="dtcc-sdr",
+            source_uri="https://example.invalid/x",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.BULK_FILE,
+            extractor_version="1",
+            payload_hash="4" * 64,
+        )
+        store.write_provenance([prov])
+        store.write_facts(
+            [
+                Fact(
+                    subject=f"swap:{USD_DISCOUNT_CURVE}:{tenor}",
+                    field="PAR_RATE",
+                    value=0.043,
+                    effective_from=DAY,
+                    effective_to=DAY,
+                    knowledge_from=KNOWN,
+                    provenance_id=prov.id,
+                )
+                for tenor in ("1Y", "2Y", "3Y", "5Y", "7Y", "10Y")
+            ]
+        )
+        with pytest.raises(ProductUnavailableError, match="fixing"):
+            crosscurrency_from_store(
+                store,
+                as_of=datetime.now(UTC),
+                domestic_notional=1e8,
+                maturity_years=5.0,
+                basis_spread=0.0,
+            )
