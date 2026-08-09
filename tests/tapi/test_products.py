@@ -437,3 +437,59 @@ class TestInflationUsesTheStoredIndex:
                 projected_index=160.0,
                 index_lag_months=60,
             )
+
+
+class TestTheSwpmCatalogue:
+    """`sys:swpm_products`. A catalogue rather than a price, because the
+    products need different caller inputs and inventing them is what this
+    repository spent a long time learning not to do."""
+
+    @staticmethod
+    def _rows() -> tuple[tuple[object, ...], ...]:
+        import tempfile
+        from pathlib import Path
+
+        from treble.tapi.local import LocalTapi
+
+        empty = DuckStore(Path(tempfile.mkdtemp()) / "t.db")
+        return LocalTapi(empty).series(None, "sys:swpm_products", as_of=datetime.now(UTC))
+
+    def test_every_product_in_the_pricer_set_is_listed(self) -> None:
+        labels = {str(r[0]) for r in self._rows()}
+        assert len(labels) == 7
+        assert "CROSS-CURRENCY" in labels
+
+    def test_the_status_is_user_facing_not_an_engineering_note(self) -> None:
+        """UNFED_PRODUCTS strings are notes to a developer -- one opens
+        "this entry was wrong in three ways, measured 2026-08-08", which is
+        right in a source file and absurd in a table cell. The first
+        version of this binding put them on screen verbatim."""
+        for row in self._rows():
+            status = str(row[2])
+            assert "wrong in three ways" not in status
+            assert "measured 2026" not in status
+            assert len(status) < 60
+
+    def test_the_catalogue_needs_no_security_or_data(self) -> None:
+        """It answers off an empty store: what a product *needs* is a fact
+        about the product, not about what happens to be ingested."""
+        assert self._rows()
+
+    def test_a_product_the_service_knows_and_the_screen_omits_is_an_error(self) -> None:
+        """A product the service records and the screen does not list reads
+        as unsupported rather than as unlisted. The catalogue is a hand-
+        written table for good reasons -- the status text is user-facing --
+        so this is what stops it drifting from the pricer set."""
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from treble.tapi.local import LocalTapi
+
+        empty = DuckStore(Path(tempfile.mkdtemp()) / "t.db")
+        tapi = LocalTapi(empty)
+        with (
+            patch.dict("treble.tapi.products.UNFED_PRODUCTS", {"swaption": "not on the screen"}),
+            pytest.raises(RuntimeError, match="does not list"),
+        ):
+            tapi.series(None, "sys:swpm_products", as_of=datetime.now(UTC))

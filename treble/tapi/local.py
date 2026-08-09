@@ -301,6 +301,7 @@ class LocalTapi:
         "sys:entity_owners",
         "sys:entity_children",
         "sys:fa_ratios",
+        "sys:swpm_products",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -541,6 +542,8 @@ class LocalTapi:
             return self._entity(security, binding, as_of=as_of)
         if binding == "sys:fa_ratios":
             return self._fa_ratios(security, as_of=as_of)
+        if binding == "sys:swpm_products":
+            return self._swpm_products(as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -767,6 +770,57 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    #: §12.1 products in the order `SWPM` lists them: label, what each
+    #: needs beyond the curve environment, and the status a user reads.
+    #:
+    #: The status is written here rather than taken from
+    #: `products.UNFED_PRODUCTS`, whose strings are engineering notes —
+    #: one of them opens "this entry was wrong in three ways, measured
+    #: 2026-08-08", which is exactly right in a source file and absurd in a
+    #: table cell. A developer-facing reason and a user-facing one are
+    #: different texts, and reusing the first as the second was the first
+    #: version of this binding.
+    _PRODUCTS: tuple[tuple[str, str, str], ...] = (
+        ("CAP / FLOOR", "normal vol", "priceable — state a vol"),
+        ("CMS", "lognormal vol", "priceable — state a vol"),
+        ("CANCELLABLE", "swaption vol", "priceable — vol from the fitted surface"),
+        ("ASSET SWAP", "bond price", "priceable — price implied from N-PORT"),
+        ("INFLATION ZC", "index + projection", "priceable — HICP stored, state a projection"),
+        ("CROSS-CURRENCY", "spot, curves, basis", "needs a USD curve build; basis is an input"),
+        ("TOTAL RETURN", "a trade", "needs a trade: reset price and financing spread"),
+    )
+
+    def _swpm_products(
+        self, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """What `SWPM` can price today, and what each product still needs.
+
+        A catalogue rather than a price, because the products need
+        different caller inputs and inventing them is what this repository
+        spent a long time learning not to do. A screen that offered
+        "cross-currency" and then priced it off a zero basis would be
+        asserting the basis is zero on an instrument whose entire purpose
+        is that it is not.
+        """
+        from treble.tapi.products import UNFED_PRODUCTS
+
+        # The catalogue and the pricer set must not drift. Every product
+        # `products.py` records as unfed has to appear here, or a product
+        # would be missing from the screen while the service knows about
+        # it -- which is how a user concludes it is unsupported when it is
+        # merely unlisted.
+        listed = {str(row[0]).split()[0].lower() for row in self._PRODUCTS}
+        aliases = {"cross-currency": "crosscurrency", "total": "totalreturn", "asset": "assetswap"}
+        listed = {aliases.get(name, name) for name in listed}
+        unlisted = sorted(set(UNFED_PRODUCTS) - listed)
+        if unlisted:
+            raise RuntimeError(
+                f"products.py records {', '.join(unlisted)} and SWPM does not list them. "
+                "A product the service knows about and the screen omits reads as "
+                "unsupported rather than as unlisted"
+            )
+        return tuple(self._PRODUCTS)
 
     def _fa_ratios(
         self, security: SecurityQuery | None, *, as_of: datetime
