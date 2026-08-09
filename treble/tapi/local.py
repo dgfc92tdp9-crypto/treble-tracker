@@ -63,9 +63,14 @@ def _looks_like_cusip(security: SecurityQuery) -> bool:
     `IBM 4.15 05/15/39 Corp` is a perfectly valid bond reference whose
     ticker is "IBM" — treating every Govt/Corp ticker as a CUSIP resolved
     that to `cusip:IBM` and reported a missing instrument instead of an
-    unbuilt lookup. Descriptor-based resolution needs a security-master
-    search over coupon and maturity, which does not exist yet, so those
-    fall through to the honest "no resolution for this namespace" error.
+    unbuilt lookup.
+
+    The security master itself now exists and is wired in — a CUSIP with no
+    stored subject resolves through it to the FIGI that has facts. What is
+    still absent is *descriptor* search: matching "IBM 4.15 05/15/39" by
+    issuer, coupon and maturity is a different lookup from resolving an
+    identifier, and those references still fall through to the honest "no
+    resolution for this namespace" error.
     """
     ticker = security.ticker
     return security.descriptor is None and len(ticker) == 9 and ticker.isalnum()

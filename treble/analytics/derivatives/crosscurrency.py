@@ -5,13 +5,18 @@ at the start and returned at maturity. That exchange is the whole difference
 from a single-currency basis swap, and it is where the risk lives: the
 value moves with FX directly, not merely through the coupons.
 
-**Priced from inputs, not from a live basis curve.** An earlier commit
-recorded cross-currency as blocked because this repository has no source for
-FX forwards. That was true of *building the curve* and false of the pricer,
-which is the same shape as every other §12.1 module here — `capfloor` takes
-forwards, `cms` takes a vol, this takes discount factors and a spot rate.
-What remains genuinely unsourced is the cross-currency basis itself, and
-that is recorded on the criterion rather than hidden behind a default.
+**Priced from inputs, and now fed from the store.** This was recorded as
+blocked three times: first for want of an FX source, then for want of a USD
+curve, then for want of a basis. The first two were wrong — ECB spot and
+both currencies' curves were already stored, or one build away — and
+`tapi/products.crosscurrency_from_store` supplies them. The third is not a
+block at all: the basis is a required argument here, exactly as volatility
+is for `capfloor` and `cms`, so the assumption sits with the caller who
+made it rather than inside a number that looks measured.
+
+What remains genuinely unsourced is a *quoted* basis curve. That is a
+missing quote, not a missing capability, and the difference is the whole
+reason this module takes the number rather than inventing one.
 
 **The basis spread sits on one leg by convention, and which one is not a
 detail.** The market quotes the basis against USD, on the non-USD leg. A
