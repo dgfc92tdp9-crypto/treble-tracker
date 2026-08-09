@@ -14,6 +14,7 @@ Enter, and nothing is required from the mouse.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import ClassVar
 
 from rich.text import Text
@@ -23,6 +24,8 @@ from textual.containers import Vertical
 from textual.widgets import Input, Static
 
 from treble.cmd.grammar import CommandKind, parse_command
+from treble.cmd.paths import DEFAULT_DATA_DIR
+from treble.render.authoring import apply_layout_command
 from treble.render.canvas import Canvas, resolve_canvas
 from treble.render.contract.buffer import CellBuffer
 from treble.render.contract.registry import get_screen, has_screen
@@ -65,6 +68,7 @@ class Workstation(App[None]):
         *,
         theme: Theme = DEFAULT_THEME,
         canvas: Canvas | None = None,
+        data_dir: Path = DEFAULT_DATA_DIR,
     ) -> None:
         super().__init__()
         self._tapi = tapi
@@ -72,6 +76,8 @@ class Workstation(App[None]):
         #: No default workspace, matching the server: an empty canvas and an
         #: unconfigured one look identical on screen, so `CNVS` says which.
         self._canvas = canvas
+        #: Where named layouts are written and read.
+        self._data_dir = data_dir
         #: The buffer most recently rendered, and the last status text.
         #: Exposed so the app's behaviour can be asserted directly rather
         #: than by scraping widget internals, which change between
@@ -99,6 +105,24 @@ class Workstation(App[None]):
     def _say(self, widget: Static, message: str) -> None:
         self.last_status = message
         widget.update(message)
+
+    def _author_layout(self, arguments: tuple[str, ...], area: Static, status: Static) -> None:
+        """`CNVS MOVE|SIZE|SAVE|LOAD` — layout authoring from the command line.
+
+        The terminal has no drag gestures and never will, so a workstation
+        whose layout could only be authored by mouse would have one renderer
+        that cannot arrange its own workspace. The behaviour lives in
+        `render.authoring`, shared with the HTTP surface, so the two cannot
+        answer differently.
+        """
+        outcome = apply_layout_command(self._canvas, arguments, data_dir=self._data_dir)
+        if outcome.canvas is not None:
+            self._canvas = outcome.canvas
+            self._draw_canvas(area, status)
+        # Said after the redraw: _draw_canvas writes its own status, and
+        # setting this first would have it overwritten by "N components"
+        # while the user is looking for whether their move was accepted.
+        self._say(status, outcome.status)
 
     def _draw_canvas(self, area: Static, status: Static) -> None:
         """`CNVS` — the whole workspace in the panel (§5.3).
@@ -159,7 +183,10 @@ class Workstation(App[None]):
             )
             return
         if parsed.function == "CNVS":
-            self._draw_canvas(area, status)
+            if parsed.arguments:
+                self._author_layout(parsed.arguments, area, status)
+            else:
+                self._draw_canvas(area, status)
             return
 
         if parsed.function is None or not has_screen(parsed.function):

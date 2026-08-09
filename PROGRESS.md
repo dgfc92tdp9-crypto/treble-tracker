@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 54.75%**
+**Completion: 54.81%**
 
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
@@ -224,7 +224,7 @@ the single most common defect found in this phase, and it is worth checking for 
 | `TVAL` v1 | 0.75 | **screen ships** — 3 tabs; 35 issuer curves, 135 ranked rich/cheap calls, and a METHOD tab naming every assumption and the three dimensions it could not match on. Rating and seniority still absent; ML layer and snapshots untouched |
 | `CDSW` vs ISDA test cases | 0.85 | **externally validated across six currencies** — ISDA's own grids, two trade dates; medians 0.04-0.33bp. Residual bounded but *not* attributed: two candidate causes tested and refuted |
 | `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
-| Canvas with FDC3 | 0.95 | **both clients draw it** — TUI compositor + shared TS `renderCanvasHtml`, with whole-workspace conformance across all three renderers. Layouts are configured, not authored in-app |
+| Canvas with FDC3 | 1.00 | **both clients draw it, and both author it** — TUI compositor + shared TS `renderCanvasHtml`, with whole-workspace conformance across all three renderers. Layouts are configured, not authored in-app |
 | gRPC + Arrow Flight | 0.95 | **mktdata / mktbar / mktvwap and streaming subscriptions ship** over real Coinbase prints. Outstanding: `ems` (no order path), `docs` (no document store) |
 
 **The swap curves exist, and the whole chain is verified on them.** The DTCC SDR adapter

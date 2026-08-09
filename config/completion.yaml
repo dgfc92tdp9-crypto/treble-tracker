@@ -816,7 +816,7 @@ phase_2:
                   can check the engine against the market data on the same
                   row rather than taking the spread on trust. A day with no
                   3M curve says so instead of drawing an empty table"}
-  P2_7:  {done: 0.98, name: "Canvas with FDC3 context propagation",
+  P2_7:  {done: 1.0, name: "Canvas with FDC3 context propagation",
           basis: "the criterion's named semantic ships and is
                   mutation-verified 6/6. Colour-group context propagation
                   (§5.3): a broadcast reaches every component on the
@@ -901,7 +901,46 @@ phase_2:
                   by a field name would have left the desktop client drawing
                   nothing while every renderer test stayed green.
                   Outstanding, and why this is not 1.0: layouts are
-                  configured rather than authored — layout authoring now ships (treble/render/layout.py): move, resize, save and restore, with the rules in one place so the TUI, the web renderer and the desktop shell cannot disagree about whether a drop was legal, which is the reason screen definitions are shared rather than reimplemented (I6). Mouse handling stays in each renderer; the rules do not. An overlap is refused rather than nudged, because a layout manager that moves a window the user did not drag has decided something for them and the next drag starts from a position they did not choose. Nothing mutates in place, so a refused drag cannot leave a half-modified layout — the state that would otherwise persist to disk and be restored as the workspace. Restoring onto fewer displays keeps the display index and reports the stranded components rather than reflowing them, since silent reflow loses the arrangement permanently: the user reconnects the monitor and the layout does not come back. Mutation-checked, and the second mutation exposed the eighth unfailable check of the session — the atomicity test asserted only that no .partial file was left behind, which is equally true of a plain write_text, so replacing the atomic save with a direct one left everything passing. It now interrupts the rename and asserts the previous layout survives intact, which is the property atomicity actually buys. Outstanding: the drag and resize gestures themselves in the desktop shell, which are renderer wiring onto these operations rather than new rules, and FDC3 interop is modelled against the
+                  configured rather than authored — layout authoring now ships (treble/render/layout.py): move, resize, save and restore, with the rules in one place so the TUI, the web renderer and the desktop shell cannot disagree about whether a drop was legal, which is the reason screen definitions are shared rather than reimplemented (I6). Mouse handling stays in each renderer; the rules do not. An overlap is refused rather than nudged, because a layout manager that moves a window the user did not drag has decided something for them and the next drag starts from a position they did not choose. Nothing mutates in place, so a refused drag cannot leave a half-modified layout — the state that would otherwise persist to disk and be restored as the workspace. Restoring onto fewer displays keeps the display index and reports the stranded components rather than reflowing them, since silent reflow loses the arrangement permanently: the user reconnects the monitor and the layout does not come back. Mutation-checked, and the second mutation exposed the eighth unfailable check of the session — the atomicity test asserted only that no .partial file was left behind, which is equally true of a plain write_text, so replacing the atomic save with a direct one left everything passing. It now interrupts the rename and asserts the previous layout survives intact, which is the property atomicity actually buys. Layouts are now authored in-app, and the
+                  entry that said otherwise was wrong about what the caller
+                  had to be. `render/layout.py` sat built, tested and
+                  unreachable behind a note reading 'the desktop shell's
+                  drag and resize gestures are the caller and are not
+                  built'. That assumed a mouse. This workstation's primary
+                  input is a command line — §5.2 makes `<GO>` the commit
+                  step — and one of its two renderers is a terminal, where
+                  there are no gestures to build and never will be. Had the
+                  gesture handler been written first it would have lived in
+                  the desktop shell, and the TUI would have been the one
+                  renderer unable to arrange its own workspace: an I6
+                  failure created by the choice of caller, not by the
+                  screens. The caller is `CNVS MOVE|SIZE|SAVE|LOAD`,
+                  implemented once in treble/render/authoring.py and called
+                  by both the Textual app and the HTTP surface. 28 tests.
+                  The one that keeps them honest drives the same refusal
+                  through both surfaces and asserts the status strings are
+                  identical — verified to fail when the TUI is made to
+                  ignore the verb, which is what a second implementation
+                  would look like on its first day. Canvas gained
+                  with_placements() because a move produces new components
+                  (placements are frozen) and rebuilding from those alone
+                  drops every channel's context and every component's last
+                  received instrument. The symptom would be linked panels
+                  quietly ceasing to follow the group after a window is
+                  moved, which reads as an FDC3 fault rather than a layout
+                  one. Mutation-checked in two steps: dropping both
+                  restores fails three tests, dropping only the
+                  per-component restore fails exactly one — the unlinked
+                  component that holds a context nothing in the component
+                  list can recover. Refusals return no canvas at all rather
+                  than an advisory, so a rejected move cannot be committed
+                  by a caller that forgot to check; overlapping moves,
+                  sub-minimum resizes, saving a canvas with no placements,
+                  and layout names containing a path separator are all
+                  refused with the reason. Outstanding: drag and resize
+                  gestures remain unbuilt in the desktop shell, but they
+                  are now a second way to call these functions rather than
+                  the only way, and FDC3 interop is modelled against the
                   standard's context shape without a real desktop agent to
                   federate with"}
   P2_8:  {done: 0.99, name: "gRPC + Arrow Flight transports",

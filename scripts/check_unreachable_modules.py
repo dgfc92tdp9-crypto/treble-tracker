@@ -53,10 +53,6 @@ AWAITING_WIRING: dict[str, str] = {
         "data question."
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
-    "treble.render.layout": (
-        "Layout authoring; the desktop shell's drag and resize gestures are the caller "
-        "and are not built."
-    ),
 }
 
 ALLOWED_UNREACHABLE = {**ENTRY_POINTS, **AWAITING_WIRING}

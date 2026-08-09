@@ -108,3 +108,122 @@ class TestTheSingleScreenPathIsUnchanged:
         assert body["status"], "an unrecognised line must never come back silent"
         assert body["canvas"] is None
         assert body["buffer"] is None
+
+
+class TestLayoutAuthoringReachesBothRenderers:
+    """I6, applied to a behaviour rather than to a screen.
+
+    Layout authoring was recorded as blocked on the desktop shell's drag
+    gestures. Had it been built that way, the terminal — which has no
+    gestures and never will — would have been the one renderer unable to
+    arrange its own workspace. Both surfaces now call the same function,
+    and the test that keeps them honest is that they say the same thing.
+    """
+
+    @staticmethod
+    def _canvas() -> Canvas:
+        return Canvas(
+            [
+                CanvasComponent(
+                    id="DES1",
+                    screen="DES",
+                    channel=Channel.BLUE,
+                    placement=Placement(x=0, y=0, width=40, height=10),
+                ),
+                CanvasComponent(
+                    id="YAS1",
+                    screen="YAS",
+                    channel=Channel.BLUE,
+                    placement=Placement(x=40, y=0, width=40, height=10),
+                ),
+            ]
+        )
+
+    def test_the_http_surface_moves_a_component(self, tmp_path: Path) -> None:
+        client = TestClient(
+            create_app(
+                LocalTapi(DuckStore(tmp_path / "t.db")),
+                canvas=self._canvas(),
+                data_dir=tmp_path,
+            )
+        )
+        reply = client.post("/command", json={"line": "CNVS MOVE DES1 0 20"})
+        assert reply.status_code == 200
+        assert "(0, 20)" in reply.json()["status"]
+
+    def test_the_move_is_kept_for_the_next_command(self, tmp_path: Path) -> None:
+        """A move the server forgets is a move that never happened. The
+        canvas is a closure variable, so this is the assertion that the
+        rebound one is what the next request sees."""
+        client = TestClient(
+            create_app(
+                LocalTapi(DuckStore(tmp_path / "t.db")),
+                canvas=self._canvas(),
+                data_dir=tmp_path,
+            )
+        )
+        client.post("/command", json={"line": "CNVS MOVE DES1 0 20"})
+        client.post("/command", json={"line": "CNVS SAVE desk"})
+        assert (tmp_path / "layouts" / "desk.json").exists()
+        # 0,20 rather than 0,0: the saved file must hold the moved position.
+        assert '"y": 20' in (tmp_path / "layouts" / "desk.json").read_text()
+
+    def test_a_refused_move_leaves_the_server_canvas_alone(self, tmp_path: Path) -> None:
+        client = TestClient(
+            create_app(
+                LocalTapi(DuckStore(tmp_path / "t.db")),
+                canvas=self._canvas(),
+                data_dir=tmp_path,
+            )
+        )
+        reply = client.post("/command", json={"line": "CNVS MOVE DES1 40 0"})
+        assert "overlap" in reply.json()["status"].lower()
+        client.post("/command", json={"line": "CNVS SAVE desk"})
+        assert '"x": 0' in (tmp_path / "layouts" / "desk.json").read_text()
+
+    def test_bare_cnvs_still_draws_the_workspace(self, tmp_path: Path) -> None:
+        """The verb is optional. An existing command must not have changed
+        meaning because authoring was added beside it."""
+        client = TestClient(
+            create_app(
+                LocalTapi(DuckStore(tmp_path / "t.db")),
+                canvas=self._canvas(),
+                data_dir=tmp_path,
+            )
+        )
+        reply = client.post("/command", json={"line": "CNVS"})
+        assert "MOVE" not in reply.json()["status"]
+
+    def test_both_renderers_give_the_same_answer(self, tmp_path: Path) -> None:
+        """The one that would catch a second implementation. A gesture
+        handler in the shell and a command handler in the terminal would
+        both work, and would drift apart on the first refusal."""
+        import asyncio
+
+        from treble.render.tui.app import Workstation
+
+        line = "CNVS MOVE DES1 40 0"
+        client = TestClient(
+            create_app(
+                LocalTapi(DuckStore(tmp_path / "h.db")),
+                canvas=self._canvas(),
+                data_dir=tmp_path,
+            )
+        )
+        http_status = client.post("/command", json={"line": line}).json()["status"]
+
+        async def drive() -> str:
+            app = Workstation(
+                LocalTapi(DuckStore(tmp_path / "t.db")),
+                canvas=self._canvas(),
+                data_dir=tmp_path,
+            )
+            async with app.run_test(size=(90, 30)) as pilot:
+                await pilot.press(*line)
+                await pilot.press("enter")
+                await pilot.pause()
+            return app.last_status
+
+        tui_status = asyncio.run(drive())
+        assert tui_status == http_status
+        assert "overlap" in tui_status.lower()

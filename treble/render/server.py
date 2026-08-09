@@ -26,12 +26,15 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
 
 from treble.cmd.grammar import CommandKind, parse_command
+from treble.cmd.paths import DEFAULT_DATA_DIR
+from treble.render.authoring import apply_layout_command
 from treble.render.canvas import Canvas, resolve_canvas
 from treble.render.contract.buffer import CellBuffer, layout_tree
 from treble.render.contract.registry import UnknownScreenError, available, get_screen
@@ -130,6 +133,7 @@ def create_app(
     *,
     contributions: ContributionService | None = None,
     canvas: Canvas | None = None,
+    data_dir: Path = DEFAULT_DATA_DIR,
 ) -> FastAPI:
     """Build the local TAPI service around a data path.
 
@@ -217,6 +221,12 @@ def create_app(
             return CommandResponse(kind=parsed.kind.value, status="no function given")
 
         if parsed.function == "CNVS":
+            if parsed.arguments:
+                nonlocal workspace
+                outcome = apply_layout_command(workspace, parsed.arguments, data_dir=data_dir)
+                if outcome.canvas is not None:
+                    workspace = outcome.canvas
+                return CommandResponse(kind=parsed.kind.value, status=outcome.status)
             return _canvas_response(workspace, tapi=tapi, as_of=as_of, kind=parsed.kind.value)
 
         try:

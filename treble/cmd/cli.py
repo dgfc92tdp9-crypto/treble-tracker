@@ -21,6 +21,7 @@ from rich.console import Console
 from rich.table import Table
 
 from treble.cmd.env import load_env
+from treble.cmd.paths import default_data_dir
 from treble.cmd.seed import FIXTURES, seed, seed_available, seed_company_index
 from treble.core.universe import load_universe_config
 from treble.ingest.populate import Populator
@@ -44,29 +45,7 @@ load_env()
 console = Console()
 
 
-def _default_data_dir() -> Path:
-    """Where the workstation looks for its store, independent of cwd.
-
-    This was a relative ``Path("data")``, so which store opened depended on
-    the directory the command ran from. Launched from the Dock, or from a
-    terminal anywhere but the repo root, it silently created a fresh empty
-    store and rendered a screen of honest-looking dashes with no error —
-    the exact shape of a wrong display that never announces itself.
-
-    ``TREBLE_DATA_DIR`` overrides. Otherwise the repo's own ``data/`` is
-    used when this is a source checkout, falling back to ``~/.treble`` for
-    an installed copy that has no repo to anchor to.
-    """
-    override = os.environ.get("TREBLE_DATA_DIR")
-    if override:
-        return Path(override).expanduser().resolve()
-    repo_root = Path(__file__).resolve().parents[2]
-    if (repo_root / "pyproject.toml").is_file():
-        return repo_root / "data"
-    return Path.home() / ".treble"
-
-
-DEFAULT_DATA_DIR = _default_data_dir()
+DEFAULT_DATA_DIR = default_data_dir()
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "config" / "universe.yaml"
 
 

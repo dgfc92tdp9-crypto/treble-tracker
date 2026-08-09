@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import enum
 import json
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 
@@ -238,6 +239,34 @@ class Canvas:
     @property
     def component_ids(self) -> tuple[str, ...]:
         return tuple(sorted(self._components))
+
+    def with_placements(self, components: Sequence[CanvasComponent]) -> Canvas:
+        """A canvas holding the given components, with this one's live context.
+
+        Layout authoring produces new component tuples — placements are
+        frozen, so a move is a replacement — and the new canvas must not
+        lose what the old one knew. Rebuilding from components alone would
+        drop every channel's context and every component's last-received
+        instrument, so a user who moved a window would watch the linked
+        panels stop following the group. That reads as an FDC3 fault, not a
+        layout one, which is what makes it worth carrying explicitly.
+
+        Context is carried, not re-derived: an unlinked component keeps the
+        last context it received (see `_component_context`), and there is
+        nothing in the component list to recover that from.
+        """
+        rebuilt = Canvas()
+        rebuilt._channel_context = dict(self._channel_context)
+        for component in components:
+            rebuilt.add(component)
+        # After `add`, because add() syncs a linked component to its
+        # channel. Restoring per-component context afterwards preserves the
+        # unlinked-but-holding-a-context state that add() cannot know about.
+        for component in components:
+            existing = self._component_context.get(component.id)
+            if existing is not None:
+                rebuilt._component_context[component.id] = existing
+        return rebuilt
 
     def members(self, channel: Channel) -> tuple[str, ...]:
         return tuple(sorted(cid for cid, c in self._components.items() if c.channel is channel))

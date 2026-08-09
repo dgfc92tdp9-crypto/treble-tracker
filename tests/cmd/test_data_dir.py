@@ -13,7 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from treble.cmd.cli import DEFAULT_CONFIG, DEFAULT_DATA_DIR, _default_data_dir
+from treble.cmd.cli import DEFAULT_CONFIG, DEFAULT_DATA_DIR
+from treble.cmd.paths import default_data_dir as _default_data_dir
 
 
 class TestDataDirIsIndependentOfCwd:
