@@ -300,6 +300,7 @@ class LocalTapi:
         "sys:vcub_method",
         "sys:entity_owners",
         "sys:entity_children",
+        "sys:fa_ratios",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -538,6 +539,8 @@ class LocalTapi:
             return self._vcub(binding, as_of=as_of)
         if binding in ("sys:entity_owners", "sys:entity_children"):
             return self._entity(security, binding, as_of=as_of)
+        if binding == "sys:fa_ratios":
+            return self._fa_ratios(security, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -764,6 +767,54 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _fa_ratios(
+        self, security: SecurityQuery | None, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """Fundamental ratios for `FA`, with the tag each rests on (§14.1).
+
+        The tag is on the row, not in a footnote. Filers do not agree on a
+        revenue tag — 2,349 report `Revenues` and 3,184 report
+        `RevenueFromContractWithCustomerExcludingAssessedTax` — so two
+        margins on two screens can be built from different measurements. A
+        column showing only the percentage would present them as comparable.
+
+        Concepts the period does not supply are listed rather than omitted:
+        a ratio that is missing and one nobody asked for look identical in
+        a table, and only the first is a data gap.
+        """
+        from treble.tapi.equity_ratios import RatiosUnavailableError, ratios_for
+
+        if security is None:
+            return (("No security selected.", None, None),)
+        try:
+            subject = self.resolve(security)
+        except SecurityNotFoundError as error:
+            return ((str(error), None, None),)
+        try:
+            found = ratios_for(self._store, subject, as_of=as_of)
+        except RatiosUnavailableError as error:
+            return ((str(error), None, None),)
+
+        # Which tag fed each ratio, so the row can name it rather than
+        # leaving the reader to assume every filer measured the same thing.
+        feeds = {
+            "gross_margin": "revenue",
+            "operating_margin": "revenue",
+            "net_margin": "revenue",
+            "return_on_equity": "equity",
+            "return_on_assets": "assets",
+            "leverage": "equity",
+        }
+        rows: list[tuple[str | float | int | None, ...]] = [
+            ("PERIOD", found.period.isoformat(), None)
+        ]
+        for name, value in sorted(found.ratios.items()):
+            tag = found.sources.get(feeds[name], "")
+            rows.append((name.upper().replace("_", " "), value, tag.removeprefix("us-gaap:")))
+        if found.missing:
+            rows.append(("NOT REPORTED THIS PERIOD", ", ".join(sorted(found.missing)), None))
+        return tuple(rows)
 
     def _entity(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime

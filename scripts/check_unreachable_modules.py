@@ -65,10 +65,6 @@ AWAITING_WIRING: dict[str, str] = {
         "§12.1 product pricing off the stored curves. Gives capfloor and cms their "
         "first callers; the SWPM product tab is what will call this."
     ),
-    "treble.tapi.equity_ratios": (
-        "§14.1 ratios from stored XBRL. Gives analytics/equity/ratios.py its first "
-        "caller; the FA drill-down is what will bind this."
-    ),
     "treble.tapi.documents": "The docs service; no screen binds it yet.",
     "treble.tapi.evaluated": "Contributed-price evaluation; no screen binds it yet.",
     "treble.render.layout": (

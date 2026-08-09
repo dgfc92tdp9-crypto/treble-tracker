@@ -14,10 +14,11 @@ from pathlib import Path
 import pytest
 
 from treble.core.facts import Fact
-from treble.core.identifiers import TUID
+from treble.core.identifiers import TUID, SecurityQuery, YellowKey
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
 from treble.tapi.equity_ratios import RatiosUnavailableError, ratios_for
+from treble.tapi.local import LocalTapi, TickerIndex
 
 KNOWN = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
 LATER = datetime(2026, 8, 1, 18, 0, tzinfo=UTC)
@@ -152,3 +153,55 @@ class TestItRefusesRatherThanInvents:
         result = ratios_for(store, CIK, as_of=LATER)
         assert "net_margin" not in result.ratios
         assert result.ratios["return_on_assets"] == pytest.approx(100.0 / 900.0)
+
+
+class TestTheFaBinding:
+    """`sys:fa_ratios` on LocalTapi. The tag lands on the row rather than
+    in a footnote, because two margins built from different revenue tags
+    are not comparable and a column of percentages would present them as
+    though they were."""
+
+    @staticmethod
+    def _rows(store: DuckStore) -> tuple[tuple[object, ...], ...]:
+        # A ticker index, or `resolve` fails and every row is the error --
+        # which is what the first version of this test asserted against
+        # without noticing it had never reached the ratios at all.
+        return LocalTapi(store, tickers=TickerIndex({"AAPL": 320193})).series(
+            SecurityQuery(ticker="AAPL", key=YellowKey.EQUITY, venue=None, descriptor=None),
+            "sys:fa_ratios",
+            as_of=LATER,
+        )
+
+    def test_each_ratio_carries_the_tag_it_rests_on(self, store: DuckStore) -> None:
+        _write(
+            store,
+            [
+                ("us-gaap:Revenues", 400.0, FY25),
+                ("us-gaap:NetIncomeLoss", 100.0, FY25),
+            ],
+        )
+        rows = self._rows(store)
+        labels = {r[0]: r for r in rows}
+        assert "NET MARGIN" in labels
+        assert labels["NET MARGIN"][2] == "Revenues"
+
+    def test_absent_concepts_are_listed_on_the_screen(self, store: DuckStore) -> None:
+        """A ratio that is missing and one nobody asked for look identical
+        in a table, and only the first is a data gap."""
+        _write(
+            store,
+            [
+                ("us-gaap:Revenues", 400.0, FY25),
+                ("us-gaap:NetIncomeLoss", 100.0, FY25),
+            ],
+        )
+        rows = self._rows(store)
+        note = next((r for r in rows if r[0] == "NOT REPORTED THIS PERIOD"), None)
+        assert note is not None
+        assert "equity" in str(note[1])
+
+    def test_a_filer_with_no_fundamentals_returns_the_reason(self, store: DuckStore) -> None:
+        """An empty table and a filer nobody has ingested render alike."""
+        rows = self._rows(store)
+        assert rows[0][1] is None
+        assert "NetIncomeLoss" in str(rows[0][0])
