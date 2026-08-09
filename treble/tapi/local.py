@@ -303,6 +303,7 @@ class LocalTapi:
         "sys:fa_ratios",
         "sys:swpm_products",
         "sys:sptr_documents",
+        "sys:allq_evaluated",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -547,6 +548,8 @@ class LocalTapi:
             return self._swpm_products(as_of=as_of)
         if binding == "sys:sptr_documents":
             return self._sptr_documents(security, as_of=as_of)
+        if binding == "sys:allq_evaluated":
+            return self._allq_evaluated(security, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             return ()
@@ -773,6 +776,54 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _allq_evaluated(
+        self, security: SecurityQuery | None, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """What the contributed book implies as a price (§15.1-15.3).
+
+        `ALLQ` shows the quotes; this shows what they add up to, with the
+        ASC 820 level and the score beside it. Both come from the same book
+        at the same moment, so a user can see the evidence and the
+        conclusion without switching screens and wondering whether they
+        were computed from the same thing.
+
+        The one-way count is shown even when the price succeeds. A book of
+        ten quotes that produced two observations is a different statement
+        about liquidity from one that produced ten, and an evaluated price
+        that did not say so would look equally well-supported either way.
+        """
+        from treble.analytics.tval.evaluate import UnpriceableError
+        from treble.tapi.evaluated import evaluate_contributed, observations_from_book
+
+        if security is None:
+            return (("No security selected.", None),)
+        try:
+            subject = self.resolve(security)
+        except SecurityNotFoundError as error:
+            return ((str(error), None),)
+
+        book = self._contributions.book(str(subject), as_of=as_of)
+        if book.is_empty:
+            # ALLQ's own correct-when-empty case, restated here rather than
+            # borrowed: an empty network and a screen that failed to load
+            # must not render alike.
+            return (("No contributed quotes for this instrument.", None),)
+        inputs = observations_from_book(book, as_of=as_of)
+        try:
+            priced = evaluate_contributed(book, as_of=as_of)
+        except UnpriceableError as error:
+            return ((str(error), None),)
+        return (
+            ("EVALUATED PRICE", priced.price),
+            ("FAIR VALUE LEVEL", priced.level.value),
+            ("SCORE (1-10)", priced.score),
+            ("OBSERVATIONS", len(priced.observations)),
+            ("ONE-WAY QUOTES SKIPPED", inputs.one_way_skipped),
+            # "No evidence" and "no *recent* evidence" are different states
+            # and the score alone cannot separate them.
+            ("DROPPED AS STALE", priced.dropped_stale),
+        )
 
     def _sptr_documents(
         self, security: SecurityQuery | None, *, as_of: datetime

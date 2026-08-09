@@ -15,13 +15,14 @@ from datetime import UTC, datetime
 import pytest
 
 from treble.analytics.tval.evaluate import ObservationKind, UnpriceableError
-from treble.core.identifiers import TUID
+from treble.core.identifiers import TUID, SecurityQuery, YellowKey
 from treble.plant.quotes import Book, Firmness, Quote
 from treble.tapi.evaluated import (
     evaluate_contributed,
     evaluated_subjects,
     observations_from_book,
 )
+from treble.tapi.local import LocalTapi, TickerIndex
 
 NOW = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
 SUBJECT = TUID("isin:US0378331005")
@@ -125,3 +126,64 @@ class TestSubjectSelection:
             TUID("isin:US9999999999"): _book(_quote("B", ask=None)),
         }
         assert evaluated_subjects(books) == (SUBJECT,)
+
+
+class TestTheAllqBinding:
+    """`sys:allq_evaluated`. ALLQ shows the quotes; this shows what they add
+    up to, from the same book at the same moment, so a user sees the
+    evidence and the conclusion without wondering whether they were computed
+    from the same thing."""
+
+    @staticmethod
+    def _tapi(requests: tuple[tuple[str, float | None, float | None], ...]) -> LocalTapi:
+        import tempfile
+        from pathlib import Path
+
+        from treble.store.duck import DuckStore
+        from treble.tapi.contribution import ContributionRequest, ContributionService
+
+        service = ContributionService()
+        for contributor, bid, ask in requests:
+            service.contribute(
+                ContributionRequest(
+                    subject="cik:0000051143",
+                    contributor=contributor,
+                    firmness=Firmness.EXECUTABLE,
+                    bid=bid,
+                    ask=ask,
+                    bid_size=1_000_000.0,
+                    ask_size=1_000_000.0,
+                ),
+                received_at=NOW,
+            )
+        store = DuckStore(Path(tempfile.mkdtemp()) / "t.db")
+        return LocalTapi(store, tickers=TickerIndex({"IBM": 51143}), contributions=service)
+
+    @staticmethod
+    def _query() -> SecurityQuery:
+        return SecurityQuery(ticker="IBM", key=YellowKey.EQUITY, venue=None, descriptor=None)
+
+    def test_an_empty_book_says_so_rather_than_failing(self) -> None:
+        """ALLQ's correct-when-empty case, restated: an empty network and a
+        screen that failed to load must not render alike."""
+        rows = self._tapi(()).series(self._query(), "sys:allq_evaluated", as_of=NOW)
+        assert "No contributed quotes" in str(rows[0][0])
+
+    def test_the_one_way_count_shows_even_when_the_price_succeeds(self) -> None:
+        """A book that produced two observations is a different statement
+        about liquidity from one that produced ten, and a price that did not
+        say so would look equally well-supported either way."""
+        tapi = self._tapi((("A", 99.0, 101.0), ("B", 99.0, None)))
+        rows = tapi.series(self._query(), "sys:allq_evaluated", as_of=NOW)
+        flat = {r[0]: r[1] for r in rows}
+        assert flat["ONE-WAY QUOTES SKIPPED"] == 1
+        assert flat["OBSERVATIONS"] == 1
+        assert flat["EVALUATED PRICE"] == pytest.approx(100.0)
+
+    def test_the_level_and_score_travel_with_the_price(self) -> None:
+        """§15's whole claim is a price *and* how much to trust it."""
+        tapi = self._tapi((("A", 99.0, 101.0), ("B", 99.5, 100.5)))
+        flat = {r[0]: r[1] for r in tapi.series(self._query(), "sys:allq_evaluated", as_of=NOW)}
+        assert flat["FAIR VALUE LEVEL"]
+        assert 1 <= int(flat["SCORE (1-10)"]) <= 10
+        assert flat["DROPPED AS STALE"] == 0

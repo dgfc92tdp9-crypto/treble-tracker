@@ -61,7 +61,6 @@ AWAITING_WIRING: dict[str, str] = {
     "treble.analytics.tval.residual": (
         "TVAL §15.4. explained_residual_bp exists and no evaluated-price path calls it."
     ),
-    "treble.tapi.evaluated": "Contributed-price evaluation; no screen binds it yet.",
     "treble.render.layout": (
         "Layout authoring; the desktop shell's drag and resize gestures are the caller "
         "and are not built."
