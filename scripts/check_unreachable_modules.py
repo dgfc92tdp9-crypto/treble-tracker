@@ -53,9 +53,11 @@ AWAITING_WIRING: dict[str, str] = {
         "data question."
     ),
     "treble.analytics.derivatives.crosscurrency": (
-        "§12.1 pricer. Not data-blocked: ECB spot, EUR-ESTR-OIS and USD-SOFR-OIS "
-        "are all stored and current. Needs build_swap_market taught to build a "
-        "second curve under USD conventions; the basis is a caller input."
+        "§12.1 pricer. The prerequisite is done: tapi/swap_market.py now builds a "
+        "USD SOFR discount curve on the US settlement calendar, so both legs "
+        "discount on their own currency. What remains is assembling each leg float "
+        "PV and the notional exchange into the pricer, with the basis as a caller "
+        "input the way volatility is for caps."
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
     "treble.render.layout": (
