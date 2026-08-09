@@ -46,9 +46,19 @@ regression in it would be silent.
 
 Every one of these methods turns stored facts into screen rows, which is
 where a wrong number reaches a person. The fixtures are the reason the
-coverage is low — each needs a store populated with curves or holdings —
-and that cost is the argument for a shared builder rather than for leaving
-them untested.
+coverage is low — each needs a store populated with curves or holdings.
+
+**`tests/storebuilder.py` is that cost paid once** (2026-08-08).
+`StoreBuilder().with_curves(usd=True).with_bonds()` gives a store an
+issuer curve can be fitted through, and `_tval_residual`'s populated path
+is now pinned rather than resting on one manual run.
+
+The gain from the first use is small — 60% to 62%, 190 missed to 179 —
+and that is the honest measure of what one method's worth of tests buys.
+The builder is the reusable half: the remaining seven methods need
+`with_factors`, `with_contributions`, `with_swaptions` and
+`with_fundamentals`, each perhaps twenty lines, after which their tests
+cost a line apiece instead of a fixture apiece.
 
 ### Phase 2 gate audit (2026-08-07)
 
