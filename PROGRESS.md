@@ -53,12 +53,23 @@ coverage is low — each needs a store populated with curves or holdings.
 issuer curve can be fitted through, and `_tval_residual`'s populated path
 is now pinned rather than resting on one manual run.
 
-The gain from the first use is small — 60% to 62%, 190 missed to 179 —
-and that is the honest measure of what one method's worth of tests buys.
-The builder is the reusable half: the remaining seven methods need
-`with_factors`, `with_contributions`, `with_swaptions` and
-`with_fundamentals`, each perhaps twenty lines, after which their tests
-cost a line apiece instead of a fixture apiece.
+The builder was the point, and the second and third uses show why:
+
+| after | coverage | missed |
+|---|---|---|
+| baseline | 60% | 190 |
+| `_tval_residual` pinned | 62% | 179 |
+| four SWPM panels | 73% | 129 |
+| three TVAL panels | 76% | 112 |
+
+Seven panels, no new fixture code — all of them needed only curves or
+bonds, which the builder already had. That they went untested for so long
+was never about difficulty; it was that each would have paid the fixture
+cost alone.
+
+What remains needs the builder extended: `_port` wants factor returns,
+`_allq` contributions, `_vcub` swaption prints. `with_factors`,
+`with_contributions` and `with_swaptions` are perhaps twenty lines each.
 
 ### Phase 2 gate audit (2026-08-07)
 

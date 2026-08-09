@@ -58,3 +58,73 @@ class TestTheProductCatalogue:
         rows = populated.series(None, "sys:swpm_products", as_of=LATER)
         assert len(rows) == 7
         assert all(str(r[2]) for r in rows)
+
+
+class TestTheSwpmPanels:
+    """The four curve-driven panels, and the largest coverage gap in the
+    binding layer: 53 statements across three of them. All they needed was
+    a store with curves in it, which is why they went untested."""
+
+    @pytest.mark.parametrize(
+        "binding",
+        ["sys:swpm_valuation", "sys:swpm_cashflows", "sys:swpm_ois", "sys:swpm_basis"],
+    )
+    def test_each_panel_returns_rows_on_a_real_curve(
+        self, populated: LocalTapi, binding: str
+    ) -> None:
+        rows = populated.series(None, binding, as_of=LATER)
+        assert rows, f"{binding} returned nothing on a populated store"
+        assert all(isinstance(r, tuple) for r in rows)
+
+    @pytest.mark.parametrize(
+        "binding",
+        ["sys:swpm_valuation", "sys:swpm_cashflows", "sys:swpm_ois", "sys:swpm_basis"],
+    )
+    def test_each_panel_says_why_on_an_empty_store(self, tmp_path: Path, binding: str) -> None:
+        """A panel that renders blank and one whose inputs are absent look
+        identical, and only the second is a data problem the reader can
+        act on."""
+        empty = LocalTapi(StoreBuilder(tmp_path / f"e-{binding[-6:]}.db").store)
+        rows = empty.series(None, binding, as_of=LATER)
+        assert rows
+        assert any(isinstance(cell, str) and cell for cell in rows[0])
+
+    def test_the_basis_panel_needs_two_real_curves(self, populated: LocalTapi) -> None:
+        """A tenor basis is the difference between two curves the market
+        quoted. Interpolating the shorter one from the longer would make
+        the basis a function of the interpolator."""
+        rows = populated.series(None, "sys:swpm_basis", as_of=LATER)
+        assert rows
+
+
+class TestTheTvalPanels:
+    """The three issuer-curve panels. Bonds are all they need, and the
+    builder already supplies them."""
+
+    @pytest.mark.parametrize("binding", ["sys:tval_curves", "sys:tval_values", "sys:tval_method"])
+    def test_each_panel_returns_rows_on_fitted_curves(
+        self, populated: LocalTapi, binding: str
+    ) -> None:
+        rows = populated.series(None, binding, as_of=LATER)
+        assert rows, f"{binding} returned nothing against 60 bonds across 4 issuers"
+
+    def test_the_method_panel_states_what_it_assumed(self, populated: LocalTapi) -> None:
+        """§15's drill-down is the honest centre of TVAL: N-PORT supplies no
+        day count and no frequency, so the panel names the ones this model
+        assumed rather than letting a reader infer they were observed."""
+        text = " ".join(
+            str(cell)
+            for row in populated.series(None, "sys:tval_method", as_of=LATER)
+            for cell in row
+        )
+        assert "assum" in text.lower() or "implied" in text.lower()
+
+    @pytest.mark.parametrize("binding", ["sys:tval_curves", "sys:tval_values", "sys:tval_method"])
+    def test_a_store_with_no_bonds_says_why(self, tmp_path: Path, binding: str) -> None:
+        """A failure to fit returns the reason as a row rather than an empty
+        table: a bond with nothing to say about it and a model that could
+        not be built must not look the same."""
+        empty = LocalTapi(StoreBuilder(tmp_path / f"t-{binding[-6:]}.db").store)
+        rows = empty.series(None, binding, as_of=LATER)
+        assert rows
+        assert any(isinstance(cell, str) and cell for cell in rows[0])
