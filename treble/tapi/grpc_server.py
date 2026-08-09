@@ -35,11 +35,18 @@ from treble.plant.broadcast import SubscriberOverflowError, TickBroadcaster
 from treble.plant.conflation import Tick, TickerPlant
 from treble.plant.quotes import Firmness
 from treble.plant.venues import PRICE_FIELD
+from treble.store.duck import DuckStore
+from treble.store.payloads import PayloadStore
 from treble.tapi._generated import tapi_pb2, tapi_pb2_grpc
 from treble.tapi.contribution import (
     ContributionRejectedError,
     ContributionRequest,
     ContributionService,
+)
+from treble.tapi.documents import (
+    DocumentUnavailableError,
+    document_bytes,
+    documents_for,
 )
 from treble.tapi.local import LocalTapi, SecurityNotFoundError
 
@@ -464,6 +471,68 @@ def _tick_update(tick: Tick, *, snapshot: bool):  # type: ignore[no-untyped-def]
     )
 
 
+class DocsService(tapi_pb2_grpc.DocsServicer):  # type: ignore[misc]
+    """`//trb/docs` — the documents the facts were parsed from (spec §8.3).
+
+    The service existed in-process and had no wire surface, which under I7
+    means a client that reaches everything through TAPI could not reach it
+    at all. A drill-down that stops at the process boundary is a drill-down
+    only the process can use.
+    """
+
+    def __init__(self, store: DuckStore, payloads: PayloadStore | None) -> None:
+        self._store = store
+        self._payloads = payloads
+
+    def ListDocuments(  # noqa: N802
+        self, request: tapi_pb2.DocumentsRequest, context: grpc.ServicerContext
+    ) -> tapi_pb2.DocumentsResponse:
+        as_of = _as_of(request.as_of, context)
+        try:
+            refs = documents_for(self._store, TUID(request.subject), as_of=as_of)
+        except DocumentUnavailableError as exc:
+            context.abort(grpc.StatusCode.NOT_FOUND, str(exc))
+        return tapi_pb2.DocumentsResponse(
+            documents=[
+                tapi_pb2.DocumentRef(
+                    payload_hash=ref.payload_hash,
+                    source_system=ref.source_system,
+                    source_uri=ref.source_uri,
+                    retrieved_at=ref.retrieved_at.isoformat(),
+                    fact_count=ref.fact_count,
+                    redistribution_restricted=ref.redistribution_restricted,
+                )
+                for ref in refs
+            ]
+        )
+
+    def GetDocumentBytes(  # noqa: N802
+        self, request: tapi_pb2.DocumentBytesRequest, context: grpc.ServicerContext
+    ) -> tapi_pb2.DocumentBytesResponse:
+        # Bound to a local before the guard: mypy does not narrow an
+        # attribute across a call, because the call could in principle
+        # reassign it.
+        payloads = self._payloads
+        if payloads is None:
+            # Distinct from a missing document. "This install stores no
+            # payloads" and "this payload is gone" are different facts about
+            # the replay chain, and only the second is a defect.
+            context.abort(
+                grpc.StatusCode.FAILED_PRECONDITION,
+                "no payload store is configured on this server; documents are listed "
+                "from provenance but their bytes are not held here",
+            )
+            # `abort` raises, but grpc's stubs do not declare NoReturn, so
+            # without this mypy carries `payloads: PayloadStore | None` past
+            # the guard. Not an assertion — a statement of grpc's contract.
+            raise AssertionError("unreachable: ServicerContext.abort raises")
+        try:
+            body = document_bytes(payloads, request.payload_hash)
+        except DocumentUnavailableError as exc:
+            context.abort(grpc.StatusCode.NOT_FOUND, str(exc))
+        return tapi_pb2.DocumentBytesResponse(body=body, payload_hash=request.payload_hash)
+
+
 def create_server(
     tapi: LocalTapi,
     *,
@@ -471,6 +540,7 @@ def create_server(
     plant: TickerPlant | None = None,
     history: TickHistory | None = None,
     broadcaster: TickBroadcaster | None = None,
+    payloads: PayloadStore | None = None,
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
     max_workers: int = 8,
@@ -484,6 +554,7 @@ def create_server(
     tapi_pb2_grpc.add_ContribServicer_to_server(ContribService(service), server)
     tapi_pb2_grpc.add_TqlServicer_to_server(TqlService(tapi), server)
     tapi_pb2_grpc.add_MktDataServicer_to_server(MktDataService(plant, history, broadcaster), server)
+    tapi_pb2_grpc.add_DocsServicer_to_server(DocsService(tapi.store, payloads), server)
     server.add_insecure_port(f"{host}:{port}")
     return server
 

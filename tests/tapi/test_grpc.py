@@ -508,3 +508,143 @@ class TestStreamingSubscriptions:
             next(iter(stub.Subscribe(tapi_pb2.SubscribeRequest())))
         assert raised.value.code() is grpc.StatusCode.FAILED_PRECONDITION
         assert "no broadcaster" in raised.value.details()
+
+
+@pytest.fixture
+def docs_channel(tmp_path: Path):  # type: ignore[no-untyped-def]
+    """A server whose docs service has both a store and a payload store."""
+    from treble.store.payloads import PayloadStore
+
+    store = DuckStore(tmp_path / "d.db")
+    payloads = PayloadStore(tmp_path / "payloads")
+    body = b'{"values": [{"close": "233.43"}]}'
+    key = payloads.put(body)
+    record = Provenance(
+        source_system="twelvedata",
+        source_uri="https://example.invalid/twelvedata",
+        retrieved_at=KNOWN,
+        method=ExtractionMethod.API,
+        extractor_version="1",
+        payload_hash=str(key),
+    )
+    store.write_provenance([record])
+    store.write_facts(
+        [
+            Fact(
+                subject="equity:IBM",
+                field=field,
+                value=1.0,
+                effective_from=DAY,
+                effective_to=DAY,
+                knowledge_from=KNOWN,
+                provenance_id=record.id,
+            )
+            for field in ("PX_LAST", "ADJ_CLOSE")
+        ]
+    )
+    server = create_server(LocalTapi(store), payloads=payloads, host=DEFAULT_HOST, port=0)
+    port = server.add_insecure_port(f"{DEFAULT_HOST}:0")
+    server.start()
+    with grpc.insecure_channel(f"{DEFAULT_HOST}:{port}") as chan:
+        yield chan
+    server.stop(grace=None)
+
+
+class TestTheDocsService:
+    """`//trb/docs` over the wire (spec §8.3).
+
+    The service worked in-process and had no wire surface at all, which
+    under I7 means a client that reaches everything through TAPI could not
+    reach documents. A drill-down that stops at the process boundary is a
+    drill-down only the process can use.
+    """
+
+    @staticmethod
+    def _stub(chan: grpc.Channel) -> object:
+        return tapi_pb2_grpc.DocsStub(chan)
+
+    def test_a_document_is_listed_with_its_fact_count_and_restriction(
+        self, docs_channel: grpc.Channel
+    ) -> None:
+        reply = self._stub(docs_channel).ListDocuments(  # type: ignore[attr-defined]
+            tapi_pb2.DocumentsRequest(
+                subject="equity:IBM",
+                as_of=tapi_pb2.AsOf(timestamp=datetime.now(UTC).isoformat()),
+            )
+        )
+        assert len(reply.documents) == 1
+        doc = reply.documents[0]
+        assert doc.source_system == "twelvedata"
+        assert doc.fact_count == 2
+        # Travels on the reference rather than needing a second call: a
+        # client that had to ask would sometimes not ask.
+        assert doc.redistribution_restricted is True
+
+    def test_the_bytes_are_the_stored_ones(self, docs_channel: grpc.Channel) -> None:
+        """Content-addressed, so this cannot serve a revised version of the
+        document the facts were parsed from."""
+        stub = self._stub(docs_channel)
+        listed = stub.ListDocuments(  # type: ignore[attr-defined]
+            tapi_pb2.DocumentsRequest(
+                subject="equity:IBM",
+                as_of=tapi_pb2.AsOf(timestamp=datetime.now(UTC).isoformat()),
+            )
+        )
+        digest = listed.documents[0].payload_hash
+        reply = stub.GetDocumentBytes(  # type: ignore[attr-defined]
+            tapi_pb2.DocumentBytesRequest(payload_hash=digest)
+        )
+        assert reply.body == b'{"values": [{"close": "233.43"}]}'
+        # Echoed so a caller can check it got the document it asked for.
+        assert reply.payload_hash == digest
+
+    def test_as_of_is_required_here_too(self, docs_channel: grpc.Channel) -> None:
+        """I2 is enforced at the boundary, not per-service. A service that
+        quietly defaulted to now would answer one question two ways."""
+        with pytest.raises(grpc.RpcError) as caught:
+            self._stub(docs_channel).ListDocuments(  # type: ignore[attr-defined]
+                tapi_pb2.DocumentsRequest(subject="equity:IBM")
+            )
+        assert caught.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+
+    def test_an_unknown_subject_is_not_found_rather_than_empty(
+        self, docs_channel: grpc.Channel
+    ) -> None:
+        with pytest.raises(grpc.RpcError) as caught:
+            self._stub(docs_channel).ListDocuments(  # type: ignore[attr-defined]
+                tapi_pb2.DocumentsRequest(
+                    subject="equity:NOPE",
+                    as_of=tapi_pb2.AsOf(timestamp=datetime.now(UTC).isoformat()),
+                )
+            )
+        assert caught.value.code() is grpc.StatusCode.NOT_FOUND
+
+    def test_a_missing_payload_names_the_broken_replay_chain(
+        self, docs_channel: grpc.Channel
+    ) -> None:
+        with pytest.raises(grpc.RpcError) as caught:
+            self._stub(docs_channel).GetDocumentBytes(  # type: ignore[attr-defined]
+                tapi_pb2.DocumentBytesRequest(payload_hash="0" * 64)
+            )
+        assert caught.value.code() is grpc.StatusCode.NOT_FOUND
+        assert "replay chain" in caught.value.details()
+
+    def test_no_payload_store_is_a_different_answer_from_no_document(self, tmp_path: Path) -> None:
+        """ "This install holds no payloads" and "this payload is gone" are
+        different facts about the replay chain, and only the second is a
+        defect. A server returning NOT_FOUND for both would send someone
+        looking for a corruption that never happened."""
+        server = create_server(LocalTapi(DuckStore(tmp_path / "n.db")), host=DEFAULT_HOST, port=0)
+        port = server.add_insecure_port(f"{DEFAULT_HOST}:0")
+        server.start()
+        try:
+            with (
+                grpc.insecure_channel(f"{DEFAULT_HOST}:{port}") as chan,
+                pytest.raises(grpc.RpcError) as caught,
+            ):
+                tapi_pb2_grpc.DocsStub(chan).GetDocumentBytes(
+                    tapi_pb2.DocumentBytesRequest(payload_hash="0" * 64)
+                )
+            assert caught.value.code() is grpc.StatusCode.FAILED_PRECONDITION
+        finally:
+            server.stop(grace=None)

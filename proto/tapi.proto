@@ -322,3 +322,46 @@ message TickUpdate {
   // treated a snapshot as a print would count trades that did not happen.
   bool snapshot = 8;
 }
+
+// ---------------------------------------------------------------------
+// //trb/docs — the documents facts were parsed from (spec §8.3)
+// ---------------------------------------------------------------------
+
+message DocumentsRequest {
+  string subject = 1;
+  // I2: the listing must answer the date it is asked about, not today, or a
+  // drill-down disagrees with the screen it was opened from.
+  AsOf as_of = 2;
+}
+
+message DocumentRef {
+  string payload_hash = 1;
+  string source_system = 2;
+  string source_uri = 3;
+  string retrieved_at = 4;
+  uint32 fact_count = 5;
+  // Travels with the reference, not looked up by the caller: the payload is
+  // the most concentrated form of a source's data, and a client that had to
+  // ask a second question to learn it would sometimes not ask.
+  bool redistribution_restricted = 6;
+}
+
+message DocumentsResponse {
+  repeated DocumentRef documents = 1;
+}
+
+message DocumentBytesRequest {
+  string payload_hash = 1;
+}
+
+message DocumentBytesResponse {
+  bytes body = 1;
+  // Echoed back so a caller can verify the server returned the document it
+  // asked for rather than trusting the channel.
+  string payload_hash = 2;
+}
+
+service Docs {
+  rpc ListDocuments(DocumentsRequest) returns (DocumentsResponse);
+  rpc GetDocumentBytes(DocumentBytesRequest) returns (DocumentBytesResponse);
+}

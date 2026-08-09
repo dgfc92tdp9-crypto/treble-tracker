@@ -196,6 +196,20 @@ class LocalTapi:
             self._master = build_security_master(self._store, as_of=datetime.now(UTC))
         return self._master
 
+    @property
+    def store(self) -> DuckStore:
+        """The underlying store, read-only.
+
+        For same-layer TAPI services that need the store directly rather
+        than through a binding — the gRPC `docs` service lists documents
+        from provenance, which is not a screen shape. Exposed as a property
+        rather than reached at as `_store` from a sibling module, so the
+        one legitimate use is visible instead of looking like a private
+        access somebody got away with. It does not widen I7: `grpc_server`
+        is inside `tapi`, and nothing above `tapi` can see this.
+        """
+        return self._store
+
     def resolve(self, security: SecurityQuery) -> TUID:
         """Security reference -> storage subject key.
 
