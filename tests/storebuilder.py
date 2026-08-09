@@ -20,7 +20,7 @@ looks exactly like a broken query.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from treble.core.facts import Fact
 from treble.core.provenance import ExtractionMethod, Provenance
@@ -123,6 +123,92 @@ class StoreBuilder:
             ):
                 rows.append((f"isin:US{i:010d}", field, value, DAY))
         return self._write("edgar-nport", rows)
+
+    def with_factors(self, days: int = 250, assets: int = 5) -> StoreBuilder:
+        """Ken French factor returns and asset returns that load on them.
+
+        Two things here were wrong on the first attempt and both produced a
+        *plausible* fit rather than a failure.
+
+        The returns are drawn from a seeded RNG, not from sinusoids. Six
+        sine waves over a three-month window are nowhere near orthogonal —
+        the design matrix is nearly rank-deficient, the multivariate fit
+        redistributes the loadings across collinear columns, and an asset
+        built with a market beta of 0.6 came back at 0.91. Nothing errored;
+        the number was simply wrong, which is the failure mode this whole
+        fixture exists to make visible.
+
+        The window ends before `DAY`. A generator running forward from the
+        start date into September 2026 would put most observations after
+        the `as_of` the tests query at, and a series truncated by an
+        effective-date bound looks exactly like a series that was never
+        written.
+        """
+        import numpy as np
+
+        rng = np.random.default_rng(20260809)
+        names = ("MKT_RF", "SMB", "HML", "RMW", "CMA", "MOM")
+        # Each asset's true loading on each factor. Market betas fan out
+        # 0.6 -> 1.8 so the test can assert recovery of a known number
+        # rather than merely that a number appeared.
+        loadings = np.array(
+            [[0.6 + 0.3 * a] + [0.2 * ((a + f) % 3 - 1) for f in range(5)] for a in range(assets)]
+        )
+        rows: list[tuple[str, str, object, date]] = []
+        for d in range(days):
+            when = date(2025, 9, 1) + timedelta(days=d)
+            draws = rng.normal(0.0, 0.010, size=len(names))
+            for name, value in zip(names, draws, strict=True):
+                rows.append((f"factor:{name}", "TOT_RETURN", float(value), when))
+            rows.append(("factor:RF", "TOT_RETURN", 0.0001, when))
+            idio = rng.normal(0.0, 0.0015, size=assets)
+            for a in range(assets):
+                rows.append(
+                    (
+                        f"portfolio:ASSET{a}",
+                        "TOT_RETURN",
+                        float(loadings[a] @ draws + idio[a] + 0.0001),
+                        when,
+                    )
+                )
+        return self._write("frenchdata", rows)
+
+    def with_swaptions(self, count: int = 40) -> StoreBuilder:
+        """Swaption prints a surface can be fitted through.
+
+        All on one trading day, so the surface is built without pooling:
+        pooling averages a fortnight of surfaces into one, and a fixture
+        that needed it would be testing the pooling rather than the fit.
+
+        **Needs `with_curves()`.** A premium is a price, and turning a
+        price into a volatility needs a forward and a discount factor. On
+        its own this method yields "40 prints read, none solvable" — which
+        is the surface being honest, and was how the omission was found.
+        """
+        rows: list[tuple[str, str, object, date]] = []
+        for i in range(count):
+            expiry_years = (1, 2, 5)[i % 3]
+            tenor_years = (5, 10)[i % 2]
+            expiry = date(DAY.year + expiry_years, 7, 31)
+            rows += [
+                (f"swaption:EUR:P{i:04d}", "EXPIRY_DATE", expiry, DAY),
+                (
+                    f"swaption:EUR:P{i:04d}",
+                    "UNDERLIER_MATURITY",
+                    date(expiry.year + tenor_years, 7, 31),
+                    DAY,
+                ),
+                (f"swaption:EUR:P{i:04d}", "STRIKE", 0.0325 + 0.0002 * (i % 5 - 2), DAY),
+                (
+                    f"swaption:EUR:P{i:04d}",
+                    "PREMIUM_FRACTION",
+                    0.030 + 0.001 * (i % 7 - 3),
+                    DAY,
+                ),
+                (f"swaption:EUR:P{i:04d}", "PAYER", True, DAY),
+                (f"swaption:EUR:P{i:04d}", "NOTIONAL_CAPPED", False, DAY),
+            ]
+        return self._write("dtcc-sdr", rows)
 
 
 __all__ = ["DAY", "KNOWN", "LATER", "StoreBuilder"]

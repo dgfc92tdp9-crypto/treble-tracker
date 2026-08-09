@@ -128,3 +128,169 @@ class TestTheTvalPanels:
         rows = empty.series(None, binding, as_of=LATER)
         assert rows
         assert any(isinstance(cell, str) and cell for cell in rows[0])
+
+
+@pytest.fixture
+def with_returns(tmp_path: Path) -> LocalTapi:
+    return LocalTapi(StoreBuilder(tmp_path / "f.db").with_factors().store)
+
+
+class TestThePortPanels:
+    """PORT's three panels are one factor fit read three ways. The fit is
+    the expensive part and it happens once, so a panel that quietly stopped
+    consulting it would still render — with numbers from nowhere."""
+
+    def test_the_summary_states_the_window_it_fitted_over(self, with_returns: LocalTapi) -> None:
+        """A factor summary without its window is uninterpretable: 250 days
+        and 5 years give different betas and the screen must say which.
+
+        Both ends are pinned. A window that reported only its start would
+        pass while silently fitting to half the data."""
+        rows = dict(with_returns.series(None, "sys:port_summary", as_of=LATER))  # type: ignore[arg-type]
+        assert rows["Window"] == "2025-09-01 to 2026-05-08"
+        assert int(rows["Observations"]) == 250
+
+    def test_every_factor_is_named_with_its_own_return(self, with_returns: LocalTapi) -> None:
+        """Six factors, six distinct annualised returns. A panel that
+        reported one number six times would be a broken join, and a test
+        that only counted rows could not tell the difference."""
+        rows = with_returns.series(None, "sys:port_factors", as_of=LATER)
+        names = [r[0] for r in rows]
+        assert names == ["MKT_RF", "SMB", "HML", "RMW", "CMA", "MOM"]
+        # Whole rows, not the return column alone: annualised returns are
+        # rounded to two places and two factors can genuinely round to the
+        # same figure, which failed this assertion for an uninteresting
+        # reason.
+        assert len({tuple(r[1:]) for r in rows}) == len(rows)
+
+    def test_exposures_recover_the_betas_the_fixture_was_built_from(
+        self, with_returns: LocalTapi
+    ) -> None:
+        """The fixture builds ASSET0..4 with market betas 0.6, 0.9, 1.2,
+        1.5, 1.8. Recovering them is the only assertion here that could
+        have failed for an interesting reason — row counts and column
+        widths cannot tell a fitted exposure from a transposed one, and
+        the first version of the fixture returned 0.91 for the 0.6 asset
+        without anything going red.
+        """
+        rows = with_returns.series(None, "sys:port_exposures", as_of=LATER)
+        betas = {str(r[0]): float(r[1]) for r in rows}  # type: ignore[arg-type]
+        assert [*betas] == [f"ASSET{i}" for i in range(5)]
+        for i in range(5):
+            assert betas[f"ASSET{i}"] == pytest.approx(0.6 + 0.3 * i, abs=0.05)
+
+    def test_an_empty_store_gives_a_reason_not_a_blank_grid(self, tmp_path: Path) -> None:
+        empty = LocalTapi(StoreBuilder(tmp_path / "e.db").store)
+        rows = empty.series(None, "sys:port_summary", as_of=LATER)
+        assert rows and isinstance(rows[0][0], str)
+
+
+class TestTheVcubPanels:
+    """The vol grid and the note explaining how it was built."""
+
+    def test_the_grid_carries_a_vol_and_the_prints_behind_it(self, tmp_path: Path) -> None:
+        """Each cell is an expiry/tenor bucket with a fitted normal vol and
+        the number of prints that produced it. A vol with no print count is
+        a figure a trader cannot weigh."""
+        tapi = LocalTapi(StoreBuilder(tmp_path / "v.db").with_curves().with_swaptions().store)
+        rows = tapi.series(None, "sys:vcub_grid", as_of=LATER)
+        assert {str(r[0]) for r in rows} == {"1Y", "2Y", "5Y"}
+        assert all(float(r[2]) > 0.0 for r in rows)  # type: ignore[arg-type]
+        assert sum(int(r[3]) for r in rows) == 40  # type: ignore[arg-type]
+
+    def test_the_method_panel_dates_the_surface(self, tmp_path: Path) -> None:
+        """A surface undated is a surface from any day, and vol from a
+        fortnight ago prices nothing today."""
+        tapi = LocalTapi(StoreBuilder(tmp_path / "vm.db").with_curves().with_swaptions().store)
+        rows = dict(tapi.series(None, "sys:vcub_method", as_of=LATER))  # type: ignore[arg-type]
+        assert rows["As of"] == "2026-07-31"
+
+    def test_no_prints_is_a_stated_reason(self, tmp_path: Path) -> None:
+        empty = LocalTapi(StoreBuilder(tmp_path / "ev.db").store)
+        rows = empty.series(None, "sys:vcub_grid", as_of=LATER)
+        assert rows and isinstance(rows[0][0], str)
+
+
+class TestTheAllqPanels:
+    """ALLQ reads a live contribution service, not the store — so nothing
+    the builder writes reaches it, and its populated path had never run."""
+
+    @staticmethod
+    def _tapi(tmp_path: Path, *, quotes: bool) -> LocalTapi:
+        from datetime import timedelta
+
+        from treble.tapi.contribution import (
+            ContributionRequest,
+            ContributionService,
+            Firmness,
+        )
+        from treble.tapi.local import TickerIndex
+
+        # A TTL wide enough that the fixture's quotes are still live at
+        # LATER: the default is five minutes, under which every quote here
+        # would expire and the populated case would silently become the
+        # empty one.
+        service = ContributionService(ttl=timedelta(days=365))
+        if quotes:
+            for i, (who, firm) in enumerate(
+                (("BANK-A", Firmness.EXECUTABLE), ("BANK-B", Firmness.INDICATIVE))
+            ):
+                service.contribute(
+                    ContributionRequest(
+                        subject="cik:0000051143",
+                        contributor=who,
+                        firmness=firm,
+                        bid=99.10 + i * 0.05,
+                        ask=99.40 + i * 0.05,
+                        bid_size=2e6,
+                        ask_size=2e6,
+                    ),
+                    received_at=LATER,
+                )
+        return LocalTapi(
+            StoreBuilder(tmp_path / f"a-{quotes}.db").store,
+            tickers=TickerIndex({"IBM": 51143}),
+            contributions=service,
+        )
+
+    @staticmethod
+    def _ibm() -> object:
+        from treble.core.identifiers import SecurityQuery, YellowKey
+
+        return SecurityQuery(ticker="IBM", key=YellowKey.EQUITY, venue=None, descriptor=None)
+
+    def test_every_contributor_appears_with_its_own_two_sided_price(self, tmp_path: Path) -> None:
+        rows = self._tapi(tmp_path, quotes=True).series(  # type: ignore[arg-type]
+            self._ibm(), "sys:allq", as_of=LATER
+        )
+        assert [r[0] for r in rows] == ["BANK-A", "BANK-B"]
+        assert [r[1] for r in rows] == ["executable", "indicative"]
+        assert rows[0][2] == pytest.approx(99.10)
+
+    def test_the_composites_separate_executable_from_indicative(self, tmp_path: Path) -> None:
+        """TCMP is what someone will trade on; TGN includes talk. Building
+        both from every quote would make the distinction decorative, and
+        the fixture contributes one of each so the two must differ.
+        """
+        rows = {
+            str(r[0]): r[1]
+            for r in self._tapi(tmp_path, quotes=True).series(  # type: ignore[arg-type]
+                self._ibm(), "sys:allq_composites", as_of=LATER
+            )
+        }
+        assert rows["TCMP (executable)"] == pytest.approx(99.10)
+        assert rows["TGN (indicative)"] != rows["TCMP (executable)"]
+        assert rows["Contributors"] == 2.0
+
+    def test_an_empty_book_says_how_long_it_has_been_empty(self, tmp_path: Path) -> None:
+        """The Phase 2 criterion is ALLQ correct-when-empty. A screen that
+        cannot distinguish "no one has ever quoted this" from "the feed
+        died" is the failure this row exists to prevent."""
+        rows = {
+            str(r[0]): r[1]
+            for r in self._tapi(tmp_path, quotes=False).series(  # type: ignore[arg-type]
+                self._ibm(), "sys:allq_composites", as_of=LATER
+            )
+        }
+        assert rows["Contributors"] == 0.0
+        assert rows["Last live"] == "never"
