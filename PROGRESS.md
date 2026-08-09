@@ -17,6 +17,39 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
 **Completion: 54.56%**
 
+### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
+
+The screen-binding layer is the least-covered module in the repository —
+190 statements missed, against a repository floor of 84% and a whole-suite
+figure of 89%. The module-coverage gate cannot see it, because that gate
+asks whether a module has *any* coverage, not whether it has enough.
+
+Attributed by method, so the next person does not have to guess where to
+start:
+
+| method | missed | added |
+|---|---|---|
+| `_swpm` | 22 | earlier |
+| `_swpm_basis` | 18 | earlier |
+| `_port` | 15 | earlier |
+| `_tval_residual` | 14 | 2026-08-08 |
+| `_tval` | 13 | earlier |
+| `_swpm_ois` | 13 | earlier |
+| `_allq` | 12 | earlier |
+| `_vcub` | 10 | earlier |
+
+Six binding methods were added on 2026-08-08 and account for 34 of the
+190. The largest of those, `_tval_residual`, is tested only on its
+empty-store path: the populated path was verified by running it against
+the live store (106 bonds, -10.5% skill) and never pinned by a test, so a
+regression in it would be silent.
+
+Every one of these methods turns stored facts into screen rows, which is
+where a wrong number reaches a person. The fixtures are the reason the
+coverage is low — each needs a store populated with curves or holdings —
+and that cost is the argument for a shared builder rather than for leaving
+them untested.
+
 ### Phase 2 gate audit (2026-08-07)
 
 Every criterion in CLAUDE.md §8 Phase 2 audited against test evidence, on a
