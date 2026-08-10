@@ -54,6 +54,8 @@ class CoinbaseCandlesAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="coinbase",
+        # candles are continuous; a day without any is a dead feed.
+        expected_cadence_days=1.0,
         description="Coinbase Exchange public daily candles",
         licence="Public market data endpoints; no key, no redistribution limit stated",
         redistribution_restricted=False,
@@ -161,6 +163,8 @@ class CoinbaseProductsAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="coinbase-products",
+        # product reference data changes when a pair is listed or retired.
+        expected_cadence_days=None,
         description="Coinbase Exchange product reference data",
         licence="Public market data endpoints; no key, no redistribution limit stated",
         redistribution_restricted=False,

@@ -59,6 +59,7 @@ from treble.ingest.ecb_hicp import SUBJECT as HICP_SUBJECT
 from treble.store.duck import DuckStore
 from treble.tapi.swap_market import (
     DISCOUNT_CURVE,
+    USD_DISCOUNT_CURVE,
     SwapMarket,
     build_swap_market,
     build_usd_discount_curve,
@@ -224,6 +225,98 @@ def _payment_times(start: float, end: float, frequency: int = _CMS_FREQUENCY) ->
         times.append(t)
         t += step
     return times
+
+
+@dataclass(frozen=True)
+class ProductReadiness:
+    """Whether a §12.1 product can actually be priced from this store."""
+
+    product: str
+    #: What the product needs that only a user can supply — a vol, a basis,
+    #: a projection. Distinct from what the store owes it.
+    user_input: str
+    ready: bool
+    #: What is missing from the store, or what satisfied it.
+    detail: str
+
+
+def product_readiness(store: DuckStore, *, as_of: datetime) -> tuple[ProductReadiness, ...]:
+    """Ask the store which products it can feed.
+
+    This was a hardcoded tuple of strings in the screen binding, and one of
+    them read "priceable — HICP stored" on an install holding no inflation
+    facts whatsoever. Nothing was wrong with the pricer; the catalogue had
+    simply never asked. A claim about data that is written rather than
+    measured is the same defect as a test that cannot fail, and it is worse
+    here because it renders to a user as a fact about their own install.
+
+    Every probe below is an existence check against the store rather than a
+    trial pricing: a catalogue must stay cheap enough to draw on every
+    keystroke, and "could this be priced" is a weaker question than "price
+    it" by exactly the margin that makes it affordable.
+    """
+    curves = bool(store.subjects_with_prefix("swap:", as_of=as_of))
+    swaptions = bool(store.subjects_with_prefix("swaption:", as_of=as_of))
+    hicp = bool(store.read(HICP_SUBJECT, "PX_LAST", as_of=as_of))
+    fx = bool(store.read(FX_SUBJECT, "PX_LAST", as_of=as_of))
+    bonds = bool(store.subjects_with_prefix("isin:", as_of=as_of))
+    usd = bool(store.subjects_with_prefix(f"swap:{USD_DISCOUNT_CURVE}", as_of=as_of))
+
+    def _curve_gate(extra_ok: bool, missing: str, present: str) -> tuple[bool, str]:
+        if not curves:
+            return False, "no swap curves in the store"
+        if not extra_ok:
+            return False, missing
+        return True, present
+
+    specs: tuple[tuple[str, str, bool, str, str], ...] = (
+        ("CAP / FLOOR", "normal vol", True, "", "curves stored"),
+        ("CMS", "lognormal vol", True, "", "curves stored"),
+        (
+            "CANCELLABLE",
+            "swaption vol",
+            swaptions,
+            "no swaption prints to fit a surface",
+            "vol from the fitted surface",
+        ),
+        (
+            "ASSET SWAP",
+            "bond price",
+            bonds,
+            "no bonds with an implied mark",
+            "price implied from N-PORT",
+        ),
+        (
+            "INFLATION ZC",
+            "index + projection",
+            hicp,
+            f"no {HICP_SUBJECT} index ingested",
+            "HICP stored",
+        ),
+        (
+            "CROSS-CURRENCY",
+            "spot, curves, basis",
+            fx and usd,
+            "no USD curve or no USDEUR fixing",
+            "both legs stored",
+        ),
+    )
+    out = [
+        ProductReadiness(product=name, user_input=needs, ready=ok, detail=detail)
+        for name, needs, extra, missing, present in specs
+        for ok, detail in (_curve_gate(extra, missing, present),)
+    ]
+    # Total return is not a store question: it needs a trade, and this
+    # install has no position store to hold one.
+    out.append(
+        ProductReadiness(
+            product="TOTAL RETURN",
+            user_input="a trade",
+            ready=False,
+            detail="needs a trade: reset and financing spread",
+        )
+    )
+    return tuple(out)
 
 
 def unfed_reason(product: str) -> str | None:
@@ -592,6 +685,7 @@ __all__ = [
     "AssetSwapPriced",
     "CancellablePriced",
     "CapPricing",
+    "ProductReadiness",
     "ProductUnavailableError",
     "assetswap_from_store",
     "cancellable_from_store",
@@ -599,5 +693,6 @@ __all__ = [
     "crosscurrency_from_store",
     "inflation_from_store",
     "price_cap_from_store",
+    "product_readiness",
     "unfed_reason",
 ]

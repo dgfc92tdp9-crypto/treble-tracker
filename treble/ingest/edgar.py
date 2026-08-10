@@ -81,6 +81,8 @@ def _filed_eod_utc(filed: str) -> datetime:
 class EdgarCompanyFactsAdapter(SourceAdapter):
     meta = SourceMeta(
         source_id="edgar-companyfacts",
+        # a per-CIK lookup driven by the universe, not a feed.
+        expected_cadence_days=None,
         description="SEC EDGAR XBRL company facts API / bulk archive",
         licence="US public domain (SEC EDGAR dissemination)",
         redistribution_restricted=False,
@@ -171,6 +173,8 @@ class EdgarCompanyFactsAdapter(SourceAdapter):
 class EdgarSubmissionsAdapter(SourceAdapter):
     meta = SourceMeta(
         source_id="edgar-submissions",
+        # a per-CIK lookup driven by the universe, not a feed.
+        expected_cadence_days=None,
         description="SEC EDGAR submissions index (acceptance timestamps)",
         licence="US public domain (SEC EDGAR dissemination)",
         redistribution_restricted=False,

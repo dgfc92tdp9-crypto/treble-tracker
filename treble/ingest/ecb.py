@@ -53,6 +53,8 @@ class EcbExchangeRatesAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="ecb-fx",
+        # ECB reference rates are published each TARGET business day.
+        expected_cadence_days=1.0,
         description="ECB SDMX euro foreign exchange reference rates",
         licence="Free reuse with attribution to the ECB; no redistribution limit",
         redistribution_restricted=False,

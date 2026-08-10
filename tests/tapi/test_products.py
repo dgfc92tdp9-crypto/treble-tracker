@@ -470,19 +470,32 @@ class TestTheSwpmCatalogue:
 
     def test_a_product_the_service_knows_and_the_screen_omits_is_an_error(self) -> None:
         """A product the service records and the screen does not list reads
-        as unsupported rather than as unlisted. The catalogue is a hand-
-        written table for good reasons -- the status text is user-facing --
-        so this is what stops it drifting from the pricer set."""
+        as unsupported rather than as unlisted.
+
+        The guard used to compare against `UNFED_PRODUCTS`; readiness is now
+        measured per product against the store, so it compares against that
+        instead. The property is unchanged and so is the reason for it.
+        """
         import tempfile
         from pathlib import Path
         from unittest.mock import patch
 
         from treble.tapi.local import LocalTapi
+        from treble.tapi.products import ProductReadiness, product_readiness
 
         empty = DuckStore(Path(tempfile.mkdtemp()) / "t.db")
         tapi = LocalTapi(empty)
+
+        def _extra(store: object, *, as_of: datetime) -> tuple[ProductReadiness, ...]:
+            return (
+                *product_readiness(store, as_of=as_of),  # type: ignore[arg-type]
+                ProductReadiness(
+                    product="SWAPTION", user_input="vol", ready=False, detail="unlisted"
+                ),
+            )
+
         with (
-            patch.dict("treble.tapi.products.UNFED_PRODUCTS", {"swaption": "not on the screen"}),
+            patch("treble.tapi.products.product_readiness", _extra),
             pytest.raises(RuntimeError, match="does not list"),
         ):
             tapi.series(None, "sys:swpm_products", as_of=datetime.now(UTC))

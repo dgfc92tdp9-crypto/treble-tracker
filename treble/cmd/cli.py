@@ -12,6 +12,7 @@ Every command is safe to interrupt. Population resumes from the ingest log
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -24,6 +25,8 @@ from treble.cmd.env import load_env
 from treble.cmd.paths import default_data_dir
 from treble.cmd.seed import FIXTURES, seed, seed_available, seed_company_index
 from treble.core.universe import load_universe_config
+from treble.ingest.base import SourceAdapter
+from treble.ingest.health import Freshness, overdue, source_health
 from treble.ingest.populate import Populator
 from treble.render.server import DEFAULT_HOST, DEFAULT_PORT
 from treble.store.duck import DuckStore
@@ -47,6 +50,9 @@ console = Console()
 
 DEFAULT_DATA_DIR = default_data_dir()
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "config" / "universe.yaml"
+
+#: ECB daily reference rates for the majors `refresh` keeps current.
+ECB_FX_SERIES = ("D.USD.EUR.SP00.A", "D.GBP.EUR.SP00.A", "D.JPY.EUR.SP00.A")
 
 
 class ContactMissingError(Exception):
@@ -247,6 +253,37 @@ def status(
         table.add_row("[dim]nothing ingested yet[/dim]", "0")
     console.print(table)
 
+    # A count can only go up, so a source that stopped flowing renders
+    # exactly like one that is fine. This is the part that says which.
+    health = source_health(log)
+    supply = Table(title="source health")
+    supply.add_column("source")
+    supply.add_column("state")
+    # The absolute timestamp beside the relative age: "9 days" tells you
+    # how bad it is, "2026-07-31" tells you what changed that day.
+    supply.add_column("last fetched")
+    supply.add_column("what it means")
+    styles = {
+        Freshness.OVERDUE: "bold red",
+        Freshness.NEVER: "yellow",
+        Freshness.IRREGULAR: "dim",
+        Freshness.FRESH: "green",
+    }
+    for state in health:
+        supply.add_row(
+            state.source_id,
+            f"[{styles[state.freshness]}]{state.freshness.value}[/]",
+            "—" if state.last_fetched is None else state.last_fetched.strftime("%Y-%m-%d %H:%M"),
+            state.explain(),
+        )
+    console.print(supply)
+    stopped = overdue(health)
+    if stopped:
+        console.print(
+            f"[bold red]{len(stopped)} source(s) have stopped flowing.[/] Anything derived "
+            "from them is as old as they are, and will not say so on its own."
+        )
+
     if not spec.discovers_filers:
         populator = _populator(data_dir, _contact_email(contact), 365)
         console.print(f"outstanding steps: {len(populator.outstanding(spec))}")
@@ -257,6 +294,73 @@ def status(
             "[dim]outstanding count for a discovery universe requires an EDGAR "
             "lookup; run `treble populate --dry-run` to see it.[/dim]"
         )
+
+
+@app.command()
+def refresh(
+    data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where payloads and the store live."),
+    only: str | None = typer.Option(None, help="Refresh one source id rather than all due."),
+    force: bool = typer.Option(False, help="Refresh even sources that are not yet due."),
+) -> None:
+    """Re-run the keyless market feeds that have gone stale.
+
+    The answer to "will I have to rebuild this in six months". Every source
+    here is keyless and permissively licensed, so this needs no credential
+    and can be run on a timer; `treble status` says which are overdue and
+    this brings them back. A workstation whose data flow can only be
+    restored by remembering which script to run is one that gets rebuilt
+    instead of repaired.
+
+    Deliberately not everything. The EDGAR and N-PORT adapters are driven
+    by a universe — which filers, over what history — and belong to
+    `populate`, whose whole job is deciding that. Refresh is for the feeds
+    that simply have a newest value.
+    """
+    from treble.ingest.ecb import EcbExchangeRatesAdapter
+    from treble.ingest.ecb_hicp import EcbHicpAdapter
+    from treble.ingest.health import Freshness, source_health
+    from treble.ingest.treasury_curve import TreasuryCurveAdapter
+
+    payloads, log, store = _open_stores(data_dir)
+    builders: dict[str, Callable[[], SourceAdapter]] = {
+        "treasury-curve": lambda: TreasuryCurveAdapter(payloads, log),
+        # The three majors the store's fx: subjects are built from. Named
+        # here rather than read from the universe config because refresh is
+        # about keeping existing series current, not about choosing which
+        # series a universe wants — that decision belongs to `populate`.
+        "ecb-fx": lambda: EcbExchangeRatesAdapter(payloads, log, series=ECB_FX_SERIES),
+        "ecb-hicp": lambda: EcbHicpAdapter(payloads, log),
+    }
+    if only is not None and only not in builders:
+        console.print(f"[red]{only}[/] is not refreshable here; try: {', '.join(builders)}")
+        raise typer.Exit(1)
+
+    due = {
+        state.source_id
+        for state in source_health(log)
+        if state.freshness in {Freshness.OVERDUE, Freshness.NEVER}
+    }
+    targets = [only] if only else sorted(builders)
+    ran = 0
+    for source_id in targets:
+        if not force and only is None and source_id not in due:
+            console.print(f"[dim]{source_id}: already fresh, skipped[/dim]")
+            continue
+        try:
+            written = 0
+            for batch in builders[source_id]().run():
+                store.write_provenance(list(batch.provenance))
+                store.write_facts(list(batch.facts))
+                written += len(batch.facts)
+        except Exception as exc:
+            # Reported and carried past, because the common case for this
+            # command is exactly that one source has broken. Aborting would
+            # mean a single dead endpoint blocks every healthy one.
+            console.print(f"[red]{source_id}: {type(exc).__name__}: {exc}[/]")
+            continue
+        ran += 1
+        console.print(f"[green]{source_id}[/]: {written} facts")
+    console.print(f"refreshed {ran} of {len(targets)} source(s); run `treble status` to confirm")
 
 
 @app.command()

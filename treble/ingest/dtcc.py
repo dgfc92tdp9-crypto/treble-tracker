@@ -520,6 +520,8 @@ class DtccSdrRatesAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="dtcc-sdr",
+        # the CFTC Part 43 tape publishes every business day.
+        expected_cadence_days=1.0,
         description="DTCC Data Repository CFTC public price dissemination — interest rates",
         licence=(
             "CFTC Part 43 mandates free public dissemination. DTCC's own terms at "

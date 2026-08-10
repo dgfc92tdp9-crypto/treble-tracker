@@ -88,6 +88,8 @@ class TwelveDataDailyAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="twelvedata",
+        # daily bars; a gap means the key, the tier or the symbol changed.
+        expected_cadence_days=1.0,
         description="Twelve Data daily equity time series (split and dividend adjusted)",
         licence=(
             "Free tier, personal use only: the data may not be displayed or shared "

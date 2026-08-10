@@ -294,3 +294,62 @@ class TestTheAllqPanels:
         }
         assert rows["Contributors"] == 0.0
         assert rows["Last live"] == "never"
+
+
+class TestTheProductCatalogueIsMeasuredNotAsserted:
+    """`sys:swpm_products`.
+
+    The status column was a hardcoded string, and on the live store one of
+    them read "priceable — HICP stored" while the store held no inflation
+    facts at all. Nothing was wrong with the pricer; the catalogue had
+    never asked. A claim about a user's own data that is written rather
+    than measured is the same defect as a test that cannot fail, and worse,
+    because it renders as a fact about their install.
+    """
+
+    def test_an_empty_store_calls_nothing_priceable(self, tmp_path: Path) -> None:
+        """The assertion that would have caught it. Every product needs at
+        least a curve, so on an empty store every row must refuse."""
+        empty = LocalTapi(StoreBuilder(tmp_path / "p.db").store)
+        rows = empty.series(None, "sys:swpm_products", as_of=LATER)
+        assert len(rows) == 7
+        assert all("not priceable" in str(r[2]) for r in rows)
+        assert any("no swap curves" in str(r[2]) for r in rows)
+
+    def test_curves_alone_make_the_vol_products_priceable(self, populated: LocalTapi) -> None:
+        """CAP/FLOOR and CMS need only a curve environment and a vol the
+        caller states, so they flip on curves alone."""
+        rows = {
+            str(r[0]): str(r[2]) for r in populated.series(None, "sys:swpm_products", as_of=LATER)
+        }
+        assert rows["CAP / FLOOR"].startswith("priceable")
+        assert rows["CMS"].startswith("priceable")
+
+    def test_inflation_refuses_until_an_index_is_ingested(self, populated: LocalTapi) -> None:
+        """The specific row that was lying. The builder writes curves and
+        bonds but no HICP, so this must still refuse — and name what is
+        missing rather than saying "unavailable"."""
+        rows = {
+            str(r[0]): str(r[2]) for r in populated.series(None, "sys:swpm_products", as_of=LATER)
+        }
+        assert "not priceable" in rows["INFLATION ZC"]
+        assert "inflation:EUR:HICP" in rows["INFLATION ZC"]
+
+    def test_swaption_prints_flip_the_cancellable_row(self, tmp_path: Path) -> None:
+        """Proof the probe reads the store rather than a constant: the same
+        row must answer differently on two stores that differ only in
+        whether swaption prints were ingested."""
+        without = LocalTapi(StoreBuilder(tmp_path / "a.db").with_curves().store)
+        with_prints = LocalTapi(
+            StoreBuilder(tmp_path / "b.db").with_curves().with_swaptions().store
+        )
+
+        def row(tapi: LocalTapi) -> str:
+            return next(
+                str(r[2])
+                for r in tapi.series(None, "sys:swpm_products", as_of=LATER)
+                if str(r[0]) == "CANCELLABLE"
+            )
+
+        assert "not priceable" in row(without)
+        assert row(with_prints).startswith("priceable")

@@ -63,6 +63,8 @@ def lei_subject(lei: str) -> TUID:
 class GleifAdapter(SourceAdapter):
     meta = SourceMeta(
         source_id="gleif",
+        # a per-LEI lookup, not a feed.
+        expected_cadence_days=None,
         description="GLEIF LEI records API (bulk concatenated files at scale)",
         licence="CC0 — GLEIF data is fully open",
         redistribution_restricted=False,
@@ -194,6 +196,8 @@ class GleifRelationshipAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="gleif-rr",
+        # the concatenated relationship file is republished daily.
+        expected_cadence_days=1.0,
         description=(
             "GLEIF Level 2 Relationship Record (RR-CDF) bulk concatenated file "
             "— entity consolidation, branch, sub-fund and feeder relationships"

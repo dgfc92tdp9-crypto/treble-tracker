@@ -68,6 +68,8 @@ class EcbHicpAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="ecb-hicp",
+        # HICP is monthly, released mid-month for the prior month.
+        expected_cadence_days=31.0,
         description="ECB SDMX euro-area HICP (all items, unadjusted)",
         licence="Free reuse with attribution to the ECB; no redistribution limit",
         redistribution_restricted=False,

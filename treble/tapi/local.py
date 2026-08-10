@@ -958,24 +958,21 @@ class LocalTapi:
             for ref in refs
         )
 
-    #: §12.1 products in the order `SWPM` lists them: label, what each
-    #: needs beyond the curve environment, and the status a user reads.
-    #:
-    #: The status is written here rather than taken from
-    #: `products.UNFED_PRODUCTS`, whose strings are engineering notes —
-    #: one of them opens "this entry was wrong in three ways, measured
-    #: 2026-08-08", which is exactly right in a source file and absurd in a
-    #: table cell. A developer-facing reason and a user-facing one are
-    #: different texts, and reusing the first as the second was the first
-    #: version of this binding.
-    _PRODUCTS: tuple[tuple[str, str, str], ...] = (
-        ("CAP / FLOOR", "normal vol", "priceable — state a vol"),
-        ("CMS", "lognormal vol", "priceable — state a vol"),
-        ("CANCELLABLE", "swaption vol", "priceable — vol from the fitted surface"),
-        ("ASSET SWAP", "bond price", "priceable — price implied from N-PORT"),
-        ("INFLATION ZC", "index + projection", "priceable — HICP stored, state a projection"),
-        ("CROSS-CURRENCY", "spot, curves, basis", "priceable — state a basis"),
-        ("TOTAL RETURN", "a trade", "needs a trade: reset price and financing spread"),
+    #: The order `SWPM` lists §12.1 products in. Only the order lives here
+    #: now: the readiness of each is asked of the store by
+    #: `products.product_readiness`, because it used to be asserted here as
+    #: a fixed string and one of those strings read "priceable — HICP
+    #: stored" on an install holding no inflation facts at all. A claim
+    #: about a user's own data that is written rather than measured is the
+    #: same defect as a test that cannot fail.
+    _PRODUCT_ORDER: tuple[str, ...] = (
+        "CAP / FLOOR",
+        "CMS",
+        "CANCELLABLE",
+        "ASSET SWAP",
+        "INFLATION ZC",
+        "CROSS-CURRENCY",
+        "TOTAL RETURN",
     )
 
     def _swpm_products(
@@ -989,25 +986,32 @@ class LocalTapi:
         "cross-currency" and then priced it off a zero basis would be
         asserting the basis is zero on an instrument whose entire purpose
         is that it is not.
-        """
-        from treble.tapi.products import UNFED_PRODUCTS
 
-        # The catalogue and the pricer set must not drift. Every product
-        # `products.py` records as unfed has to appear here, or a product
-        # would be missing from the screen while the service knows about
-        # it -- which is how a user concludes it is unsupported when it is
-        # merely unlisted.
-        listed = {str(row[0]).split()[0].lower() for row in self._PRODUCTS}
-        aliases = {"cross-currency": "crosscurrency", "total": "totalreturn", "asset": "assetswap"}
-        listed = {aliases.get(name, name) for name in listed}
-        unlisted = sorted(set(UNFED_PRODUCTS) - listed)
-        if unlisted:
+        The status column is measured against this store, so a product
+        whose data has not been ingested — or whose source stopped flowing
+        — says so instead of promising a price the pricer would refuse.
+        """
+        from treble.tapi.products import product_readiness
+
+        readiness = {r.product: r for r in product_readiness(self._store, as_of=as_of)}
+        # The catalogue and the readiness set must not drift. A product the
+        # service knows about and the screen omits reads as unsupported
+        # rather than as unlisted.
+        missing = sorted(set(readiness) - set(self._PRODUCT_ORDER))
+        if missing:
             raise RuntimeError(
-                f"products.py records {', '.join(unlisted)} and SWPM does not list them. "
-                "A product the service knows about and the screen omits reads as "
-                "unsupported rather than as unlisted"
+                f"products.py reports readiness for {', '.join(missing)} and SWPM does "
+                "not list them. A product the service knows about and the screen omits "
+                "reads as unsupported rather than as unlisted"
             )
-        return tuple(self._PRODUCTS)
+        rows: list[tuple[str | float | int | None, ...]] = []
+        for name in self._PRODUCT_ORDER:
+            entry = readiness[name]
+            status = (
+                f"priceable — {entry.detail}" if entry.ready else f"not priceable — {entry.detail}"
+            )
+            rows.append((name, entry.user_input, status))
+        return tuple(rows)
 
     def _fa_ratios(
         self, security: SecurityQuery | None, *, as_of: datetime

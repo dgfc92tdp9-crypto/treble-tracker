@@ -149,6 +149,8 @@ class FrenchDataAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="frenchdata",
+        # Ken French republishes the factor files monthly.
+        expected_cadence_days=31.0,
         description="Kenneth R. French Data Library — Fama/French factors and industry portfolios",
         licence=(
             "No terms-of-use statement is published on the data pages. Files are stamped "

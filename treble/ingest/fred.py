@@ -43,6 +43,8 @@ def series_subject(series_id: str) -> TUID:
 class FredAdapter(SourceAdapter):
     meta = SourceMeta(
         source_id="fred",
+        # the configured set includes daily series such as DGS10.
+        expected_cadence_days=1.0,
         description="Federal Reserve Economic Data, fredgraph CSV endpoint",
         licence="FRED terms of use; series carry their own source licences",
         redistribution_restricted=False,

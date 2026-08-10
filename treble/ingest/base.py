@@ -59,6 +59,13 @@ class SourceMeta(BaseModel):
     licence: str  # the source's stated terms, quoted or referenced
     redistribution_restricted: bool = False  # drives the bulk-export guard
     rate_limit_per_second: float | None = None
+    #: How often this source expects to have something new, in days. Read by
+    #: `ingest.health` to tell a source that has stopped flowing from one
+    #: that is merely quiet. None means genuinely irregular — a bulk file
+    #: republished when it changes, or an on-demand lookup — and is honest
+    #: rather than lazy: inventing a cadence generates false alarms, and a
+    #: report that cries wolf is worse than no report.
+    expected_cadence_days: float | None = None
 
 
 class RawPayload(BaseModel):

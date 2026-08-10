@@ -82,6 +82,8 @@ def cusip_subject(cusip: str) -> TUID:
 class TreasuryAuctionsAdapter(SourceAdapter):
     meta = SourceMeta(
         source_id="treasury-auctions",
+        # auctions run on a weekly cycle across the bill and note calendar.
+        expected_cadence_days=7.0,
         description="US Treasury FiscalData auction results",
         licence="US public domain (17 USC 105)",
         redistribution_restricted=False,

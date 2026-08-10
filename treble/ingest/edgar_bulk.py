@@ -123,6 +123,8 @@ class EdgarBulkFinancialsAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="edgar-bulk",
+        # DERA financial statement data sets are quarterly.
+        expected_cadence_days=92.0,
         description="SEC Financial Statement Data Sets (quarterly bulk XBRL)",
         licence="US federal government work; public domain. SEC fair-access "
         "policy requires a declared User-Agent.",

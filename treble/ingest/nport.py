@@ -136,6 +136,8 @@ class NportAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="sec-nport",
+        # a per-filing fetch; funds file on their own quarterly cycles.
+        expected_cadence_days=None,
         description="SEC N-PORT quarterly fund holdings with per-security fair values",
         licence="US public domain (17 USC 105); freely redistributable",
         redistribution_restricted=False,

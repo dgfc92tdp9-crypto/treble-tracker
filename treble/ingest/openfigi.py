@@ -59,6 +59,8 @@ def figi_subject(figi: str) -> TUID:
 class OpenFigiAdapter(SourceAdapter):
     meta = SourceMeta(
         source_id="openfigi",
+        # an identifier lookup, not a feed.
+        expected_cadence_days=None,
         description="OpenFIGI v3 mapping API (ANSI X9.145)",
         licence="Open Symbology terms; FIGIs are openly redistributable",
         redistribution_restricted=False,

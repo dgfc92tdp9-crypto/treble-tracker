@@ -683,6 +683,79 @@ whose hardcoded `max_examples` silently overrode the deep profile (so the nightl
 never stressing price↔yield, the duration identity, or the I2 guarantee), and a `make mutate`
 target that had never worked.
 
+## Source sustainability sweep (2026-08-09)
+
+Asked of Phase 1: which sources break, and would we notice. The answer to the
+second was **no**, and that mattered more than any individual source.
+
+**`treble status` counted payloads, and a count can only go up.** A source that
+stopped publishing, changed its URL, or had its free tier withdrawn rendered
+exactly like a healthy one — the number simply stopped changing, on a screen
+nobody diffed against last week's. Every adapter now declares
+`expected_cadence_days`, `ingest.health` compares that against the log, and
+`treble status` reports it worst-first. Run on the live install it immediately
+found **four sources silently stale**: `ecb-fx` and `coinbase` at 9 days,
+`fred` and `dtcc-sdr` at 7, against declared daily cadences.
+
+`treble refresh` is the other half: it re-runs the keyless feeds that are
+overdue and skips the ones that are fine. Health says what broke, refresh
+fixes it, and neither needs a credential. That is the answer to "will I have
+to rebuild this in six months" — the failure gets surfaced on the day it
+happens rather than the day a chart looks wrong.
+
+**Three quiet states are distinguished** because they need different responses
+and render identically if collapsed: `NEVER` (built but never wired into a
+run), `OVERDUE` (was flowing, stopped), `IRREGULAR` (a lookup, not a feed — no
+cadence declared, so staleness is not judged). Inventing a cadence for OpenFIGI
+would produce a permanent false alarm, and a report that cries wolf gets turned
+off, which is worse than not having one.
+
+### What the sweep found on the live install
+
+| Finding | Detail |
+|---|---|
+| `ecb-hicp` never once run | The adapter shipped, the inflation pricer shipped, and the store held **zero** `inflation:` subjects |
+| `SWPM` claimed **"priceable — HICP stored"** | A hardcoded string, on a store with no HICP. Class E: an explanation recorded as fact, never tested — rendered to a user as a claim about their own data |
+| CMT curve routed through a chart-download URL | `ICVS` reads Treasury data **via FRED's `fredgraph.csv`**, which exists to serve a web page's download button |
+| 4 sources silently stale | Invisible before this sweep, because the only signal was a count |
+
+The product catalogue now **asks the store** rather than asserting. Every row
+is an existence probe, so the status changes when the data does — proven by
+ingesting HICP and watching `INFLATION ZC` flip from "not priceable — no
+inflation:EUR:HICP index ingested" to "priceable — HICP stored" with no code
+change.
+
+### Sources added
+
+| Source | Why it is durable |
+|---|---|
+| **US Treasury Daily Par Yield Curve (CMT)** | Public domain (17 USC 105) — no licence to withdraw. No API key — no credential to rotate, expire or leak. `robots.txt` clean. Published every business day **since 1990**. 14 tenors against FRED's 11, adding 6W, 2M and 4M at the short end |
+| **ECB HICP** | Was built and never run; now ingested (708 facts) and on the refresh rotation |
+
+The Treasury curve also removes an intermediary. The chain was
+Treasury → FRED → an undocumented URL → us; it is now Treasury → us, with the
+FRED route still present as an independent second path to the same curve.
+
+### Sources assessed and rejected, with the reason
+
+| Source | Outcome |
+|---|---|
+| **Bank of England IADB** | `robots.txt` says **`Disallow: /boeapps/iadb`** — the exact path. The request *worked*; the policy forbids it. Not automated |
+| **Bundesbank SDMX** | API alive, series key not yet identified. Open, not blocked |
+| **Bank of Canada Valet** | **Permitted** — documented API, attribution required, rate limits must not be circumvented. The strongest untaken candidate |
+
+**The BoE case is the KBRA lesson arriving from the other direction.** KBRA's
+`robots.txt` said yes and its terms said no; BoE's endpoint answered 200 and
+its `robots.txt` said no. Neither the response code nor any single document is
+the authority. Fetching successfully is not permission.
+
+### Remaining fragility, ranked
+
+1. **`twelvedata` is a single point of failure for equity prices** — keyed, free-tier, redistribution-restricted. No second path exists. Bank of Canada and Bundesbank do not cover equities; the permissive options assessed so far all fail on terms.
+2. **`fred` reads an undocumented endpoint.** Its documented API needs a free key. Now partly de-risked for rates by the direct Treasury route.
+3. **`dtcc-sdr` fetches from a vendor S3 bucket name** (`kgc0418-tdw-data-0`) with terms that remain unverifiable behind Cloudflare.
+4. **`trace-api` depends on Jack's OAuth credentials**, whose client id was exposed in a screenshot and is still unrotated.
+
 ## Data access findings (settled 2026-07-26 — do not re-derive)
 
 **Credit ratings: closed across every NRSRO whose terms can be read (measured 2026-08-09).**

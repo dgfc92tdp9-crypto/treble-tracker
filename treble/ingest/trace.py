@@ -94,6 +94,8 @@ class TraceApiAdapter(SourceAdapter):
 
     meta = SourceMeta(
         source_id="trace-api",
+        # the FINRA summaries this reads are weekly.
+        expected_cadence_days=7.0,
         description="FINRA TRACE fixed income datasets (credentialed public API)",
         licence="FINRA API terms; redistribution conditions apply per dataset",
         redistribution_restricted=True,
