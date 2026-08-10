@@ -321,6 +321,7 @@ def refresh(
     from treble.ingest.ecb import EcbExchangeRatesAdapter
     from treble.ingest.ecb_hicp import EcbHicpAdapter
     from treble.ingest.fred import FredAdapter
+    from treble.ingest.gleif_isin import GleifIsinLeiAdapter
     from treble.ingest.health import Freshness, source_health
     from treble.ingest.treasury_curve import TreasuryCurveAdapter
 
@@ -340,6 +341,7 @@ def refresh(
         return tuple(sorted({str(s).split(":", drop)[drop] for s in subjects}))
 
     fred_series = _existing("fred:", drop=1)
+    stored_isins = tuple(str(s) for s in store.subjects_with_prefix("isin:", as_of=now))
     crypto_products = _existing("crypto:coinbase:", drop=2)
 
     builders: dict[str, Callable[[], SourceAdapter]] = {
@@ -364,6 +366,15 @@ def refresh(
             end=now.date(),
         ),
         "coinbase": lambda: CoinbaseCandlesAdapter(payloads, log, products=crypto_products),
+        # Scoped to the bonds this store holds, not the whole 9.1M-row
+        # file: the mapping exists to identify *our* instruments' issuers,
+        # and ingesting ten million rows to answer for two thousand bonds
+        # would be paying GLEIF's scale for our question.
+        "gleif-isin": lambda: GleifIsinLeiAdapter(
+            payloads,
+            log,
+            isins=[i.split(":", 1)[1] for i in stored_isins],
+        ),
         # The public CFTC Part 43 tape, by report date. Ten days rather
         # than one: the tape is published per trading day and a run that
         # asked only for today would leave a permanent hole after any
@@ -381,7 +392,11 @@ def refresh(
     # which would mark it fresh and hide that it holds no data at all.
     empty = {
         source_id
-        for source_id, targets in (("fred", fred_series), ("coinbase", crypto_products))
+        for source_id, targets in (
+            ("fred", fred_series),
+            ("coinbase", crypto_products),
+            ("gleif-isin", stored_isins),
+        )
         if not targets
     }
     for source_id in sorted(empty):

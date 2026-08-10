@@ -683,6 +683,44 @@ whose hardcoded `max_examples` silently overrode the deep profile (so the nightl
 never stressing price↔yield, the duration identity, or the I2 guarantee), and a `make mutate`
 target that had never worked.
 
+## GLEIF ISIN-to-LEI mapping (2026-08-10)
+
+Added, and it is **not** redundant with N-PORT — the difference is the point.
+
+N-PORT already carries an issuer LEI for every bond in the store, but that
+LEI is *filer-reported*: a fund administrator recording what it believes the
+issuer to be. GLEIF's is the issuer's own registration. Measured on the live
+store:
+
+| | |
+|---|---|
+| published mapping rows | 9,118,616 |
+| our ISINs found in it | 1,175 of 1,861 (63%) |
+| overlapping with an N-PORT LEI | 1,163 |
+| **agree** | 1,148 |
+| **disagree** | **15 (1.3%)** |
+
+The disagreements are not noise. Three are bonds a filer attributed to
+Deutsche Bank AG's LEI while GLEIF assigns them elsewhere — the classic shape
+of a filer naming the parent or guarantor rather than the subsidiary that
+issued the paper. **An issuer curve is fitted across one entity's debt, so
+each of those was a bond on the wrong credit** — and the fit still succeeded,
+still looked smooth, and still produced a rich/cheap call. `issuer_curves.py`
+now prefers the registry over the filer.
+
+Both facts are kept. GLEIF's is written under `gleif:lei` rather than
+overwriting `nport:lei`, because a disagreement between a registry and a
+filer is evidence *about the filing*, and an ingest that replaced one with
+the other would destroy the signal worth having (I1, I2).
+
+Only requested ISINs are parsed — 9.1M rows against a store holding 1,861
+bonds. The raw payload is stored whole, so I5 replay is exact; it is the
+*fact* set that is scoped, not the evidence. `treble refresh` supplies the
+ISIN list from the store, so it stays scoped to the universe without anyone
+maintaining a list.
+
+CC0, keyless, `mapping.gleif.org/robots.txt` is a bare `Disallow:`.
+
 ## Binding scan (2026-08-10)
 
 Ran every one of the 27 screen bindings against the live store and asked

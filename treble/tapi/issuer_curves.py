@@ -121,6 +121,8 @@ def _bond_rows(store: DuckStore, *, as_of: datetime) -> list[dict[str, object]]:
     """Every `isin:` bond with the fields a curve needs, point-in-time."""
     wanted = (
         "nport:lei",
+        # GLEIF's registered issuer, preferred below where the two differ.
+        "gleif:lei",
         "nport:maturityDt",
         "nport:annualizedRt",
         "nport:curCd",
@@ -176,7 +178,15 @@ def build_issuer_curves(
             excluded.append((identifier, "no report date on the holding record"))
             continue
         maturity, coupon = row.get("nport:maturityDt"), row.get("nport:annualizedRt")
-        lei, currency = row.get("nport:lei"), row.get("nport:curCd")
+        # The registry over the filer. N-PORT's LEI is what a fund
+        # administrator believed the issuer to be; GLEIF's is the issuer's
+        # own registration. On the live store they disagree for 15 of 1,163
+        # overlapping bonds — 1.3% — and the disagreements cluster on
+        # subsidiaries attributed to a parent. An issuer curve is fitted
+        # across one entity's debt, so each of those was a bond on the
+        # wrong credit, and the fit succeeded and looked smooth regardless.
+        lei = row.get("gleif:lei") or row.get("nport:lei")
+        currency = row.get("nport:curCd")
         value, balance = row.get("nport:valUSD"), row.get("nport:balance")
         if not isinstance(maturity, date) or not isinstance(coupon, float | int):
             excluded.append((identifier, "no maturity or coupon reported"))
