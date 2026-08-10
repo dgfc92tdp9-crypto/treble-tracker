@@ -199,6 +199,14 @@ class DuckStore:
             )
 
     def write_facts(self, facts: list[Fact]) -> None:
+        # First, not last. This guard existed below the provenance check,
+        # which builds `WHERE id IN ()` from an empty set and is a DuckDB
+        # syntax error. An empty batch is legitimate — the DTCC tape
+        # publishes nothing on a weekend — so a source with no data for a
+        # day took down the whole refresh with a parser error, which reads
+        # like a corrupted store rather than a quiet Saturday.
+        if not facts:
+            return
         needed = {f.provenance_id for f in facts}
         placeholders = ",".join("?" for _ in needed)
         rows = self._conn.execute(
@@ -211,8 +219,6 @@ class DuckStore:
             raise MissingProvenanceError(
                 f"facts reference unknown provenance ids: {sorted(missing)[:3]}"
             )
-        if not facts:
-            return
 
         # One Arrow batch, one INSERT. The row-at-a-time loop this replaced
         # cost 11.2s for a single EDGAR companyfacts payload (37,540 facts)

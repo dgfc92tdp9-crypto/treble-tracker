@@ -698,7 +698,15 @@ found **four sources silently stale**: `ecb-fx` and `coinbase` at 9 days,
 `fred` and `dtcc-sdr` at 7, against declared daily cadences.
 
 `treble refresh` is the other half: it re-runs the keyless feeds that are
-overdue and skips the ones that are fine. Health says what broke, refresh
+overdue and skips the ones that are fine. It now covers **every** keyless
+source — Treasury, ECB FX, ECB HICP, FRED, Coinbase, DTCC — and works out
+*what* to fetch by reading the store rather than a config file: the FRED
+series and Coinbase products it refreshes are whichever ones the store
+already holds. Nobody has to remember which series they set up eighteen
+months ago, which is the difference between a workstation you repair and one
+you rebuild. First full run: 7,275 FRED facts, 24,439 DTCC, 2,100 Coinbase.
+The only source left outside it is `twelvedata`, correctly — it needs a key,
+and a keyless command should not pretend otherwise. Health says what broke, refresh
 fixes it, and neither needs a credential. That is the answer to "will I have
 to rebuild this in six months" — the failure gets surfaced on the day it
 happens rather than the day a chart looks wrong.

@@ -316,12 +316,32 @@ def refresh(
     `populate`, whose whole job is deciding that. Refresh is for the feeds
     that simply have a newest value.
     """
+    from treble.ingest.coinbase import CoinbaseCandlesAdapter
+    from treble.ingest.dtcc import DtccSdrRatesAdapter
     from treble.ingest.ecb import EcbExchangeRatesAdapter
     from treble.ingest.ecb_hicp import EcbHicpAdapter
+    from treble.ingest.fred import FredAdapter
     from treble.ingest.health import Freshness, source_health
     from treble.ingest.treasury_curve import TreasuryCurveAdapter
 
     payloads, log, store = _open_stores(data_dir)
+    now = datetime.now(UTC)
+
+    def _existing(prefix: str, *, drop: int) -> tuple[str, ...]:
+        """What this store already tracks under a namespace.
+
+        Refresh keeps existing series current; `populate` decides which
+        series a universe wants. Reading the answer from the store rather
+        than a config file is the difference between a workstation you
+        repair and one you rebuild: nobody has to remember which FRED
+        series they set up eighteen months ago, because the store knows.
+        """
+        subjects = store.subjects_with_prefix(prefix, as_of=now)
+        return tuple(sorted({str(s).split(":", drop)[drop] for s in subjects}))
+
+    fred_series = _existing("fred:", drop=1)
+    crypto_products = _existing("crypto:coinbase:", drop=2)
+
     builders: dict[str, Callable[[], SourceAdapter]] = {
         "treasury-curve": lambda: TreasuryCurveAdapter(payloads, log),
         # The three majors the store's fx: subjects are built from. Named
@@ -330,7 +350,42 @@ def refresh(
         # series a universe wants — that decision belongs to `populate`.
         "ecb-fx": lambda: EcbExchangeRatesAdapter(payloads, log, series=ECB_FX_SERIES),
         "ecb-hicp": lambda: EcbHicpAdapter(payloads, log),
+        # Both of these refresh whatever the store already holds. A window
+        # of a year rather than a day: FRED restates, and re-reading a span
+        # that overlaps what is stored is how a revision arrives at all —
+        # bitemporality (I2) keeps the original alongside it rather than
+        # overwriting, so the cost of overlap is disk, and the cost of no
+        # overlap is silently missing every correction.
+        "fred": lambda: FredAdapter(
+            payloads,
+            log,
+            series=fred_series,
+            start=now.date() - timedelta(days=365),
+            end=now.date(),
+        ),
+        "coinbase": lambda: CoinbaseCandlesAdapter(payloads, log, products=crypto_products),
+        # The public CFTC Part 43 tape, by report date. Ten days rather
+        # than one: the tape is published per trading day and a run that
+        # asked only for today would leave a permanent hole after any
+        # weekend the command was not run over. Days already ingested cost
+        # a fetch and write nothing new — payloads are content-addressed
+        # (I5), so a repeat is an idempotent no-op rather than a duplicate.
+        "dtcc-sdr": lambda: DtccSdrRatesAdapter(
+            payloads,
+            log,
+            report_dates=tuple(now.date() - timedelta(days=n) for n in range(1, 11)),
+        ),
     }
+    # A source with nothing to refresh is skipped rather than run empty: an
+    # adapter asked for zero series fetches nothing and logs a success,
+    # which would mark it fresh and hide that it holds no data at all.
+    empty = {
+        source_id
+        for source_id, targets in (("fred", fred_series), ("coinbase", crypto_products))
+        if not targets
+    }
+    for source_id in sorted(empty):
+        builders.pop(source_id, None)
     if only is not None and only not in builders:
         console.print(f"[red]{only}[/] is not refreshable here; try: {', '.join(builders)}")
         raise typer.Exit(1)
