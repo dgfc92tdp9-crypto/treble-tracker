@@ -353,3 +353,79 @@ class TestTheProductCatalogueIsMeasuredNotAsserted:
 
         assert "not priceable" in row(without)
         assert row(with_prints).startswith("priceable")
+
+
+class TestBondsResolveByTheIdentifierTheFilingsCarry:
+    """Resolution accepted CUSIPs only, and N-PORT publishes ISINs.
+
+    The live store held 1,861 ISIN subjects against 147 CUSIPs, so 93% of
+    the bond universe was addressable only by an identifier no source in
+    the system writes — and the 373,125-fact GLEIF relationship graph
+    behind those issuers could not be reached from any screen at all.
+    """
+
+    @staticmethod
+    def _tapi(tmp_path: Path) -> LocalTapi:
+        return LocalTapi(StoreBuilder(tmp_path / "i.db").with_bonds(count=4).store)
+
+    @staticmethod
+    def _query(ticker: str) -> object:
+        from treble.core.identifiers import SecurityQuery, YellowKey
+
+        return SecurityQuery(ticker=ticker, key=YellowKey.CORP, venue=None, descriptor=None)
+
+    def test_an_isin_resolves_to_the_stored_bond(self, tmp_path: Path) -> None:
+        from treble.core.identifiers import isin_from_cusip
+
+        isin = isin_from_cusip("000000000")
+        assert str(self._tapi(tmp_path).resolve(self._query(isin))) == f"isin:{isin}"  # type: ignore[arg-type]
+
+    def test_a_bare_cusip_finds_the_bond_stored_under_its_isin(self, tmp_path: Path) -> None:
+        """The reverse bridge, and the one a trader actually needs: they
+        type a CUSIP, the filing wrote an ISIN."""
+        from treble.core.identifiers import isin_from_cusip
+
+        resolved = self._tapi(tmp_path).resolve(self._query("000000000"))  # type: ignore[arg-type]
+        assert str(resolved) == f"isin:{isin_from_cusip('000000000')}"
+
+    def test_an_unknown_isin_says_it_was_not_ingested(self, tmp_path: Path) -> None:
+        """Distinct from "no resolution for this namespace", which was the
+        old answer and sent a reader looking for an unbuilt feature rather
+        than an unloaded bond."""
+        from treble.tapi.local import SecurityNotFoundError
+
+        with pytest.raises(SecurityNotFoundError, match="ISIN has not been ingested"):
+            self._tapi(tmp_path).resolve(self._query("US0378331005"))  # type: ignore[arg-type]
+
+    def test_a_malformed_identifier_is_not_treated_as_an_isin(self, tmp_path: Path) -> None:
+        """`IBM 4.15 05/15/39 Corp` is a valid bond reference whose ticker
+        is "IBM". Treating every Corp ticker as an identifier is the defect
+        the CUSIP path already had to fix."""
+        from treble.tapi.local import SecurityNotFoundError
+
+        with pytest.raises(SecurityNotFoundError):
+            self._tapi(tmp_path).resolve(self._query("IBM"))  # type: ignore[arg-type]
+
+
+class TestTheEmptyAllqBookStatesItself:
+    """The criterion is ALLQ *correct-when-empty*, and half the screen was
+    getting it right: composites reported "Contributors 0 / Last live
+    never" while the quote pane returned zero rows, which renders as a
+    blank pane indistinguishable from one that failed to load."""
+
+    def test_no_contributors_gives_a_reason_not_an_empty_table(self, tmp_path: Path) -> None:
+        from treble.core.identifiers import SecurityQuery, YellowKey
+        from treble.tapi.local import TickerIndex
+
+        tapi = LocalTapi(
+            StoreBuilder(tmp_path / "q.db").store,
+            tickers=TickerIndex({"IBM": 51143}),
+        )
+        rows = tapi.series(
+            SecurityQuery(ticker="IBM", key=YellowKey.EQUITY, venue=None, descriptor=None),
+            "sys:allq",
+            as_of=LATER,
+        )
+        assert len(rows) == 1
+        assert "no contributor is quoting" in str(rows[0][0])
+        assert "never quoted" in str(rows[0][0])

@@ -26,7 +26,14 @@ from treble.analytics._ql import DayCount
 from treble.analytics.bonds.spec import FixedBondSpec, Frequency
 from treble.analytics.derivatives.swap import SwapSpec
 from treble.core.facts import Fact
-from treble.core.identifiers import TUID, SecurityQuery, YellowKey
+from treble.core.identifiers import (
+    TUID,
+    SecurityQuery,
+    YellowKey,
+    cusip_from_isin,
+    isin_from_cusip,
+    looks_like_isin,
+)
 from treble.core.provenance import ProvenanceId
 from treble.store.duck import DuckStore
 from treble.tapi.contribution import ContributionService
@@ -230,6 +237,29 @@ class LocalTapi:
                     f"{security.display()!r}: ticker not in EDGAR's company index"
                 )
             return TUID(f"cik:{cik:010d}")
+        if security.key in (YellowKey.GOVT, YellowKey.CORP) and looks_like_isin(security.ticker):
+            # ISIN first, because that is what the filings carry. N-PORT
+            # publishes ISINs and this store holds 1,861 of them against
+            # 147 CUSIPs, so before this the great majority of the bond
+            # universe was addressable only by an identifier no source in
+            # the system actually writes.
+            ticker = security.ticker.upper()
+            subject = TUID(f"isin:{ticker}")
+            if self._store.has_subject(subject):
+                return subject
+            # A US or Canadian ISIN carries its CUSIP in characters 3-11,
+            # so the same instrument may be stored under either. Checked
+            # rather than assumed: elsewhere those nine characters are a
+            # national number that is not a CUSIP at all.
+            embedded = cusip_from_isin(ticker)
+            if embedded is not None:
+                by_cusip = TUID(f"cusip:{embedded}")
+                if self._store.has_subject(by_cusip):
+                    return by_cusip
+            resolved = self._security_master().resolve(subject)
+            if resolved is not None and self._store.has_subject(resolved):
+                return resolved
+            raise SecurityNotFoundError(f"{security.display()!r}: that ISIN has not been ingested")
         if security.key in (YellowKey.GOVT, YellowKey.CORP) and _looks_like_cusip(security):
             # Bonds are addressed by CUSIP, the subject the Treasury and
             # N-PORT adapters write under. Existence is checked rather than
@@ -248,6 +278,14 @@ class LocalTapi:
             resolved = self._security_master().resolve(subject)
             if resolved is not None and self._store.has_subject(resolved):
                 return resolved
+            # The reverse bridge. A trader types a CUSIP; the filings wrote
+            # an ISIN. Both country prefixes are tried because a CUSIP alone
+            # does not say which — Canadian issues carry CUSIPs too, and
+            # assuming US would silently miss them.
+            for country in ("US", "CA"):
+                candidate = TUID(f"isin:{isin_from_cusip(security.ticker, country=country)}")
+                if self._store.has_subject(candidate):
+                    return candidate
             raise SecurityNotFoundError(f"{security.display()!r}: that CUSIP has not been ingested")
         if security.key == YellowKey.INDEX and security.venue is None:
             # Macro series are addressable as tickers (spec §7.4).
@@ -630,6 +668,29 @@ class LocalTapi:
         book = self._contributions.book(str(self.resolve(security)), as_of=as_of)
 
         if binding == "sys:allq":
+            if not book.quotes:
+                # A reason, not zero rows. The composites pane below has
+                # always said "Contributors 0 / Last live never"; this one
+                # returned an empty tuple, which renders as a blank pane
+                # and is indistinguishable from a pane that failed to load.
+                # The criterion is ALLQ *correct-when-empty*, and half the
+                # screen was getting that right.
+                since = (
+                    f"; last live {book.last_live.isoformat(timespec='seconds')}"
+                    if book.last_live
+                    else "; never quoted"
+                )
+                return (
+                    (
+                        f"no contributor is quoting this instrument{since}",
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                )
             return tuple(
                 (
                     quote.contributor,
@@ -708,7 +769,32 @@ class LocalTapi:
             return self._swpm_ois(market)
 
         if binding == "sys:swpm_basis":
-            return self._swpm_basis(market)
+            # Its own market, built with the short curve required. The
+            # shared one picks the newest day the discount/forecast pair
+            # builds on, which on a thin day is not a day the 3M curve
+            # builds on at all — and a basis tab that goes blank on the
+            # newest day, while two days earlier it had nine nodes, reads
+            # as a broken screen rather than a quiet Friday.
+            try:
+                basis_market = build_swap_market(self._store, as_of=as_of, require_short=True)
+            except SwapMarketUnavailableError as error:
+                return ((f"no tenor basis available: {error}",),)
+            rows = self._swpm_basis(basis_market)
+            if basis_market.report_date != market.report_date:
+                # Said, not silently substituted. A basis quoted from an
+                # older day than the rest of the screen is legitimate and
+                # must not be read as today's.
+                return (
+                    *rows,
+                    (
+                        f"basis from {basis_market.report_date}, not "
+                        f"{market.report_date}: the newer day had too few 3M nodes",
+                        None,
+                        None,
+                        None,
+                    ),
+                )
+            return rows
 
         spec = self._swpm_trade(market)
         csa = CsaTerms(collateral_currency="EUR", discount_curve=DISCOUNT_CURVE)

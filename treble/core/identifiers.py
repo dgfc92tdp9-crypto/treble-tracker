@@ -196,3 +196,66 @@ def parse_security(text: str) -> SecurityQuery:
         else:
             descriptor = " ".join(middle)
     return SecurityQuery(ticker=ticker, key=key, venue=venue, descriptor=descriptor)
+
+
+def isin_check_digit(body: str) -> str:
+    """The Luhn check digit for an 11-character ISIN body.
+
+    Letters expand to two digits (A=10 … Z=35) *before* the Luhn pass, not
+    after — expanding afterwards changes which digits fall in the doubled
+    positions and produces a plausible wrong answer for exactly the ISINs
+    containing letters, which is most of them.
+    """
+    digits = "".join(str(int(c, 36)) for c in body.upper())
+    total = 0
+    # Doubling applies from the rightmost digit of the *body*, because the
+    # check digit that will sit to its right is not yet present.
+    for index, char in enumerate(reversed(digits)):
+        value = int(char)
+        if index % 2 == 0:
+            value *= 2
+            if value > 9:
+                value -= 9
+        total += value
+    return str((10 - total % 10) % 10)
+
+
+def isin_from_cusip(cusip: str, *, country: str = "US") -> str:
+    """The ISIN a CUSIP sits inside.
+
+    A US or Canadian ISIN is the country code, the nine-character CUSIP and
+    a check digit — so the two identifiers are the same instrument written
+    two ways, and a store that holds one can answer for the other. This
+    matters here because N-PORT publishes ISINs and a trader types CUSIPs:
+    without the bridge, 1,861 stored bonds were addressable only by an
+    identifier the filings do not carry.
+    """
+    body = f"{country.upper()}{cusip.upper()}"
+    return body + isin_check_digit(body)
+
+
+def cusip_from_isin(isin: str) -> str | None:
+    """The CUSIP inside a US or Canadian ISIN, or None.
+
+    Only US and CA: elsewhere the nine characters after the country code
+    are a national number that is not a CUSIP, and returning one anyway
+    would produce an identifier that looks right and refers to nothing.
+    """
+    value = isin.strip().upper()
+    if len(value) != 12 or value[:2] not in {"US", "CA"}:
+        return None
+    return value[2:11]
+
+
+def looks_like_isin(value: str) -> bool:
+    """Whether a string is shaped like an ISIN and passes its check digit.
+
+    The check digit is verified rather than assumed. A twelve-character
+    typo is otherwise indistinguishable from an ISIN, and resolves to a
+    subject with no facts — a screen of dashes that reads as "no data for
+    this bond" rather than "you mistyped it".
+    """
+    candidate = value.strip().upper()
+    if len(candidate) != 12 or not candidate[:2].isalpha() or not candidate.isalnum():
+        return False
+    return isin_check_digit(candidate[:11]) == candidate[11]

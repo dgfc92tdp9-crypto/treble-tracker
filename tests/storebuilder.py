@@ -47,6 +47,20 @@ _EUR_RATES = {
 _USD_RATES = {t: r + 0.0135 for t, r in _EUR_RATES.items()}
 
 
+def _isin(index: int) -> str:
+    """A syntactically valid ISIN for fixture bond `index`.
+
+    Generated through the real check-digit routine rather than written as
+    `US{i:010d}`. Those strings were the right *shape* and failed
+    validation, so a fixture built from them could not exercise identifier
+    resolution at all — the store held bonds no query could address, which
+    is precisely the defect this builder is used to test for.
+    """
+    from treble.core.identifiers import isin_from_cusip
+
+    return isin_from_cusip(f"{index:09d}")
+
+
 class StoreBuilder:
     """Builds a store one kind of evidence at a time."""
 
@@ -121,7 +135,7 @@ class StoreBuilder:
                 ("nport:balance", par),
                 ("nport:valUSD", par * price / 100.0),
             ):
-                rows.append((f"isin:US{i:010d}", field, value, DAY))
+                rows.append((f"isin:{_isin(i)}", field, value, DAY))
         return self._write("edgar-nport", rows)
 
     def with_factors(self, days: int = 250, assets: int = 5) -> StoreBuilder:

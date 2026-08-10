@@ -150,7 +150,11 @@ def build_usd_discount_curve(store: DuckStore, *, as_of: datetime, report_date: 
 
 
 def build_swap_market(
-    store: DuckStore, *, as_of: datetime, report_date: date | None = None
+    store: DuckStore,
+    *,
+    as_of: datetime,
+    report_date: date | None = None,
+    require_short: bool = False,
 ) -> SwapMarket:
     """A curve environment for one trading day.
 
@@ -192,6 +196,23 @@ def build_swap_market(
         short_tenors = (
             sorted(set(tenors) & set(short_rates), key=_tenor_years) if short_rates else []
         )
+        if require_short and len(short_tenors) < MIN_NODES:
+            # The tenor basis needs a *third* curve, and the newest day the
+            # discount/forecast pair builds on is not always a day the short
+            # curve does: on 2026-08-07 the live store had 13 EURIBOR-6M
+            # tenors and 4 EURIBOR-3M, one short of the minimum. Without
+            # this the basis tab went blank on the newest day while two days
+            # earlier it would have built from nine.
+            #
+            # The same trap TVAL hit — "most recent" is not "most complete",
+            # and on thin days it is reliably the opposite. Fixed there for
+            # issuer curves and not carried across, which is why it is
+            # stated here rather than left as a parameter nobody reads.
+            failures.append(
+                f"{report_date}: {SHORT_FORECAST_CURVE} has {len(short_tenors)} of "
+                f"{MIN_NODES} shared nodes"
+            )
+            continue
         try:
             curves = _build(
                 report_date,

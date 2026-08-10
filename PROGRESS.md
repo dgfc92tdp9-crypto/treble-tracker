@@ -683,6 +683,57 @@ whose hardcoded `max_examples` silently overrode the deep profile (so the nightl
 never stressing price↔yield, the duration identity, or the I2 guarantee), and a `make mutate`
 target that had never worked.
 
+## Binding scan (2026-08-10)
+
+Ran every one of the 27 screen bindings against the live store and asked
+which refused. **22 live, 5 refusing, 0 broken.** Three of the five refusals
+were real defects rather than honest absences, and one of them was large.
+
+### The bond universe was unaddressable
+
+`sys:entity_owners` said "carries no LEI" for every equity — true, and
+chasing it found something bigger. Bond resolution accepted **CUSIPs only**,
+while N-PORT (the source of nearly all of them) publishes **ISINs**. The
+live store holds **1,861 ISIN subjects against 147 CUSIPs**, so 93% of the
+bond universe was addressable only by an identifier no source in the system
+writes — and the **373,125-fact GLEIF relationship graph** behind those
+issuers could not be reached from any screen at all.
+
+Both directions now resolve, because a US or Canadian ISIN carries its CUSIP
+in characters 3–11: an ISIN finds the bond, and a bare CUSIP finds a bond
+stored under its ISIN. The check digit is verified rather than assumed — a
+twelve-character typo is otherwise indistinguishable from an ISIN and
+resolves to a subject with no facts, rendering as "no data for this bond"
+instead of "you mistyped it". Validated against published ISINs (Apple
+`US0378331005`, IBM `US4592001014`), not against itself.
+
+This also caught the fixture builder writing `isin:US{i:010d}` — the right
+*shape*, failing validation. A fixture built from those could not exercise
+identifier resolution at all, which is exactly the defect the builder is
+used to test for.
+
+### "Most recent" is not "most complete", again
+
+`sys:swpm_basis` reported "no EUR-EURIBOR-3M curve on 2026-08-07". There
+*was* one — with 4 tenors against a `MIN_NODES` of 5. The shared market
+picks the newest day the **discount/forecast pair** builds on; the basis tab
+needs a **third** curve, and on a thin day the newest date is reliably the
+worst one. Two days earlier the 3M curve had nine nodes.
+
+**TVAL learned this exact lesson and it was not carried across** — its
+issuer-curve default moved from "most recent report date" to "the date with
+the most fittable issuers" for the same reason. The basis tab now builds its
+own market with the short curve required, and *states* which date it used
+when that is not the screen's date. It shows a real term structure: 11.16bp
+at 4Y declining to 3.15bp at 20Y, annuity ratio flat at ~0.977.
+
+### Half of ALLQ was correct-when-empty
+
+The composites pane reported "Contributors 0 / Last live never". The quote
+pane returned **zero rows** — a blank pane indistinguishable from one that
+failed to load. The criterion is `ALLQ` correct-when-*empty*, and the
+screen was getting it half right.
+
 ## Source sustainability sweep (2026-08-09)
 
 Asked of Phase 1: which sources break, and would we notice. The answer to the
