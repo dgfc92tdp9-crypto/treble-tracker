@@ -315,6 +315,7 @@ class LocalTapi:
         "sys:tval_curves",
         "sys:tval_values",
         "sys:tval_method",
+        "sys:tval_snapshots",
         "sys:vcub_grid",
         "sys:vcub_method",
         "sys:entity_owners",
@@ -556,6 +557,8 @@ class LocalTapi:
             return self._allq(security, binding, as_of=as_of)
         if binding in ("sys:port_summary", "sys:port_factors", "sys:port_exposures"):
             return self._port(binding, as_of=as_of)
+        if binding == "sys:tval_snapshots":
+            return self._tval_snapshots(security, as_of=as_of)
         if binding in ("sys:tval_curves", "sys:tval_values", "sys:tval_method"):
             return self._tval(binding, as_of=as_of)
         if binding in ("sys:vcub_grid", "sys:vcub_method"):
@@ -798,6 +801,71 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _tval_snapshots(
+        self, security: SecurityQuery | None, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`sys:tval_snapshots` — §15.5's publication times, bid/mid/ask.
+
+        Recorded for a long time as data-blocked: "needs intraday quote
+        captures no free source here provides". Half true. The captures are
+        genuinely absent and stay absent; knowing when 4pm New York falls in
+        UTC never depended on them, and the two were collapsed into one
+        excuse. That is the same move as the product catalogue that claimed
+        "HICP stored" on a store holding none.
+
+        So the times are real and the marks are whatever the contribution
+        book holds — which on this install is nothing, and the panel says
+        so per row rather than rendering four blank lines.
+        """
+        from treble.analytics.tval.snapshots import SNAPSHOT_TIMES, snapshot_series
+
+        rows: list[tuple[str | float | int | None, ...]] = []
+        if security is None:
+            return (("no security selected", None, None, None, ""),)
+        subject = str(self.resolve(security))
+        day = as_of.date()
+        # One book read per publication instant. The books are gathered
+        # here because only this layer knows where they come from; the
+        # analytics module takes them already resolved so it can be tested
+        # without a service at all.
+        books = {
+            snapshot_time.at(day).isoformat(): self._contributions.book(
+                subject, as_of=snapshot_time.at(day)
+            )
+            for snapshot_time in SNAPSHOT_TIMES
+        }
+        # `.value` unwraps the I3 envelope: the panel shows the series, and
+        # the envelope is what `MDL` reads to say which model produced it.
+        series = snapshot_series(books, day=day).value
+        for snapshot in series.snapshots:
+            rows.append(
+                (
+                    snapshot.time_name,
+                    snapshot.at.strftime("%H:%M UTC"),
+                    snapshot.bid,
+                    snapshot.mid,
+                    snapshot.ask,
+                    snapshot.contributors,
+                )
+            )
+        if series.all_empty:
+            rows.append(
+                (
+                    "no contributed quotes on this install, so every time is empty rather "
+                    "than equal",
+                    "",
+                    None,
+                    None,
+                    None,
+                    0,
+                )
+            )
+        elif series.unchanged:
+            # Four identical rows and four independent agreeing evaluations
+            # render the same and are very different claims.
+            rows.append(("unchanged across all published times", "", None, None, None, 0))
+        return tuple(rows)
 
     def _tval_residual(
         self, *, as_of: datetime

@@ -1,0 +1,22 @@
+TREBLE VALUATION · PUBLICATION TIMES
+────────────────────────────────────────────────────────────────────────────
+Bid, mid and ask at each globally relevant time (§15.5), resolved by zone.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:tval_snapshots]                                             |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Times follow daylight saving; London and New York change on different dates.

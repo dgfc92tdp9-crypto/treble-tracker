@@ -123,3 +123,28 @@ tabs:
         at: {row: 21, col: 0}
         text: "Rating and seniority are absent, so the similarity metric is incomplete."
         attrs: [label]
+
+  - name: snapshots
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "TREBLE VALUATION · PUBLICATION TIMES"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Bid, mid and ask at each globally relevant time (§15.5), resolved by zone."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:tval_snapshots"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Times follow daylight saving; London and New York change on different dates."
+        attrs: [label]

@@ -120,3 +120,33 @@ def test_every_shipped_screen_has_a_case() -> None:
     covered = {c.definition.mnemonic for c in CASES}
     missing = sorted(set(available()) - covered)
     assert not missing, f"screens with no conformance case: {', '.join(missing)}"
+
+
+def test_every_shipped_tab_has_a_case() -> None:
+    """The same kill-test, one level deeper — where it should always have been.
+
+    The check above is satisfied by a single case on a four-tab screen, and
+    a tab is not a variation on a layout: it is its own grid with its own
+    binding, rendered by its own code path. An uncovered tab can render
+    differently on the TUI and the desktop, or render nothing at all, and
+    the per-screen check passes because a *sibling* tab has a case.
+
+    Found by adding TVAL's snapshots tab and watching the suite stay green
+    with nothing checking it. Every tab that existed before then already
+    had one, which is why the gap survived: the convention was right and
+    only the enforcement was shallow, so there was no failing example to
+    notice.
+    """
+    from treble.render.contract.registry import available, get_screen
+
+    # A case with no explicit tab resolves to the screen's first, so that
+    # is the tab it covers. Treating it as covering nothing would demand a
+    # redundant case for every single-tab screen.
+    covered = {(c.definition.mnemonic, c.context.tab or c.definition.tabs[0].name) for c in CASES}
+    missing = sorted(
+        f"{mnemonic}:{tab.name}"
+        for mnemonic in available()
+        for tab in get_screen(mnemonic).tabs
+        if (mnemonic, tab.name) not in covered
+    )
+    assert not missing, f"tabs with no conformance case: {', '.join(missing)}"

@@ -1,0 +1,111 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TREBLE VALUATION · PUBLICATION TIMES"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Bid, mid and ask at each globally relevant time (§15.5), resolved by zone."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Times follow daylight saving; London and New York change on different dates."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "TVAL",
+  "panes": [
+    {
+      "binding": "sys:tval_snapshots",
+      "data": [
+        [
+          "Tokyo close",
+          "06:00 UTC",
+          99.1,
+          99.25,
+          99.4,
+          2
+        ],
+        [
+          "London 16:15",
+          "16:15 UTC",
+          99.12,
+          99.27,
+          99.42,
+          2
+        ],
+        [
+          "New York 15:00",
+          "19:00 UTC",
+          99.18,
+          99.33,
+          99.48,
+          3
+        ],
+        [
+          "New York 16:00",
+          "20:00 UTC",
+          99.2,
+          99.35,
+          99.5,
+          3
+        ]
+      ],
+      "region": [
+        4,
+        0,
+        16,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "snapshots"
+}
