@@ -1,0 +1,95 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "ECONOMIC STATISTICS · WHAT THIS RESTS ON"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "The source, the units, and when each series is considered stale."
+    },
+    {
+      "at": [
+        30,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Series carry their own licences; FRED redistributes, it does not originate."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    32,
+    80
+  ],
+  "mnemonic": "ECO",
+  "panes": [
+    {
+      "binding": "sys:eco_method",
+      "data": [
+        [
+          "Source",
+          "FRED (Federal Reserve Bank of St. Louis)"
+        ],
+        [
+          "Series catalogued",
+          "25"
+        ],
+        [
+          "Units",
+          "per series, from FRED's own stated unit — never inferred"
+        ],
+        [
+          "Stale after",
+          "daily 7d; weekly 21d; monthly 75d; quarterly 210d"
+        ]
+      ],
+      "region": [
+        4,
+        0,
+        25,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "method"
+}

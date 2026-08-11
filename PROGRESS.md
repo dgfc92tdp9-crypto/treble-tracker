@@ -694,6 +694,52 @@ whose hardcoded `max_examples` silently overrode the deep profile (so the nightl
 never stressing price↔yield, the duration identity, or the I2 guarantee), and a `make mutate`
 target that had never worked.
 
+## Phase 1 expansion: `ECO` (2026-08-11)
+
+**Twenty-five ingested series had no screen.** Thirty-six FRED series are in
+the store and refreshed daily; eleven are the DGS curve points `ICVS` draws.
+The other twenty-five — inflation, labour, credit spreads, breakevens, the
+2s10s slope, policy and overnight rates, equity levels, vol, FX — could not
+be displayed anywhere. That is the mirror of the fault this repository named
+as its most common in Phase 2, *working analytics nothing can display*, and
+it had been sitting in the store the whole time.
+
+`ECO` is a spec mnemonic (§7.4) and was in `KNOWN_MNEMONICS` all along. It
+now ships with a MAIN tab and a METHOD tab, each with a conformance case.
+
+Two columns carry the whole burden of not lying:
+
+**Units.** `CPIAUCSL` is 332.568 and `UNRATE` is 4.1 — an index on a 1982-84
+base and a percentage of the labour force. Bare numbers in one column invite
+reading either as the other and nothing on screen would contradict it. Every
+unit is FRED's own stated unit, written once in `tapi/macro.py`.
+
+**The observation date.** These series do not share a clock. On 2026-08-11
+the store held CPI for June, unemployment for July, VIX for the 7th and the
+2s10s slope for the 10th — ten weeks across four rows of one table.
+
+Staleness is judged per series against its own release frequency, for the
+same reason `ingest.health` judges sources against their own cadence:
+monthly CPI six weeks old is a routine publication lag, and a daily series
+six weeks old is a dead feed. One threshold would call the first broken —
+and a warning that is always on stops being read.
+
+Series in the catalogue the store has never ingested are reported rather
+than dropped: a configuration gap and a series with no print today render
+identically if the row disappears, and only one is worth acting on. FRED's
+`.` for a non-publishing day is skipped rather than read as zero, which on
+`VIXCLS` would be a volatility of nothing and a change equal to the level.
+
+### The unbuilt-mnemonic count, for context
+
+142 mnemonics in `KNOWN_MNEMONICS`, 17 built. The remaining 125 are mostly
+Phase 3+ scope — `EMS`, `RFQ`, `TRADE`, `VCON`, `MSG`, `BOLT`, `DESK` are
+trading and messaging. The Phase 1 candidates that are *feedable from data
+already held* are `DDIS` (debt distribution by maturity, now reachable via
+`gleif:lei`), `SPRD`/`OAS1` (the bond spread analytics are built and
+validated but only `YAS` surfaces them), and `RELS` (related securities via
+the GLEIF graph). None are blocked on data.
+
 ## GLEIF ISIN-to-LEI mapping (2026-08-10)
 
 Added, and it is **not** redundant with N-PORT — the difference is the point.

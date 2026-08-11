@@ -1,0 +1,23 @@
+{
+  "fields": {},
+  "series": {
+    "sys:eco_method": [
+      [
+        "Source",
+        "FRED (Federal Reserve Bank of St. Louis)"
+      ],
+      [
+        "Series catalogued",
+        "25"
+      ],
+      [
+        "Units",
+        "per series, from FRED's own stated unit \u2014 never inferred"
+      ],
+      [
+        "Stale after",
+        "daily 7d; weekly 21d; monthly 75d; quarterly 210d"
+      ]
+    ]
+  }
+}

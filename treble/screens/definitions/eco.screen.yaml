@@ -1,0 +1,79 @@
+# ECO — Economic statistics (spec §7.4).
+#
+# Twenty-five macro series were being ingested and refreshed daily with no
+# screen able to show any of them. That is the same defect as an analytic
+# nothing can call, running the other way: this repository named "working
+# analytics nothing can display" as its most common Phase 2 fault, and the
+# mirror image had been sitting in the store the whole time.
+#
+# **Every row carries its unit.** CPIAUCSL is 332.568 and UNRATE is 4.1 —
+# an index on a 1982-84 base and a percentage of the labour force. Bare
+# numbers in one column invite reading either as the other, and nothing on
+# the screen would contradict it.
+#
+# **Every row carries its observation date.** These series do not share a
+# clock. On 2026-08-11 this store held CPI for June, unemployment for July
+# and VIX for the 7th — ten weeks across three rows. "Latest" without a date
+# puts a June inflation print beside a Monday vol close as if they were
+# comparable.
+#
+# **Staleness is judged per series.** Monthly CPI six weeks old is a routine
+# publication lag; a daily series six weeks old is a dead feed. One
+# threshold would call the first broken — and a warning that is always on
+# stops being read.
+mnemonic: ECO
+title: Economic Statistics
+rows: 32
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "ECONOMIC STATISTICS · LATEST READINGS"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Series, unit, latest value, the date it was observed, and the change."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 25, width: 80}
+        pane_type: table_scroll
+        binding: "sys:eco_dashboard"
+
+      - kind: static
+        at: {row: 30, col: 0}
+        text: "Dates differ by series: a monthly print beside a daily close is not a spread."
+        attrs: [label]
+
+  - name: method
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "ECONOMIC STATISTICS · WHAT THIS RESTS ON"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "The source, the units, and when each series is considered stale."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 25, width: 80}
+        pane_type: table_scroll
+        binding: "sys:eco_method"
+
+      - kind: static
+        at: {row: 30, col: 0}
+        text: "Series carry their own licences; FRED redistributes, it does not originate."
+        attrs: [label]

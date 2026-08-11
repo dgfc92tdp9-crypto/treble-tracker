@@ -1,0 +1,31 @@
+ECONOMIC STATISTICS · LATEST READINGS
+────────────────────────────────────────────────────────────────────────────
+Series, unit, latest value, the date it was observed, and the change.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:eco_dashboard]                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Dates differ by series: a monthly print beside a daily close is not a spread.

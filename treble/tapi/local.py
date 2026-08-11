@@ -354,6 +354,8 @@ class LocalTapi:
         "sys:tval_values",
         "sys:tval_method",
         "sys:tval_snapshots",
+        "sys:eco_dashboard",
+        "sys:eco_method",
         "sys:vcub_grid",
         "sys:vcub_method",
         "sys:entity_owners",
@@ -595,6 +597,8 @@ class LocalTapi:
             return self._allq(security, binding, as_of=as_of)
         if binding in ("sys:port_summary", "sys:port_factors", "sys:port_exposures"):
             return self._port(binding, as_of=as_of)
+        if binding in ("sys:eco_dashboard", "sys:eco_method"):
+            return self._eco(binding, as_of=as_of)
         if binding == "sys:tval_snapshots":
             return self._tval_snapshots(security, as_of=as_of)
         if binding in ("sys:tval_curves", "sys:tval_values", "sys:tval_method"):
@@ -887,6 +891,73 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _eco(
+        self, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`ECO` — the macro dashboard and its method tab (§7.4).
+
+        Twenty-five series were arriving on a daily refresh with nothing
+        able to display them. The unit and the observation date are columns
+        rather than footnotes: without the first a reader cannot tell an
+        index from a percentage, and without the second a June CPI print
+        sits beside a Monday vol close looking comparable.
+        """
+        from treble.tapi.macro import CATALOGUE, GROUPS, Frequency, macro_dashboard
+
+        readings = macro_dashboard(self._store, as_of=as_of)
+        today = as_of.date()
+
+        if binding == "sys:eco_method":
+            rows: list[tuple[str | float | int | None, ...]] = [
+                ("Source", "FRED (Federal Reserve Bank of St. Louis)"),
+                ("Series catalogued", str(len(CATALOGUE))),
+                ("Ingested here", str(sum(1 for r in readings if r.ingested))),
+                ("Groups", ", ".join(GROUPS)),
+                ("Units", "per series, from FRED's own stated unit — never inferred"),
+                (
+                    "Stale after",
+                    "; ".join(f"{f.value} {f.tolerated_days}d" for f in Frequency),
+                ),
+                (
+                    "Why per series",
+                    "monthly CPI six weeks old is a release lag; a daily series six "
+                    "weeks old is a dead feed",
+                ),
+                (
+                    "Change column",
+                    "difference from the previous observation, not a revision — one "
+                    "fact per observation date",
+                ),
+                (
+                    "Missing values",
+                    "FRED writes '.' for a non-publishing day; those are skipped, so a "
+                    "holiday does not read as a zero",
+                ),
+                ("Licence", "series carry their own; FRED redistributes rather than originates"),
+            ]
+            return tuple(rows)
+
+        return tuple(
+            (
+                reading.series.group,
+                reading.series.series_id,
+                reading.series.title,
+                reading.series.unit,
+                reading.value,
+                reading.observed.isoformat() if reading.observed else None,
+                # Rounded here, not in a renderer. A change of
+                # -0.029999999999999805 is float noise from the subtraction
+                # and would show in every surface that displayed it;
+                # rounding once keeps the two renderers agreeing, which is
+                # the same reason ALLQ rounds its spread in the binding.
+                # Four places: enough for a breakeven quoted in basis
+                # points, and PAYEMS in thousands is unharmed by it.
+                None if reading.change is None else round(reading.change, 4),
+                reading.staleness(today=today),
+            )
+            for reading in readings
+        )
 
     def _tval_snapshots(
         self, security: SecurityQuery | None, *, as_of: datetime

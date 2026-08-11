@@ -1,0 +1,31 @@
+ECONOMIC STATISTICS · WHAT THIS RESTS ON
+────────────────────────────────────────────────────────────────────────────
+The source, the units, and when each series is considered stale.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:eco_method]                                                 |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Series carry their own licences; FRED redistributes, it does not originate.
