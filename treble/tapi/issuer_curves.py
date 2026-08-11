@@ -117,8 +117,14 @@ class IssuerCurveSet:
 CORPORATE_ASSET_CATEGORIES = frozenset({"DBT"})
 
 
-def _bond_rows(store: DuckStore, *, as_of: datetime) -> list[dict[str, object]]:
-    """Every `isin:` bond with the fields a curve needs, point-in-time."""
+def bond_rows(store: DuckStore, *, as_of: datetime) -> list[dict[str, object]]:
+    """Every `isin:` bond with its N-PORT fields, point-in-time.
+
+    Public because `tapi.debt` builds the DDIS maturity ladder from the
+    same rows. Duplicating the field list would mean two places to add a
+    field and one place to forget the assetCat column — which is the field
+    whose absence once put securitisations onto corporate issuer curves.
+    """
     wanted = (
         "nport:lei",
         # GLEIF's registered issuer, preferred below where the two differ.
@@ -161,7 +167,7 @@ def build_issuer_curves(
     blended: a curve mixing March's front end with May's long end is smooth
     and wrong.
     """
-    rows = _bond_rows(store, as_of=as_of)
+    rows = bond_rows(store, as_of=as_of)
     if not rows:
         raise IssuerCurvesUnavailableError(
             "no `isin:` bonds in the store; N-PORT holdings supply the marks these "
@@ -318,5 +324,6 @@ __all__ = [
     "MIN_YIELD",
     "IssuerCurveSet",
     "IssuerCurvesUnavailableError",
+    "bond_rows",
     "build_issuer_curves",
 ]

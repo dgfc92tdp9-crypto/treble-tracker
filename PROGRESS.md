@@ -694,6 +694,47 @@ whose hardcoded `max_examples` silently overrode the deep profile (so the nightl
 never stressing price↔yield, the duration identity, or the I2 guarantee), and a `make mutate`
 target that had never worked.
 
+## Phase 1 expansion: `DDIS` (2026-08-11)
+
+An issuer's maturity ladder, keyed on LEI. It is the first screen that needed
+*both* of the last two days' work: a bond could not be addressed before ISIN
+resolution, and its issuer could not be identified before the GLEIF mapping.
+
+**It is a sample, not a census, and the screen says so in three places.**
+Bloomberg's DDIS shows amount *outstanding*. This is built from N-PORT, which
+reports what funds *hold* — so it sees only the part of an issuer's debt that
+appears in a filing we have ingested. Worse, the held figure is not a sum
+across funds: several filers hold the same bond and all write to one subject,
+so a point-in-time read returns one filing's position (I2). The column is
+named **HELD** everywhere it appears, never OUTSTANDING, and the METHOD tab
+explains why it is not a total.
+
+The ladder therefore leads with the **bond count**, which survives all of
+that: whether an issuer has five bonds due inside three years is a fact about
+the issuer, not about who holds them.
+
+### Two defects found building it, both plausible-looking rather than loud
+
+**The report date was chosen by the wrong count.** It counted an issuer's
+holdings and *then* filtered to straight debt, so a day whose seven holdings
+were every one a derivative beat a day with six bonds — and the ladder came
+back empty for an issuer that plainly had one. This is the same defect as
+`SWPM`'s basis tab choosing the newest day the discount/forecast *pair* built
+on when it needed a third curve. **Choosing by a count that is not the count
+that matters** now has three instances in this repository, and each one
+produced an empty screen rather than an error.
+
+**The coupon was read as a decimal.** `nport:annualizedRt` ranges 0 to 12.5
+on the live store with a median of 4.625 — it is a rate in percent. Rendered
+as a decimal the ladder showed 546% coupons, which looks like a data fault
+and would be chased in the parser rather than in the units. The field is now
+named `mean_coupon_pct`.
+
+Both mutation-checked: reintroducing either fails the test written for it.
+
+Live output, Barclays PLC on 2026-03-31: 5 bonds in 1-3y at a 5.16% average
+coupon, 1 in 3-5y at 4.22%, $10.86m held, no exclusions.
+
 ## Phase 1 expansion: `ECO` (2026-08-11)
 
 **Twenty-five ingested series had no screen.** Thirty-six FRED series are in

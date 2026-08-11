@@ -1,0 +1,74 @@
+# DDIS — Debt distribution (spec §7.5).
+#
+# An issuer's maturity ladder: what comes due, and when.
+#
+# **This is a sample, not a census.** Bloomberg's DDIS shows amount
+# outstanding. This is built from N-PORT, which reports what funds *hold*,
+# so it shows only the part of an issuer's debt that appears in a filing
+# this install has ingested. An issuer funded privately, or held outside
+# registered funds, looks smaller here than it is.
+#
+# The held figure is not even a sum across funds: several filers hold the
+# same bond and all write to one subject, so a point-in-time read returns
+# whichever filing was known most recently. It is one fund's position.
+#
+# So the ladder leads with the bond count, which survives all of that —
+# whether an issuer has five bonds due inside three years is a fact about
+# the issuer, not about who holds them. The money column is named HELD, not
+# OUTSTANDING, everywhere it appears.
+mnemonic: DDIS
+title: Debt Distribution
+rows: 22
+cols: 80
+namespaces: [Corp, Govt]
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "DEBT DISTRIBUTION · MATURITY LADDER"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Bonds due per bucket, the face held by filers, and the average coupon."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:ddis_ladder"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "HELD is what funds report holding — not the amount outstanding."
+        attrs: [label, warning]
+
+  - name: method
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "DEBT DISTRIBUTION · WHAT THIS RESTS ON"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Where the ladder comes from, and what it cannot see."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:ddis_method"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Issuer identity is GLEIF's registration where it differs from the filer's."
+        attrs: [label]

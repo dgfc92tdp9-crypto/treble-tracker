@@ -1,0 +1,27 @@
+{
+  "fields": {},
+  "series": {
+    "sys:ddis_method": [
+      [
+        "Issuer",
+        "BARCLAYS PLC"
+      ],
+      [
+        "LEI",
+        "213800LBQA1Y9L22JB70"
+      ],
+      [
+        "Report date",
+        "2026-03-31"
+      ],
+      [
+        "Date chosen by",
+        "most usable bonds, not most recent"
+      ],
+      [
+        "What HELD means",
+        "face reported by a filing fund \u2014 not the amount outstanding"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+DEBT DISTRIBUTION · MATURITY LADDER
+────────────────────────────────────────────────────────────────────────────
+Bonds due per bucket, the face held by filers, and the average coupon.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:ddis_ladder]                                                |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+HELD is what funds report holding — not the amount outstanding.

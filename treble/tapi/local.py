@@ -354,6 +354,8 @@ class LocalTapi:
         "sys:tval_values",
         "sys:tval_method",
         "sys:tval_snapshots",
+        "sys:ddis_ladder",
+        "sys:ddis_method",
         "sys:eco_dashboard",
         "sys:eco_method",
         "sys:vcub_grid",
@@ -597,6 +599,8 @@ class LocalTapi:
             return self._allq(security, binding, as_of=as_of)
         if binding in ("sys:port_summary", "sys:port_factors", "sys:port_exposures"):
             return self._port(binding, as_of=as_of)
+        if binding in ("sys:ddis_ladder", "sys:ddis_method"):
+            return self._ddis(security, binding, as_of=as_of)
         if binding in ("sys:eco_dashboard", "sys:eco_method"):
             return self._eco(binding, as_of=as_of)
         if binding == "sys:tval_snapshots":
@@ -891,6 +895,103 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _ddis(
+        self, security: SecurityQuery | None, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`DDIS` — an issuer's maturity ladder, from the selected bond.
+
+        The security is a *bond*; the ladder is its *issuer's*. Resolving
+        one to the other is the whole reason the ISIN path and the GLEIF
+        mapping had to exist first: before them a bond could not be
+        addressed and its issuer could not be identified.
+        """
+        from treble.tapi.debt import (
+            DebtDistributionUnavailableError,
+            debt_distribution,
+        )
+
+        if security is None:
+            return (("no security selected: DDIS profiles the issuer of a bond", None),)
+        try:
+            subject = self.resolve(security)
+        except SecurityNotFoundError as error:
+            return ((str(error), None),)
+
+        lei = next(
+            (
+                str(fact.value)
+                for field in ("gleif:lei", "nport:lei")
+                for fact in self._store.read(subject, field, as_of=as_of)
+                if isinstance(fact.value, str)
+            ),
+            None,
+        )
+        if lei is None:
+            # Distinct from "this issuer has no bonds". The instrument is
+            # here and carries no issuer identity, which is a gap in the
+            # holding record rather than a fact about the issuer's debt.
+            return (
+                (
+                    f"{subject} carries no issuer LEI, so its issuer cannot be identified",
+                    None,
+                ),
+            )
+        try:
+            profile = debt_distribution(self._store, lei=lei, as_of=as_of)
+        except DebtDistributionUnavailableError as error:
+            return ((str(error), None),)
+
+        if binding == "sys:ddis_method":
+            return (
+                ("Issuer", profile.issuer_name or "—"),
+                ("LEI", profile.lei),
+                ("Report date", profile.report_date.isoformat()),
+                ("Date chosen by", "most usable bonds, not most recent"),
+                (
+                    "Why not most recent",
+                    "N-PORT coverage thins until funds file; the newest date is "
+                    "reliably the sparsest",
+                ),
+                ("Bonds on the ladder", str(profile.total_bonds)),
+                ("Excluded on that date", str(len(profile.excluded))),
+                (
+                    "What HELD means",
+                    "face reported by a filing fund — not the amount outstanding",
+                ),
+                (
+                    "Why it is not a total",
+                    "several funds hold the same bond and write to one subject, so a "
+                    "point-in-time read returns one filing's position",
+                ),
+                ("Coupon", "percent, unweighted mean — weighting would weight the filer"),
+                ("Excluded categories", "anything but straight debt (DBT): ABS, CLO, derivatives"),
+                ("Issuer identity", "GLEIF registration where it differs from the filer's"),
+                ("Currencies", ", ".join(f"{code} x{n}" for code, n in profile.currencies) or "—"),
+            )
+
+        rows: list[tuple[str | float | int | None, ...]] = [
+            (
+                bucket.label,
+                bucket.bonds,
+                round(bucket.held_face, 2),
+                None if bucket.mean_coupon_pct is None else round(bucket.mean_coupon_pct, 3),
+                bucket.earliest.isoformat() if bucket.earliest else None,
+                bucket.latest.isoformat() if bucket.latest else None,
+            )
+            for bucket in profile.buckets
+        ]
+        rows.append(
+            (
+                "TOTAL",
+                profile.total_bonds,
+                round(profile.total_held_face, 2),
+                None,
+                None,
+                None,
+            )
+        )
+        return tuple(rows)
 
     def _eco(
         self, binding: str, *, as_of: datetime
