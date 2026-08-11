@@ -694,6 +694,55 @@ whose hardcoded `max_examples` silently overrode the deep profile (so the nightl
 never stressing price↔yield, the duration identity, or the I2 guarantee), and a `make mutate`
 target that had never worked.
 
+## A units error in `bonds.g_spread` (2026-08-11)
+
+Found while building the government curve `SPRD` needs. **A ten-year par
+Treasury priced at 100 on the very curve it was built from reported a
+G-spread of +5.38bp.** A bond on the curve is worth the curve; the answer
+should be zero.
+
+`yield_from_price` returns a yield compounded at the bond's frequency.
+`Curve.zero` returns a *continuously* compounded rate, because that is what
+`exp(-zt)` discounting needs. `g_spread` subtracted one from the other.
+
+Of the 5.38bp, **5.32bp was the conversion** — at 4.65%, semi-annual and
+continuous differ by exactly that. It is systematic and always the same
+sign, so it never reads as noise, and on a typical 100bp corporate spread it
+is a 5% error.
+
+**The golden tests could not have caught it.** They compare `g_spread`
+against values computed the same mixed way, so a units error shared by both
+sides passes. What catches it is a self-consistency property — a bond *on*
+the curve has no spread — which needs no external reference at all. That
+test is now in the suite, mutation-verified against the original
+subtraction, and paired with a second assertion that the fix did not simply
+zero everything: a bond with a coupon 200bp higher still reads +200.05bp.
+
+The curve moves to the bond rather than the reverse, because market
+convention quotes a G-spread on the bond's own basis.
+
+### Status of `SPRD` and `OAS1`
+
+The **government curve is built and tested** — 400 usable days on the live
+store, bootstrapping to 3.97% at 1y and 5.18% at 30y. Bills under a year are
+excluded rather than approximated: Treasury quotes them on a discount basis,
+and treating them as par bonds would misprice the short end, which is
+exactly where a two-year corporate reads its G-spread.
+
+The **per-bond rows and the two screens are not written**. `tapi/spreads.py`
+is in `AWAITING_WIRING` with that reason. A `BondSpreads` container was
+written for them and deleted again — a type nothing reads is the defect this
+repository keeps finding, not a head start on one.
+
+**`OAS1` is data-blocked and this is now measured rather than assumed.**
+N-PORT publishes `maturityDt`, `couponKind`, `isPaidKind` and thirty other
+fields, and **no call schedule** — the schema has none. Without one, OAS is
+identically the Z-spread, so an `OAS1` built on this store would either
+repeat `SPRD`'s Z column under a different heading or price a call schedule
+somebody invented. The honest form is a sensitivity screen over a *stated*
+call structure, labelled as an assumption in the way ADR-0003 already treats
+the volatility parameter.
+
 ## Phase 1 expansion: `DDIS` (2026-08-11)
 
 An issuer's maturity ladder, keyed on LEI. It is the first screen that needed

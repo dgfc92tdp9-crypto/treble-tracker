@@ -229,8 +229,36 @@ def z_spread(spec: FixedBondSpec, clean_price: float, curve: Curve, *, as_of: da
     summary="Yield minus interpolated government curve at maturity",
 )
 def g_spread(spec: FixedBondSpec, clean_price: float, govt_curve: Curve, *, as_of: date) -> float:
+    """Yield over the government curve, both on the bond's own basis.
+
+    **The conversion is the whole correctness of this function.**
+    `yield_from_price` returns a yield compounded at the bond's frequency;
+    `Curve.zero` returns a *continuously* compounded rate, because that is
+    what `exp(-zt)` discounting needs. Subtracting one from the other, as
+    this did, is a units error — and a quiet one, because both numbers are
+    rates near 4% and the difference is a plausible-looking spread.
+
+    Measured 2026-08-11: a ten-year par Treasury priced at 100 on the curve
+    it was built from reported a G-spread of **+5.38bp**, of which +5.32bp
+    was the conversion. It is systematic and always the same sign, so it
+    never reads as noise, and on a 100bp corporate spread it is a 5% error.
+
+    The golden tests could not catch it: they compared against values
+    computed the same mixed way. What catches it is the self-consistency
+    check — a bond *on* the curve must show zero — which is now in the
+    suite.
+    """
+    import math
+
     ytm = yield_from_price.__wrapped__(spec, clean_price, as_of=as_of)  # type: ignore[attr-defined]
     with _ql.evaluation_date(as_of):
         dc = _ql.day_counter(spec.day_count)
         t_maturity = dc.yearFraction(_ql.to_ql_date(as_of), _ql.to_ql_date(spec.maturity))
-    return float(ytm - govt_curve.zero(t_maturity))
+    # Continuous -> the bond's compounding frequency, so the subtraction is
+    # between two rates quoted the same way. Market convention quotes a
+    # G-spread on the bond's basis, which is why the curve moves to the
+    # bond rather than the other way round.
+    frequency = float(spec.frequency.value)
+    continuous = govt_curve.zero(t_maturity)
+    benchmark = frequency * (math.exp(continuous / frequency) - 1.0)
+    return float(ytm - benchmark)
