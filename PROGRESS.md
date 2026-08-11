@@ -199,33 +199,44 @@ Criteria in `CLAUDE.md` §8. The ledger (`config/completion.yaml`) tracks one en
 because here the criteria *are* the deliverables — unlike Phase 1 there is no separate work-package
 plan, and inventing one would put a second set of numbers beside the gate's own.
 
-**Verified state, 2026-08-06** — measured on a fresh clone of `7fc5124`, not on the working tree,
-because a working tree carries generated artefacts a clean checkout does not and that difference
-has already hidden a broken CI here once:
+**Verified state, 2026-08-10** — measured on the working tree at `34b8fdc`:
 
 | | |
 |---|---|
-| `make setup && make check` on a fresh clone | exit 0 |
-| tests | 1,472 passed, 11 deselected |
-| screens registered | 16 — the 11 from Phase 1 plus ALLQ, PORT, SWPM, TVAL, VCUB |
-| conformance cases | 32 screen cases + 2 canvas cases, each across three renderers |
-| analytics carrying an I3 envelope | 45 |
+| `make gate` | green |
+| tests | 1,985 collected, 11 deselected |
+| screens registered | 16 — ALLQ DES EQS FA FLDS GP HP ICVS MDL PORT SPTR SRCH SWPM TVAL VCUB YAS |
+| tabs across them | 28, each with its own conformance case |
+| conformance cases | 33 |
+| analytics carrying an I3 envelope | 57 |
+| ingest adapters | 19 |
+
+Against the 2026-08-06 audit: tests 1,472 → 1,985, I3 analytics 45 → 57, adapters
+16 → 19. The per-tab conformance requirement is new (2026-08-10) and was added
+after a tab shipped with nothing checking it.
 
 Five screens were added in Phase 2 and each one closed a gap between an analytic and a user:
 `SWPM` gained OIS and tenor-basis tabs, `PORT` reached the factor model, `TVAL` the issuer
 curves, `VCUB` the volatility surface. That gap — working analytics nothing can display — was
 the single most common defect found in this phase, and it is worth checking for by default.
 
-| Criterion | State | What is outstanding |
-|---|---|---|
-| Ticker plant (conflated / TPIPE) | 0.78 | **a real venue feeds it, with bars, VWAP and a security master** — Coinbase `matches` over WebSocket, sequenced on `trade_id`. Crypto only; outstanding: Redpanda + NATS |
-| `ALLQ` correct-when-empty | **1.00** | complete for this phase — the only limitation left is the loopback binding, which is §22.1 and out of scope until Phase 5 |
-| `PORT` with TFM3 v1 | 0.60 | **screen ships** — three tabs off 1.34M ingested return facts; equal-weight 49-industry template at 16.48% vol, 97.6% factor. Six factors not 1,500; still no per-name panel |
-| `TVAL` v1 | 0.75 | **screen ships** — 3 tabs; 35 issuer curves, 135 ranked rich/cheap calls, and a METHOD tab naming every assumption and the three dimensions it could not match on. Rating and seniority still absent; ML layer and snapshots untouched |
-| `CDSW` vs ISDA test cases | 0.85 | **externally validated across six currencies** — ISDA's own grids, two trade dates; medians 0.04-0.33bp. Residual bounded but *not* attributed: two candidate causes tested and refuted |
-| `SWPM` multi-curve CSA-aware | 0.85 | the §12.1 product breadth (swaptions, CMS, XCCY, inflation); the trade is a template, not bookable |
-| Canvas with FDC3 | 1.00 | **both clients draw it, and both author it** — TUI compositor + shared TS `renderCanvasHtml`, with whole-workspace conformance across all three renderers. Layouts are configured, not authored in-app |
-| gRPC + Arrow Flight | 0.95 | **mktdata / mktbar / mktvwap and streaming subscriptions ship** over real Coinbase prints. Outstanding: `ems` (no order path), `docs` (no document store) |
+**The per-criterion numbers live in `config/completion.yaml` and are deliberately
+not repeated here.** A table of the same eight figures in a second file is a
+second source of truth, and this one had already drifted: it still showed the
+ticker plant at 0.78, `PORT` at 0.60 and `TVAL` at 0.75 while the ledger read
+1.00, 1.00 and 0.98. The ledger's own comment warns against exactly this —
+"inventing one would put a second set of numbers beside the gate's own" — and
+then a prose table did it anyway.
+
+Phase 2 as at 2026-08-10: **P2_1 through P2_8 = 1.0, 1.0, 1.0, 0.98, 1.0, 1.0,
+1.0, 0.99.** The residual 0.03 is not unbuilt work:
+
+- **P2_4 (0.98)** — rating and seniority. Seniority is measured absent from
+  N-PORT (0 of 460 debt titles carry a token; the schema has no such field).
+  Ratings are legally public under Rule 17g-7(b) and blocked by per-vendor
+  terms at every NRSRO whose terms could be read.
+- **P2_8 (0.99)** — `ems` needs an execution venue, which the spec puts in
+  Phase 3 (§23.3).
 
 **The swap curves exist, and the whole chain is verified on them.** The DTCC SDR adapter
 (2026-08-02) ingests CFTC Part 43 public price dissemination — ~20,000 interest-rate prints a
