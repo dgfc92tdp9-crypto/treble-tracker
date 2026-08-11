@@ -1,0 +1,103 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SPREAD ANALYSIS · WHAT THIS RESTS ON"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "The curves, the conventions, and the assumptions N-PORT does not supply."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Both benchmarks are USD; a non-USD bond is refused rather than measured."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "SPRD",
+  "panes": [
+    {
+      "binding": "sys:sprd_method",
+      "data": [
+        [
+          "Bond",
+          "isin:US00206RKD35"
+        ],
+        [
+          "Issuer",
+          "ABN AMRO BANK NV"
+        ],
+        [
+          "Price",
+          "100.8600 — implied mark, not a traded level"
+        ],
+        [
+          "Government curve",
+          "UST CMT, bootstrapped 2026-08-07"
+        ],
+        [
+          "Swap curve",
+          "USD SOFR OIS, bootstrapped 2026-08-07"
+        ],
+        [
+          "Currency",
+          "both benchmarks are USD; other currencies are refused"
+        ]
+      ],
+      "region": [
+        4,
+        0,
+        16,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "method"
+}

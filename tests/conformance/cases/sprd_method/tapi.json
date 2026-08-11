@@ -1,0 +1,31 @@
+{
+  "fields": {},
+  "series": {
+    "sys:sprd_method": [
+      [
+        "Bond",
+        "isin:US00206RKD35"
+      ],
+      [
+        "Issuer",
+        "ABN AMRO BANK NV"
+      ],
+      [
+        "Price",
+        "100.8600 \u2014 implied mark, not a traded level"
+      ],
+      [
+        "Government curve",
+        "UST CMT, bootstrapped 2026-08-07"
+      ],
+      [
+        "Swap curve",
+        "USD SOFR OIS, bootstrapped 2026-08-07"
+      ],
+      [
+        "Currency",
+        "both benchmarks are USD; other currencies are refused"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,73 @@
+# SPRD — Spread analysis (spec §10.1).
+#
+# The three spreads answer three different questions and are not
+# interchangeable. A screen showing one and calling it "spread" would be
+# choosing a benchmark on the reader's behalf.
+#
+#   G  over the government curve — credit, liquidity and the swap spread.
+#   I  over the swap curve at the bond's maturity — the swap spread drops out.
+#   Z  the parallel shift to the whole zero curve that reprices the bond.
+#
+# G minus I is the swap spread at that maturity. It is printed rather than
+# left to be inferred, because it is the arithmetic check on the other two:
+# a swap spread of 300bp is not a market, it is a broken input.
+#
+# **The price is an implied mark, not a traded level.** N-PORT reports a
+# fund's holding as a USD value and a face balance; their ratio is what one
+# valuation agent thought the bond was worth at a month end.
+mnemonic: SPRD
+title: Spread Analysis
+rows: 22
+cols: 80
+namespaces: [Corp, Govt]
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SPREAD ANALYSIS · OVER EACH BENCHMARK"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "One bond, three benchmarks, and the swap spread that separates two of them."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:sprd_spreads"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Price is an implied mark from N-PORT, not a traded level."
+        attrs: [label, warning]
+
+  - name: method
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "SPREAD ANALYSIS · WHAT THIS RESTS ON"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "The curves, the conventions, and the assumptions N-PORT does not supply."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:sprd_method"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Both benchmarks are USD; a non-USD bond is refused rather than measured."
+        attrs: [label]

@@ -120,3 +120,142 @@ class TestItIsPointInTime:
         ingested in August."""
         store = _store(tmp_path, PAR)
         assert govt_curve_dates(store, as_of=datetime(2026, 7, 1, tzinfo=UTC)) == []
+
+
+class TestBondSpreads:
+    """Three benchmarks, one bond.
+
+    The first bond this ever ran on was an Australian 2055 line measured
+    against the US CMT curve — three numbers that computed cleanly and
+    meant nothing. Currency is checked before anything else now.
+    """
+
+    @staticmethod
+    def _with_bond(
+        store: DuckStore, *, currency: str = "USD", coupon: float = 5.0, price: float = 98.5
+    ) -> DuckStore:
+        record = Provenance(
+            source_system="edgar-nport",
+            source_uri="https://example.invalid/nport",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.BULK_FILE,
+            extractor_version="1",
+            payload_hash="b" * 64,
+        )
+        store.write_provenance([record])
+        report = date(2026, 3, 31)
+        fields: dict[str, object] = {
+            "nport:maturityDt": date(2031, 3, 31),
+            "nport:annualizedRt": coupon,
+            "nport:curCd": currency,
+            "nport:assetCat": "DBT",
+            "nport:name": "TEST ISSUER",
+            "nport:valUSD": 1_000_000.0 * price / 100.0,
+            "nport:balance": 1_000_000.0,
+        }
+        store.write_facts(
+            [
+                Fact(
+                    subject="isin:US0000000000",
+                    field=field,
+                    value=value,
+                    effective_from=report,
+                    effective_to=report,
+                    knowledge_from=KNOWN,
+                    provenance_id=record.id,
+                )
+                for field, value in fields.items()
+            ]
+        )
+        return store
+
+    def test_a_non_usd_bond_is_refused_not_measured(self, tmp_path: Path) -> None:
+        """Both benchmarks are USD. An AUD bond against them produces a
+        spread across currencies, which is not a spread."""
+        from treble.tapi.spreads import BondNotPriceableError, bond_spreads
+
+        store = self._with_bond(_store(tmp_path, PAR), currency="AUD")
+        with pytest.raises(BondNotPriceableError, match="not a spread"):
+            bond_spreads(store, identifier="isin:US0000000000", as_of=LATER)
+
+    def test_the_three_spreads_are_computed(self, tmp_path: Path) -> None:
+        from treble.tapi.spreads import bond_spreads
+
+        measured = bond_spreads(
+            self._with_bond(_store(tmp_path, PAR)), identifier="isin:US0000000000", as_of=LATER
+        )
+        assert measured.g_spread_bp is not None
+        assert measured.price == pytest.approx(98.5)
+        assert 0.0 < measured.yield_pct < 20.0
+
+    def test_a_richer_price_narrows_the_spread(self, tmp_path: Path) -> None:
+        """Direction, which no single number can establish. Paying more for
+        the same cash flows earns less, which is a tighter spread."""
+        from treble.tapi.spreads import bond_spreads
+
+        cheap = bond_spreads(
+            self._with_bond(_store(tmp_path, PAR, name="c"), price=95.0),
+            identifier="isin:US0000000000",
+            as_of=LATER,
+        )
+        dear = bond_spreads(
+            self._with_bond(_store(tmp_path, PAR, name="d"), price=105.0),
+            identifier="isin:US0000000000",
+            as_of=LATER,
+        )
+        assert cheap.g_spread_bp is not None and dear.g_spread_bp is not None
+        assert cheap.g_spread_bp > dear.g_spread_bp
+
+    def test_the_swap_spread_is_g_minus_i(self, tmp_path: Path) -> None:
+        """Published as the arithmetic check on the other two, so it must
+        actually be their difference rather than a separate computation."""
+        from treble.tapi.spreads import bond_spreads
+
+        measured = bond_spreads(
+            self._with_bond(_store(tmp_path, PAR)), identifier="isin:US0000000000", as_of=LATER
+        )
+        if measured.i_spread_bp is None:
+            pytest.skip("no swap curve in this fixture store")
+        assert measured.swap_spread_bp == pytest.approx(
+            measured.g_spread_bp - measured.i_spread_bp  # type: ignore[operator]
+        )
+
+    def test_a_bond_with_no_holding_record_is_refused(self, tmp_path: Path) -> None:
+        from treble.tapi.spreads import BondNotPriceableError, bond_spreads
+
+        with pytest.raises(BondNotPriceableError, match="no N-PORT holding"):
+            bond_spreads(_store(tmp_path, PAR), identifier="isin:US9999999999", as_of=LATER)
+
+    def test_a_later_but_emptier_report_does_not_win(self, tmp_path: Path) -> None:
+        """The live store holds a 2026-08-10 row for one Barclays bond with
+        every field null beside a complete 2026-03-31 one. Taking the most
+        recent report rather than the most recent *usable* one would refuse
+        a bond that is perfectly priceable."""
+        from treble.tapi.spreads import bond_spreads
+
+        store = self._with_bond(_store(tmp_path, PAR))
+        record = Provenance(
+            source_system="edgar-nport",
+            source_uri="https://example.invalid/later",
+            retrieved_at=KNOWN,
+            method=ExtractionMethod.BULK_FILE,
+            extractor_version="1",
+            payload_hash="c" * 64,
+        )
+        store.write_provenance([record])
+        store.write_facts(
+            [
+                Fact(
+                    subject="isin:US0000000000",
+                    field="nport:name",
+                    value="TEST ISSUER",
+                    effective_from=date(2026, 8, 10),
+                    effective_to=date(2026, 8, 10),
+                    knowledge_from=KNOWN,
+                    provenance_id=record.id,
+                )
+            ]
+        )
+        assert bond_spreads(store, identifier="isin:US0000000000", as_of=LATER).price == (
+            pytest.approx(98.5)
+        )

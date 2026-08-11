@@ -354,6 +354,8 @@ class LocalTapi:
         "sys:tval_values",
         "sys:tval_method",
         "sys:tval_snapshots",
+        "sys:sprd_spreads",
+        "sys:sprd_method",
         "sys:ddis_ladder",
         "sys:ddis_method",
         "sys:eco_dashboard",
@@ -599,6 +601,8 @@ class LocalTapi:
             return self._allq(security, binding, as_of=as_of)
         if binding in ("sys:port_summary", "sys:port_factors", "sys:port_exposures"):
             return self._port(binding, as_of=as_of)
+        if binding in ("sys:sprd_spreads", "sys:sprd_method"):
+            return self._sprd(security, binding, as_of=as_of)
         if binding in ("sys:ddis_ladder", "sys:ddis_method"):
             return self._ddis(security, binding, as_of=as_of)
         if binding in ("sys:eco_dashboard", "sys:eco_method"):
@@ -895,6 +899,84 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _sprd(
+        self, security: SecurityQuery | None, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`SPRD` — one bond over each benchmark (§10.1).
+
+        Three rows rather than three columns on one row: each is measured
+        against a different curve on a possibly different date, and a
+        single row would have to pick one date to display or drop them all.
+        """
+        from treble.tapi.spreads import (
+            GOVT_DAY_COUNT,
+            MIN_GOVT_TENOR_YEARS,
+            BondNotPriceableError,
+            bond_spreads,
+        )
+
+        if security is None:
+            return (("no security selected: SPRD measures one bond", None, None, None),)
+        try:
+            subject = self.resolve(security)
+            measured = bond_spreads(self._store, identifier=str(subject), as_of=as_of)
+        except (SecurityNotFoundError, BondNotPriceableError) as error:
+            return ((str(error), None, None, None),)
+
+        if binding == "sys:sprd_method":
+            from treble.tapi.issuer_curves import ASSUMED_DAY_COUNT, ASSUMED_FREQUENCY
+
+            return (
+                ("Bond", measured.identifier),
+                ("Issuer", measured.issuer or "—"),
+                ("Price", f"{measured.price:.4f} — implied mark, not a traded level"),
+                ("Yield", f"{measured.yield_pct:.4f}% at the bond's own frequency"),
+                ("Government curve", f"UST CMT, bootstrapped {measured.govt_date or '—'}"),
+                ("Swap curve", f"USD SOFR OIS, bootstrapped {measured.swap_date or '—'}"),
+                (
+                    "Bills excluded",
+                    f"CMT tenors under {MIN_GOVT_TENOR_YEARS:g}y are discount-basis",
+                ),
+                ("Curve day count", GOVT_DAY_COUNT),
+                (
+                    "Assumed frequency",
+                    ASSUMED_FREQUENCY.name.title() + " — N-PORT does not report it",
+                ),
+                ("Assumed day count", ASSUMED_DAY_COUNT.value + " — N-PORT does not report it"),
+                (
+                    "I-spread method",
+                    "the same computation as G against the swap curve, so one conversion",
+                ),
+                (
+                    "Compounding",
+                    "the curve is converted to the bond's frequency before subtracting",
+                ),
+                ("Currency", "both benchmarks are USD; other currencies are refused"),
+            )
+
+        def row(
+            name: str, value: float | None, when: date | None, note: str
+        ) -> tuple[str | float | int | None, ...]:
+            return (
+                name,
+                None if value is None else round(value, 1),
+                when.isoformat() if when else None,
+                note,
+            )
+
+        rows = [
+            row("G-spread", measured.g_spread_bp, measured.govt_date, "over the government curve"),
+            row("I-spread", measured.i_spread_bp, measured.swap_date, "over the swap curve"),
+            row("Z-spread", measured.z_spread_bp, measured.swap_date, "parallel shift, all flows"),
+            row(
+                "Swap spread",
+                measured.swap_spread_bp,
+                None,
+                "G less I — the check on the other two",
+            ),
+        ]
+        return tuple(rows)
 
     def _ddis(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime

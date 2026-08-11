@@ -721,18 +721,50 @@ zero everything: a bond with a coupon 200bp higher still reads +200.05bp.
 The curve moves to the bond rather than the reverse, because market
 convention quotes a G-spread on the bond's own basis.
 
-### Status of `SPRD` and `OAS1`
+### `SPRD` ships (2026-08-11)
 
-The **government curve is built and tested** — 400 usable days on the live
-store, bootstrapping to 3.97% at 1y and 5.18% at 30y. Bills under a year are
+Two tabs, two conformance cases, 19 screens registered. Live on an ABN AMRO
+2027: **G +160.6bp, I +172.4bp, Z +168.4bp, swap spread -11.9bp.**
+
+The government curve underneath it takes 400 usable days on the live store
+and bootstraps to 3.97% at 1y and 5.18% at 30y. Bills under a year are
 excluded rather than approximated: Treasury quotes them on a discount basis,
 and treating them as par bonds would misprice the short end, which is
 exactly where a two-year corporate reads its G-spread.
 
-The **per-bond rows and the two screens are not written**. `tapi/spreads.py`
-is in `AWAITING_WIRING` with that reason. A `BondSpreads` container was
-written for them and deleted again — a type nothing reads is the defect this
-repository keeps finding, not a head start on one.
+**I-spread is computed by `g_spread` against the swap curve.** They are the
+same operation — a yield less a benchmark rate at the bond's maturity — and
+only the curve differs. A second implementation would have been a second
+chance to get the compounding conversion wrong, which is the error that
+function had just been fixed for.
+
+**Z lands within a few basis points of I on every bond**, which is the
+internal check: Z uses every cash flow and I uses one point, so on a smooth
+curve they must nearly agree. Where they would not is where the curve is
+kinked, and the two columns show it rather than hiding it in one number.
+
+Three things the first live runs caught:
+
+- **The first bond it ever ran on was Australian.** `AU3CB0328482`, a 2055
+  line, measured against the US CMT and SOFR curves — three numbers that
+  computed cleanly and meant nothing. Currency is now checked before
+  anything else, and a non-USD bond is refused rather than measured.
+- **The Z-spread solver brackets between -500bp and +5,000bp** and a
+  distressed mark fell outside it. Reported as absent rather than clamped:
+  a bond pinned to exactly +5,000bp would look like a measurement.
+- **A later report can be emptier than an earlier one.** One Barclays bond
+  carries a 2026-08-10 row with every field null beside a complete
+  2026-03-31 one. Taking the most recent report rather than the most recent
+  *usable* one refuses a bond that is perfectly priceable — the third
+  variant of "most recent is not most complete" in this repository.
+
+Negative spreads do appear, and they are the implied mark rather than the
+maths: a Barclays 2027 at a mark of 98.50 with a 2.279% coupon genuinely
+yields 3.22%, which is through Treasuries. `TVAL` independently flags the
+same bond as anomalously rich. The main tab carries the warning that the
+price is an implied mark, not a traded level.
+
+`OAS1` remains unbuilt and data-blocked — see above.
 
 **`OAS1` is data-blocked and this is now measured rather than assumed.**
 N-PORT publishes `maturityDt`, `couponKind`, `isPaidKind` and thirty other

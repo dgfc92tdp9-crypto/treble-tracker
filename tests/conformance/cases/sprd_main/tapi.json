@@ -1,0 +1,31 @@
+{
+  "fields": {},
+  "series": {
+    "sys:sprd_spreads": [
+      [
+        "G-spread",
+        160.6,
+        "2026-08-07",
+        "over the government curve"
+      ],
+      [
+        "I-spread",
+        172.4,
+        "2026-08-07",
+        "over the swap curve"
+      ],
+      [
+        "Z-spread",
+        168.4,
+        "2026-08-07",
+        "parallel shift, all flows"
+      ],
+      [
+        "Swap spread",
+        -11.9,
+        null,
+        "G less I \u2014 the check on the other two"
+      ]
+    ]
+  }
+}

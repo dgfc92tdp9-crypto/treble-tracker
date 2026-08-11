@@ -53,12 +53,6 @@ AWAITING_WIRING: dict[str, str] = {
         "data question."
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
-    "treble.tapi.spreads": (
-        "The CMT government curve G-spread is measured against. Built and tested; the "
-        "SPRD screen that reads it is not written yet. Listed here rather than wired to a "
-        "placeholder caller: building it is what exposed the compounding error in "
-        "bonds.g_spread, so the correction shipped ahead of the screen deliberately."
-    ),
 }
 
 ALLOWED_UNREACHABLE = {**ENTRY_POINTS, **AWAITING_WIRING}

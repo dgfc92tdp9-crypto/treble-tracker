@@ -1,0 +1,104 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SPREAD ANALYSIS · OVER EACH BENCHMARK"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "One bond, three benchmarks, and the swap spread that separates two of them."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label",
+        "warning"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Price is an implied mark from N-PORT, not a traded level."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "SPRD",
+  "panes": [
+    {
+      "binding": "sys:sprd_spreads",
+      "data": [
+        [
+          "G-spread",
+          160.6,
+          "2026-08-07",
+          "over the government curve"
+        ],
+        [
+          "I-spread",
+          172.4,
+          "2026-08-07",
+          "over the swap curve"
+        ],
+        [
+          "Z-spread",
+          168.4,
+          "2026-08-07",
+          "parallel shift, all flows"
+        ],
+        [
+          "Swap spread",
+          -11.9,
+          null,
+          "G less I — the check on the other two"
+        ]
+      ],
+      "region": [
+        4,
+        0,
+        16,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

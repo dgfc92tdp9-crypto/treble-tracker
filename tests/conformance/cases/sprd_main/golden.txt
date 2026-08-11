@@ -1,0 +1,22 @@
+SPREAD ANALYSIS · OVER EACH BENCHMARK
+────────────────────────────────────────────────────────────────────────────
+One bond, three benchmarks, and the swap spread that separates two of them.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:sprd_spreads]                                               |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Price is an implied mark from N-PORT, not a traded level.

@@ -40,8 +40,10 @@ a head start on one.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime
 
+from treble.analytics.bonds.spec import FixedBondSpec
 from treble.analytics.curves.bootstrap import Curve, CurveBuildError, build_curve
 from treble.analytics.curves.config import (
     CurveConfig,
@@ -91,6 +93,168 @@ _TENOR_YEARS: dict[str, float] = {
 
 class GovtCurveUnavailableError(ValueError):
     """The CMT curve could not be built on any stored date."""
+
+
+class BondNotPriceableError(ValueError):
+    """The store holds nothing that can imply a price for this bond."""
+
+
+@dataclass(frozen=True)
+class BondSpread:
+    """One bond measured against each benchmark, in basis points."""
+
+    identifier: str
+    issuer: str | None
+    maturity: date
+    coupon_pct: float
+    price: float
+    yield_pct: float
+    g_spread_bp: float | None
+    i_spread_bp: float | None
+    z_spread_bp: float | None
+    govt_date: date | None
+    swap_date: date | None
+
+    @property
+    def swap_spread_bp(self) -> float | None:
+        """G minus I: the swap spread at this maturity, derived not quoted.
+
+        Shown because it is the arithmetic check on the other two. If the
+        government and swap curves were built on different days, or one of
+        them wrongly, this is where it surfaces — a swap spread of 300bp is
+        not a market, it is a broken input.
+        """
+        if self.g_spread_bp is None or self.i_spread_bp is None:
+            return None
+        return self.g_spread_bp - self.i_spread_bp
+
+
+def bond_spreads(store: DuckStore, *, identifier: str, as_of: datetime) -> BondSpread:
+    """The three spreads for one bond, each against its own benchmark.
+
+    **I-spread is computed by `g_spread` against the swap curve.** They are
+    the same operation — a yield less a benchmark rate at the bond's
+    maturity — and only the curve differs. Writing a second implementation
+    would be writing a second chance to get the compounding conversion
+    wrong, which is precisely the error that function was just fixed for.
+    """
+    from treble.analytics.bonds.pricing import g_spread, yield_from_price, z_spread
+    from treble.tapi.issuer_curves import (
+        ASSUMED_DAY_COUNT,
+        ASSUMED_FREQUENCY,
+        bond_rows,
+    )
+    from treble.tapi.swap_market import (
+        SwapMarketUnavailableError,
+        build_usd_discount_curve,
+    )
+
+    rows = [r for r in bond_rows(store, as_of=as_of) if str(r.get("identifier")) == identifier]
+    if not rows:
+        raise BondNotPriceableError(f"{identifier} has no N-PORT holding record")
+    # The most recent report that carries everything needed, not simply the
+    # most recent: a later filing missing a coupon is not an improvement.
+    usable = [
+        r
+        for r in rows
+        if isinstance(r.get("nport:maturityDt"), date)
+        and isinstance(r.get("nport:annualizedRt"), float | int)
+        and isinstance(r.get("nport:valUSD"), float | int)
+        and isinstance(r.get("nport:balance"), float | int)
+        and r.get("nport:balance")
+    ]
+    if not usable:
+        raise BondNotPriceableError(
+            f"{identifier} has no report carrying a maturity, coupon, value and face "
+            "balance together — an implied mark needs all four"
+        )
+    row = max(usable, key=lambda r: r["report_date"])  # type: ignore[arg-type,return-value]
+    day = row["report_date"]
+    maturity = row["nport:maturityDt"]
+    assert isinstance(day, date) and isinstance(maturity, date)  # noqa: S101 - narrowed above
+    if maturity <= day:
+        raise BondNotPriceableError(f"{identifier} matured on {maturity}, before the {day} report")
+    currency = row.get("nport:curCd")
+    if currency != "USD":
+        # Both benchmarks here are USD — the CMT curve and the SOFR OIS
+        # curve. Measuring an AUD bond against them produces three numbers
+        # that all compute cleanly and mean nothing: the first bond this
+        # function ever ran on was an Australian 2055 line, and it returned
+        # a G-spread of +419bp against a curve from another country.
+        raise BondNotPriceableError(
+            f"{identifier} is denominated in {currency}; the benchmarks here are USD and "
+            "a spread across currencies is not a spread"
+        )
+
+    coupon_pct = float(row["nport:annualizedRt"])  # type: ignore[arg-type]
+    price = float(row["nport:valUSD"]) / float(row["nport:balance"]) * 100.0  # type: ignore[arg-type]
+    spec = FixedBondSpec(
+        coupon=coupon_pct / 100.0,
+        issue_date=day,
+        maturity=maturity,
+        frequency=ASSUMED_FREQUENCY,
+        day_count=ASSUMED_DAY_COUNT,
+    )
+    quoted_yield = yield_from_price.__wrapped__(spec, price, as_of=day)  # type: ignore[attr-defined]
+
+    govt: float | None = None
+    govt_date: date | None = None
+    try:
+        govt_curve, govt_date = build_govt_curve(store, as_of=as_of)
+        govt = g_spread.__wrapped__(spec, price, govt_curve, as_of=day) * 10_000.0  # type: ignore[attr-defined]
+    except (GovtCurveUnavailableError, CurveBuildError):
+        # Left as None, never zero. A spread of zero is a bond trading on
+        # the benchmark, which is a finding; an absent curve is not.
+        govt = None
+
+    i_spread: float | None = None
+    z: float | None = None
+    swap_date: date | None = None
+    for candidate in _swap_curve_dates(store, as_of=as_of):
+        try:
+            swap_curve = build_usd_discount_curve(store, as_of=as_of, report_date=candidate)
+        except (SwapMarketUnavailableError, CurveBuildError):
+            continue
+        swap_date = candidate
+        # The same function as the G-spread, against the swap curve. See
+        # the docstring: one implementation, one conversion.
+        i_spread = g_spread.__wrapped__(spec, price, swap_curve, as_of=day) * 10_000.0  # type: ignore[attr-defined]
+        try:
+            z = z_spread.__wrapped__(spec, price, swap_curve, as_of=day) * 10_000.0  # type: ignore[attr-defined]
+        except ValueError:
+            # The solver brackets between -500bp and +5,000bp. A mark
+            # outside that is a distressed price or a stale balance, not a
+            # spread — reported as absent rather than clamped to the
+            # bracket, which would put a bond at exactly +5,000bp and look
+            # like a measurement.
+            z = None
+        break
+
+    name = row.get("nport:name")
+    return BondSpread(
+        identifier=identifier,
+        issuer=str(name) if isinstance(name, str) else None,
+        maturity=maturity,
+        coupon_pct=coupon_pct,
+        price=price,
+        yield_pct=quoted_yield * 100.0,
+        g_spread_bp=govt,
+        i_spread_bp=i_spread,
+        z_spread_bp=z,
+        govt_date=govt_date if govt is not None else None,
+        swap_date=swap_date,
+    )
+
+
+def _swap_curve_dates(store: DuckStore, *, as_of: datetime) -> list[date]:
+    """USD curve dates, newest first. Newest *usable* is chosen by trial."""
+    from treble.tapi.swap_market import USD_DISCOUNT_CURVE
+
+    days: set[date] = set()
+    for subject in store.subjects_with_prefix(f"swap:{USD_DISCOUNT_CURVE}", as_of=as_of):
+        for fact in store.read(TUID(str(subject)), "PAR_RATE", as_of=as_of):
+            days.add(fact.effective_from)
+    return sorted(days, reverse=True)
 
 
 def govt_curve_dates(store: DuckStore, *, as_of: datetime) -> list[date]:
@@ -162,7 +326,10 @@ __all__ = [
     "GOVT_DAY_COUNT",
     "MIN_GOVT_NODES",
     "MIN_GOVT_TENOR_YEARS",
+    "BondNotPriceableError",
+    "BondSpread",
     "GovtCurveUnavailableError",
+    "bond_spreads",
     "build_govt_curve",
     "govt_curve_dates",
 ]

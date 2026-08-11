@@ -1,0 +1,22 @@
+SPREAD ANALYSIS · WHAT THIS RESTS ON
+────────────────────────────────────────────────────────────────────────────
+The curves, the conventions, and the assumptions N-PORT does not supply.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:sprd_method]                                                |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Both benchmarks are USD; a non-USD bond is refused rather than measured.
