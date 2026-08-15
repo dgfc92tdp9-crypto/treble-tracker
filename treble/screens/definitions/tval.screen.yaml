@@ -148,3 +148,28 @@ tabs:
         at: {row: 21, col: 0}
         text: "Times follow daylight saving; London and New York change on different dates."
         attrs: [label]
+
+  - name: peers
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "TREBLE VALUATION · PEER RELATIVE VALUE"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "For bonds whose issuer has too few lines to fit a curve of its own."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:tval_peers"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Weaker than a curve call: peers are other companies, unmatched on rating."
+        attrs: [label, warning]

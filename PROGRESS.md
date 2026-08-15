@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 54.91%**
+**Completion: 54.94%**
 
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
@@ -825,6 +825,55 @@ repeat `SPRD`'s Z column under a different heading or price a call schedule
 somebody invented. The honest form is a sensitivity screen over a *stated*
 call structure, labelled as an assumption in the way ADR-0003 already treats
 the volatility parameter.
+
+## Phase 2: TVAL peer relative value (2026-08-11)
+
+**157 of 269 bonds were absent from the rich/cheap ranking entirely.** Not
+refused on screen — simply not there, which is the quieter failure. An
+issuer curve needs three bonds from one legal entity and 28 of 153 issuers
+clear that bar.
+
+`ComparableSet` — §15.1's similarity metric — was built, tested, and called
+by **nothing outside its own test suite**. The reachability gate could not
+see it: `relative.py` is imported for `fit_issuer_curve`, so the module is
+reachable even though this class in it was not. A gate that checks module
+reachability cannot catch a public class nobody constructs.
+
+A TVAL PEERS tab now values 121 of those bonds — 12 significant, 109 in
+noise.
+
+**Two numbers are published with every call, because a peer call is a
+materially weaker claim than a curve call.** An issuer curve holds credit
+constant and varies maturity. A peer set compares a bond with *other
+companies'* paper matched on currency, issuer category and maturity
+proximity — so a bond can be "cheap" purely by being a worse credit, which
+is not a finding, it is the definition of a spread.
+
+- **The peer group's own dispersion.** A bond 80bp from a median whose peers
+  span 400bp reads as noise, exactly as a curve call inside its residual
+  scatter does.
+- **The peer count over the universe size.** On this store a "peer group" is
+  routinely **226 of 233 bonds** — a market level wearing the word peer.
+  With rating, sector and seniority absent that is what these dimensions can
+  deliver, and the ratio says so rather than letting a reader assume
+  selectivity.
+
+The missing dimensions travel on every row rather than sitting in a
+docstring nobody reading the screen will see. Mutation-checked: flipping the
+residual's sign fails two tests, disabling the noise gate fails one.
+
+Building it fixed a smaller thing: issuer names were populated only for
+*fitted* issuers, so every peer call would have been attributed to an
+unreadable LEI — the exact failure the names field exists to prevent.
+
+### A negative result worth recording
+
+Grouping issuer curves by **corporate family** rather than legal entity was
+measured before being built, and does not help: 151 family groups against
+153 issuers, and **28 fittable either way**. Only two issuers merge and
+neither crosses the three-bond threshold. The RELS work does not improve
+curve coverage on this store, and saying so is cheaper than discovering it
+after the fact.
 
 ## Phase 1 expansion: `RELS` (2026-08-11)
 

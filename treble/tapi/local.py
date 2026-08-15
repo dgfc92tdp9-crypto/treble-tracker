@@ -354,6 +354,7 @@ class LocalTapi:
         "sys:tval_values",
         "sys:tval_method",
         "sys:tval_snapshots",
+        "sys:tval_peers",
         "sys:rels_securities",
         "sys:rels_method",
         "sys:oas1_grid",
@@ -615,6 +616,8 @@ class LocalTapi:
             return self._ddis(security, binding, as_of=as_of)
         if binding in ("sys:eco_dashboard", "sys:eco_method"):
             return self._eco(binding, as_of=as_of)
+        if binding == "sys:tval_peers":
+            return self._tval_peers(as_of=as_of)
         if binding == "sys:tval_snapshots":
             return self._tval_snapshots(security, as_of=as_of)
         if binding in ("sys:tval_curves", "sys:tval_values", "sys:tval_method"):
@@ -1294,6 +1297,57 @@ class LocalTapi:
             )
             for reading in readings
         )
+
+    def _tval_peers(self, *, as_of: datetime) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`sys:tval_peers` — relative value for bonds with no issuer curve.
+
+        Twenty-eight of 153 issuers have the three bonds a curve needs, so
+        157 of 269 bonds were absent from the rich/cheap ranking entirely —
+        not refused on screen, simply not there. `ComparableSet` is the
+        machinery for exactly those and was called by nothing outside its
+        own test suite.
+
+        The peer count is shown over the universe size because the ratio is
+        what says how selective the match was. Matching on currency,
+        issuer category and maturity proximity routinely selects 226 of 233
+        bonds, which is a market level wearing the word peer — and with
+        rating, sector and seniority absent, that is what these dimensions
+        can deliver.
+        """
+        from treble.tapi.peers import NoPeersError, peer_values
+
+        try:
+            values = peer_values(self._store, as_of=as_of)
+        except NoPeersError as error:
+            return ((str(error), None, None, None, None, None, None),)
+
+        rows: list[tuple[str | float | int | None, ...]] = [
+            (
+                value.issuer or value.identifier,
+                value.identifier.removeprefix("isin:"),
+                value.maturity.isoformat(),
+                round(value.yield_pct, 3),
+                f"{value.peer_count}/{value.universe_size}",
+                round(value.residual_bp, 1),
+                value.verdict,
+            )
+            for value in values
+        ]
+        # The dimensions are a row, not a footnote: they are the reason a
+        # peer call is weaker than a curve call, and a reader ranking these
+        # against the ISSUER CURVES tab needs to see it in the same table.
+        rows.append(
+            (
+                f"not matched on: {', '.join(values[0].missing_dimensions)}",
+                None,
+                None,
+                None,
+                None,
+                None,
+                f"{sum(1 for v in values if not v.in_noise)} of {len(values)} significant",
+            )
+        )
+        return tuple(rows)
 
     def _tval_snapshots(
         self, security: SecurityQuery | None, *, as_of: datetime

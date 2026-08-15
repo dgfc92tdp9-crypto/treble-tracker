@@ -1,0 +1,52 @@
+{
+  "fields": {},
+  "series": {
+    "sys:tval_peers": [
+      [
+        "CAPITAL ONE FINANCIAL CO",
+        "US14040HDB87",
+        "2027-10-29",
+        6.222,
+        "226/233",
+        171.6,
+        "cheap"
+      ],
+      [
+        "BLACKSTONE PRIVATE CRE",
+        "US09261HAK32",
+        "2027-03-15",
+        5.943,
+        "222/233",
+        143.8,
+        "cheap"
+      ],
+      [
+        "ABN AMRO BANK NV",
+        "US00084DBA72",
+        "2027-09-18",
+        5.723,
+        "226/233",
+        121.7,
+        "cheap"
+      ],
+      [
+        "FORTITUDE GROUP HOLDINGS",
+        "US34966XAA63",
+        "2030-04-01",
+        5.715,
+        "181/233",
+        119.9,
+        "cheap"
+      ],
+      [
+        "not matched on: sector, rating, seniority",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "12 of 121 significant"
+      ]
+    ]
+  }
+}

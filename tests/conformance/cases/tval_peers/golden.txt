@@ -1,0 +1,22 @@
+TREBLE VALUATION · PEER RELATIVE VALUE
+────────────────────────────────────────────────────────────────────────────
+For bonds whose issuer has too few lines to fit a curve of its own.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:tval_peers]                                                 |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Weaker than a curve call: peers are other companies, unmatched on rating.

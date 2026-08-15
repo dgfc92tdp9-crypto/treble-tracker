@@ -84,6 +84,15 @@ class IssuerCurveSet:
     #: screen, and a rich/cheap call nobody can attribute to a company is a
     #: number they cannot act on or check.
     names: dict[str, str]
+    #: Every usable bond on the chosen date, *including* issuers with too
+    #: few for a curve. `bonds` above holds only the fitted ones.
+    #:
+    #: Carried because the difference is most of the universe: 28 of 153
+    #: issuers have three bonds, so 157 of 269 bonds sit with an issuer
+    #: that cannot be fitted and got no relative-value call at all. Peer
+    #: comparison is the only method available to them, and it needs the
+    #: bonds this field holds.
+    universe: dict[str, tuple[IssuerBond, ...]]
 
     @property
     def issuers(self) -> tuple[str, ...]:
@@ -308,12 +317,19 @@ def build_issuer_curves(
             "through"
         )
     return IssuerCurveSet(
+        universe={
+            lei: tuple(sorted(bonds, key=lambda b: b.maturity)) for lei, bonds in chosen.items()
+        },
         report_date=report_date,
         curves=curves,
         bonds=kept,
         excluded=tuple(sorted(excluded)),
         coverage=coverage,
-        names={lei: names.get(lei, lei) for lei in curves},
+        # Over the universe, not the fitted set. A peer call on an
+        # unfitted issuer is exactly the case that needs a name: an LEI is
+        # unreadable, and a rich/cheap call nobody can attribute to a
+        # company is one they can neither act on nor check.
+        names={lei: names.get(lei, lei) for lei in chosen},
     )
 
 
