@@ -1,0 +1,21 @@
+{
+  "fields": {},
+  "series": {
+    "sys:rels_securities": [
+      [
+        "same parent",
+        "isin:US07274EAH62",
+        "BAYER US FINANCE LLC",
+        "2026-11-21",
+        6.125
+      ],
+      [
+        "133 entities under this parent, 1 with paper held here",
+        null,
+        null,
+        null,
+        null
+      ]
+    ]
+  }
+}

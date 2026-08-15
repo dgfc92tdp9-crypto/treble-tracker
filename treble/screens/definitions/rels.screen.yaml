@@ -1,0 +1,75 @@
+# RELS — Related securities (spec §9.5).
+#
+# **"Related" here means shared legal ownership, not similarity.** Two
+# utilities in the same state with the same rating are not related by this
+# screen; a bank's captive leasing arm is. That is narrower and more
+# defensible than sector — it comes from a registry rather than from a
+# classification somebody chose — and it is the only relation this store
+# can support, since sector and rating are both absent.
+#
+# Two kinds, and they are different claims. Same issuer is the identical
+# legal entity, the set TVAL fits one curve across. Same parent is a
+# corporate family: Bayer US Finance and Bayer US Finance II are separate
+# LEIs, file separately, and are one credit to anyone trading them.
+#
+# **The family size and the reachable count are both shown.** A Bayer
+# financing entity sits under a parent with 130 entities, of which one has
+# a bond in any filing held here. Showing only the one presents a vast
+# group as a pair; showing only the 130 implies 130 tradeable lines. The
+# gap between them is this install's coverage and belongs on the screen.
+mnemonic: RELS
+title: Related Securities
+rows: 22
+cols: 80
+namespaces: [Corp, Govt]
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "RELATED SECURITIES · BY LEGAL OWNERSHIP"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Same issuer, then the corporate family GLEIF puts under one parent."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:rels_securities"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Related by ownership, not by sector: rating and sector are absent here."
+        attrs: [label, warning]
+
+  - name: method
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "RELATED SECURITIES · WHAT THIS RESTS ON"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "How relation is defined, and how much of the family this store can see."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 16, width: 80}
+        pane_type: table_scroll
+        binding: "sys:rels_method"
+
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "A family of 130 with one bond here is coverage, not a small group."
+        attrs: [label]

@@ -1,0 +1,103 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "RELATED SECURITIES · WHAT THIS RESTS ON"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "How relation is defined, and how much of the family this store can see."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "A family of 130 with one bond here is coverage, not a small group."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "RELS",
+  "panes": [
+    {
+      "binding": "sys:rels_method",
+      "data": [
+        [
+          "Bond",
+          "isin:US07274NAL73"
+        ],
+        [
+          "Issuer",
+          "BAYER US FINANCE II LLC"
+        ],
+        [
+          "Ultimate parent",
+          "lei:549300J4U55H3WP1XT59"
+        ],
+        [
+          "Entities under it",
+          "133"
+        ],
+        [
+          "Reachable here",
+          "1 security(ies) in N-PORT filings"
+        ],
+        [
+          "Relation",
+          "shared legal ownership — not sector, rating or seniority"
+        ]
+      ],
+      "region": [
+        4,
+        0,
+        16,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "method"
+}

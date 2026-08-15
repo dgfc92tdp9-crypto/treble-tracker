@@ -1,0 +1,94 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "RELATED SECURITIES · BY LEGAL OWNERSHIP"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Same issuer, then the corporate family GLEIF puts under one parent."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label",
+        "warning"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Related by ownership, not by sector: rating and sector are absent here."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "RELS",
+  "panes": [
+    {
+      "binding": "sys:rels_securities",
+      "data": [
+        [
+          "same parent",
+          "isin:US07274EAH62",
+          "BAYER US FINANCE LLC",
+          "2026-11-21",
+          6.125
+        ],
+        [
+          "133 entities under this parent, 1 with paper held here",
+          null,
+          null,
+          null,
+          null
+        ]
+      ],
+      "region": [
+        4,
+        0,
+        16,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

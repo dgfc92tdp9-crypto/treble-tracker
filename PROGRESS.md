@@ -826,6 +826,51 @@ somebody invented. The honest form is a sensitivity screen over a *stated*
 call structure, labelled as an assumption in the way ADR-0003 already treats
 the volatility parameter.
 
+## Phase 1 expansion: `RELS` (2026-08-11)
+
+Related securities, by **legal ownership** — not similarity. Two utilities
+in the same state with the same rating are not related by this screen; a
+bank's captive leasing arm is. That is narrower and more defensible than
+sector: it comes from a registry rather than a classification somebody
+chose, and it is the only relation this store can support, since sector and
+rating are both absent.
+
+Two relations, deliberately distinct. **Same issuer** is the identical legal
+entity — the set `TVAL` fits one curve across. **Same parent** is a corporate
+family: Bayer US Finance and Bayer US Finance II are separate LEIs, file
+separately, and are one credit to anyone trading them.
+
+Live, from a Bayer US Finance II bond: one related security
+(`isin:US07274EAH62`, Bayer US Finance LLC, 2026-11-21, 6.125%) out of a
+family of **133 entities**.
+
+**Both counts are published, and that is the point.** Showing only the one
+security presents a vast corporate group as a pair. Showing only the 133
+implies 133 tradeable lines. The gap between them is this install's
+coverage, and it belongs on the screen. Measured: of 154 bond issuers, 52
+appear in the GLEIF relationship graph and 33 of those have siblings.
+
+### A bug the mutation found, and a test that could not
+
+The parent was resolved by the **ultimate** relationship and its children
+queried by the **direct** one. GLEIF states the two separately and they
+disagree often — three of six entities sampled from this store — so the
+family returned was a different family, and an entirely plausible one. On
+the live store the two answers are **133 entities and 130**, with nothing on
+screen to say which had been shown.
+
+Fixed to query by whichever relationship found the parent. **The first
+mutation of that fix passed all ten tests**, because every fixture gave an
+entity the same direct and ultimate parent, so both queries returned the
+same set. The suite now builds an entity whose two parents differ, and the
+mutation fails.
+
+A second self-inflicted one: the fixture's first draft wrote relationship
+edges as a single fact with a `lei:` prefix, where the parser wants a bare
+LEI *and* a paired `:status` fact. Every family came back empty. The edit
+that was meant to fix it silently matched nothing — I had omitted the
+assert — so the second run failed identically. Both are now asserted.
+
 ## Phase 1 expansion: `DDIS` (2026-08-11)
 
 An issuer's maturity ladder, keyed on LEI. It is the first screen that needed

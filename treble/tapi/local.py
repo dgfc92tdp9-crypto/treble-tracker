@@ -354,6 +354,8 @@ class LocalTapi:
         "sys:tval_values",
         "sys:tval_method",
         "sys:tval_snapshots",
+        "sys:rels_securities",
+        "sys:rels_method",
         "sys:oas1_grid",
         "sys:oas1_method",
         "sys:sprd_spreads",
@@ -603,6 +605,8 @@ class LocalTapi:
             return self._allq(security, binding, as_of=as_of)
         if binding in ("sys:port_summary", "sys:port_factors", "sys:port_exposures"):
             return self._port(binding, as_of=as_of)
+        if binding in ("sys:rels_securities", "sys:rels_method"):
+            return self._rels(security, binding, as_of=as_of)
         if binding in ("sys:oas1_grid", "sys:oas1_method"):
             return self._oas1(security, binding, as_of=as_of)
         if binding in ("sys:sprd_spreads", "sys:sprd_method"):
@@ -903,6 +907,69 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _rels(
+        self, security: SecurityQuery | None, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`RELS` — related securities, by legal ownership (§9.5).
+
+        Related means an entity relationship GLEIF asserts, not a
+        similarity somebody judged. A screen that mixed the two would let
+        "same parent" and "same sector" sit in one column while only one of
+        them comes from a registry.
+        """
+        from treble.tapi.related import NoRelationsError, related_securities
+
+        if security is None:
+            return (("no security selected: RELS relates one bond", None, None, None, None),)
+        try:
+            subject = self.resolve(security)
+            related = related_securities(self._store, identifier=str(subject), as_of=as_of)
+        except (SecurityNotFoundError, NoRelationsError) as error:
+            return ((str(error), None, None, None, None),)
+
+        if binding == "sys:rels_method":
+            return (
+                ("Bond", related.subject),
+                ("Issuer", related.issuer or "—"),
+                ("Issuer LEI", related.lei),
+                ("Ultimate parent", related.ultimate_parent or "none recorded by GLEIF"),
+                ("Entities under it", str(related.family_size)),
+                ("Reachable here", f"{related.reachable} security(ies) in N-PORT filings"),
+                (
+                    "Why they differ",
+                    "the family comes from the registry, the securities from filings",
+                ),
+                ("Relation", "shared legal ownership — not sector, rating or seniority"),
+                ("Why not sector", "no sector or rating source this store's terms permit"),
+                ("Issuer identity", "GLEIF registration where it differs from the filer's"),
+                ("Scope", "straight debt only; securitisations are a different credit"),
+            )
+
+        rows: list[tuple[str | float | int | None, ...]] = [
+            (
+                item.relationship,
+                item.identifier,
+                item.issuer,
+                item.maturity.isoformat() if item.maturity else None,
+                item.coupon_pct,
+            )
+            for item in (*related.same_issuer, *related.family)
+        ]
+        # The count the rows cannot show. A family of 130 with one bond
+        # here is coverage, not a small group, and a reader seeing one row
+        # would conclude the latter.
+        rows.append(
+            (
+                f"{related.family_size} entities under this parent, "
+                f"{related.reachable} with paper held here",
+                None,
+                None,
+                None,
+                None,
+            )
+        )
+        return tuple(rows)
 
     def _oas1(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime

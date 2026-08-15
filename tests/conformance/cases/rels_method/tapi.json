@@ -1,0 +1,31 @@
+{
+  "fields": {},
+  "series": {
+    "sys:rels_method": [
+      [
+        "Bond",
+        "isin:US07274NAL73"
+      ],
+      [
+        "Issuer",
+        "BAYER US FINANCE II LLC"
+      ],
+      [
+        "Ultimate parent",
+        "lei:549300J4U55H3WP1XT59"
+      ],
+      [
+        "Entities under it",
+        "133"
+      ],
+      [
+        "Reachable here",
+        "1 security(ies) in N-PORT filings"
+      ],
+      [
+        "Relation",
+        "shared legal ownership \u2014 not sector, rating or seniority"
+      ]
+    ]
+  }
+}
