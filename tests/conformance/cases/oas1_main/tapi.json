@@ -1,0 +1,56 @@
+{
+  "fields": {},
+  "series": {
+    "sys:oas1_grid": [
+      [
+        "BULLET (as it actually is)",
+        "\u2014",
+        168.4,
+        0.0,
+        "no call: Z-spread is the OAS"
+      ],
+      [
+        "par call, 0.25y before maturity",
+        "0.50%",
+        159.1,
+        9.2,
+        ""
+      ],
+      [
+        "par call, 0.25y before maturity",
+        "1.00%",
+        156.1,
+        12.3,
+        ""
+      ],
+      [
+        "par call, 0.25y before maturity",
+        "1.50%",
+        152.4,
+        16.0,
+        ""
+      ],
+      [
+        "callable at par, last 1y",
+        "0.50%",
+        43.0,
+        125.4,
+        ""
+      ],
+      [
+        "callable at par, last 1y",
+        "1.00%",
+        42.9,
+        125.5,
+        ""
+      ],
+      [
+        "callable at par, last 1y",
+        "1.50%",
+        40.5,
+        127.9,
+        ""
+      ]
+    ]
+  }
+}

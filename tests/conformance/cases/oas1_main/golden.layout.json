@@ -12,7 +12,7 @@
       "input": null,
       "link": null,
       "provenance": null,
-      "text": "SPREAD ANALYSIS · WHAT THIS RESTS ON"
+      "text": "OPTION-ADJUSTED SPREAD · SENSITIVITY, NOT A MEASUREMENT"
     },
     {
       "at": [
@@ -38,66 +38,92 @@
       "input": null,
       "link": null,
       "provenance": null,
-      "text": "The curves, the conventions, and the assumptions N-PORT does not supply."
+      "text": "If this bond were callable on the stated structure, at the stated vol."
     },
     {
       "at": [
-        21,
+        23,
         0
       ],
       "attrs": [
-        "label"
+        "label",
+        "warning"
       ],
       "input": null,
       "link": null,
       "provenance": null,
-      "text": "Both benchmarks are USD; a non-USD bond is refused rather than measured."
+      "text": "No call schedule is published by N-PORT. These structures are assumptions."
     }
   ],
   "footnotes": [],
   "grid": [
-    22,
+    24,
     80
   ],
-  "mnemonic": "SPRD",
+  "mnemonic": "OAS1",
   "panes": [
     {
-      "binding": "sys:sprd_method",
+      "binding": "sys:oas1_grid",
       "data": [
         [
-          "Bond",
-          "isin:US00084DBA72"
+          "BULLET (as it actually is)",
+          "—",
+          168.4,
+          0.0,
+          "no call: Z-spread is the OAS"
         ],
         [
-          "Issuer",
-          "ABN AMRO BANK NV"
+          "par call, 0.25y before maturity",
+          "0.50%",
+          159.1,
+          9.2,
+          ""
         ],
         [
-          "Price",
-          "100.8600 — implied mark, not a traded level"
+          "par call, 0.25y before maturity",
+          "1.00%",
+          156.1,
+          12.3,
+          ""
         ],
         [
-          "Government curve",
-          "UST CMT, bootstrapped 2026-08-07"
+          "par call, 0.25y before maturity",
+          "1.50%",
+          152.4,
+          16.0,
+          ""
         ],
         [
-          "Swap curve",
-          "USD SOFR OIS, bootstrapped 2026-08-07"
+          "callable at par, last 1y",
+          "0.50%",
+          43.0,
+          125.4,
+          ""
         ],
         [
-          "Currency",
-          "both benchmarks are USD; other currencies are refused"
+          "callable at par, last 1y",
+          "1.00%",
+          42.9,
+          125.5,
+          ""
+        ],
+        [
+          "callable at par, last 1y",
+          "1.50%",
+          40.5,
+          127.9,
+          ""
         ]
       ],
       "region": [
         4,
         0,
-        16,
+        18,
         80
       ],
       "type": "table_scroll"
     }
   ],
   "stale": false,
-  "tab": "method"
+  "tab": "main"
 }

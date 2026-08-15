@@ -1,0 +1,35 @@
+{
+  "fields": {},
+  "series": {
+    "sys:oas1_method": [
+      [
+        "Bond",
+        "isin:US00084DBA72"
+      ],
+      [
+        "Issuer",
+        "ABN AMRO BANK NV"
+      ],
+      [
+        "Bullet Z-spread",
+        "+168.4bp \u2014 the bond as it actually is"
+      ],
+      [
+        "MEASURED",
+        "the price, the coupon, the maturity, the curve"
+      ],
+      [
+        "ASSUMED",
+        "the call schedule and the volatility \u2014 both are columns"
+      ],
+      [
+        "Why assumed",
+        "N-PORT has no call schedule field; without one OAS equals Z"
+      ],
+      [
+        "Model",
+        "Hull-White lattice, mean reversion 3%"
+      ]
+    ]
+  }
+}

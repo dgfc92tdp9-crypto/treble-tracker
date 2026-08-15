@@ -12,7 +12,7 @@
       "input": null,
       "link": null,
       "provenance": null,
-      "text": "SPREAD ANALYSIS · WHAT THIS RESTS ON"
+      "text": "OPTION-ADJUSTED SPREAD · WHAT THIS RESTS ON"
     },
     {
       "at": [
@@ -38,11 +38,11 @@
       "input": null,
       "link": null,
       "provenance": null,
-      "text": "The curves, the conventions, and the assumptions N-PORT does not supply."
+      "text": "What is measured, what is assumed, and which is which."
     },
     {
       "at": [
-        21,
+        23,
         0
       ],
       "attrs": [
@@ -51,18 +51,18 @@
       "input": null,
       "link": null,
       "provenance": null,
-      "text": "Both benchmarks are USD; a non-USD bond is refused rather than measured."
+      "text": "Option cost must be positive: a call right belongs to the issuer."
     }
   ],
   "footnotes": [],
   "grid": [
-    22,
+    24,
     80
   ],
-  "mnemonic": "SPRD",
+  "mnemonic": "OAS1",
   "panes": [
     {
-      "binding": "sys:sprd_method",
+      "binding": "sys:oas1_method",
       "data": [
         [
           "Bond",
@@ -73,26 +73,30 @@
           "ABN AMRO BANK NV"
         ],
         [
-          "Price",
-          "100.8600 — implied mark, not a traded level"
+          "Bullet Z-spread",
+          "+168.4bp — the bond as it actually is"
         ],
         [
-          "Government curve",
-          "UST CMT, bootstrapped 2026-08-07"
+          "MEASURED",
+          "the price, the coupon, the maturity, the curve"
         ],
         [
-          "Swap curve",
-          "USD SOFR OIS, bootstrapped 2026-08-07"
+          "ASSUMED",
+          "the call schedule and the volatility — both are columns"
         ],
         [
-          "Currency",
-          "both benchmarks are USD; other currencies are refused"
+          "Why assumed",
+          "N-PORT has no call schedule field; without one OAS equals Z"
+        ],
+        [
+          "Model",
+          "Hull-White lattice, mean reversion 3%"
         ]
       ],
       "region": [
         4,
         0,
-        16,
+        18,
         80
       ],
       "type": "table_scroll"

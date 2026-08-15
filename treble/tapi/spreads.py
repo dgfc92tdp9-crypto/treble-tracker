@@ -129,24 +129,29 @@ class BondSpread:
         return self.g_spread_bp - self.i_spread_bp
 
 
-def bond_spreads(store: DuckStore, *, identifier: str, as_of: datetime) -> BondSpread:
-    """The three spreads for one bond, each against its own benchmark.
+@dataclass(frozen=True)
+class BondInputs:
+    """A priceable bond assembled from one N-PORT holding record."""
 
-    **I-spread is computed by `g_spread` against the swap curve.** They are
-    the same operation — a yield less a benchmark rate at the bond's
-    maturity — and only the curve differs. Writing a second implementation
-    would be writing a second chance to get the compounding conversion
-    wrong, which is precisely the error that function was just fixed for.
+    spec: FixedBondSpec
+    price: float
+    report_date: date
+    issuer: str | None
+    coupon_pct: float
+
+
+def bond_pricing_inputs(store: DuckStore, *, identifier: str, as_of: datetime) -> BondInputs:
+    """The spec and implied mark for one bond, or a refusal saying why.
+
+    Extracted so `SPRD` and `OAS1` assemble a bond exactly once. Two copies
+    would be two places to decide what an implied mark is, which currency
+    counts, and which report to read — and the two screens would drift
+    apart on a bond where it mattered without either looking wrong.
     """
-    from treble.analytics.bonds.pricing import g_spread, yield_from_price, z_spread
     from treble.tapi.issuer_curves import (
         ASSUMED_DAY_COUNT,
         ASSUMED_FREQUENCY,
         bond_rows,
-    )
-    from treble.tapi.swap_market import (
-        SwapMarketUnavailableError,
-        build_usd_discount_curve,
     )
 
     rows = [r for r in bond_rows(store, as_of=as_of) if str(r.get("identifier")) == identifier]
@@ -171,16 +176,17 @@ def bond_spreads(store: DuckStore, *, identifier: str, as_of: datetime) -> BondS
     row = max(usable, key=lambda r: r["report_date"])  # type: ignore[arg-type,return-value]
     day = row["report_date"]
     maturity = row["nport:maturityDt"]
-    assert isinstance(day, date) and isinstance(maturity, date)  # noqa: S101 - narrowed above
+    if not isinstance(day, date) or not isinstance(maturity, date):  # pragma: no cover
+        raise BondNotPriceableError(f"{identifier} has a non-date report or maturity")
     if maturity <= day:
         raise BondNotPriceableError(f"{identifier} matured on {maturity}, before the {day} report")
     currency = row.get("nport:curCd")
     if currency != "USD":
         # Both benchmarks here are USD — the CMT curve and the SOFR OIS
-        # curve. Measuring an AUD bond against them produces three numbers
-        # that all compute cleanly and mean nothing: the first bond this
-        # function ever ran on was an Australian 2055 line, and it returned
-        # a G-spread of +419bp against a curve from another country.
+        # curve. Measuring an AUD bond against them produces numbers that
+        # all compute cleanly and mean nothing: the first bond this ever
+        # ran on was an Australian 2055 line, and it returned a G-spread of
+        # +419bp against a curve from another country.
         raise BondNotPriceableError(
             f"{identifier} is denominated in {currency}; the benchmarks here are USD and "
             "a spread across currencies is not a spread"
@@ -188,13 +194,40 @@ def bond_spreads(store: DuckStore, *, identifier: str, as_of: datetime) -> BondS
 
     coupon_pct = float(row["nport:annualizedRt"])  # type: ignore[arg-type]
     price = float(row["nport:valUSD"]) / float(row["nport:balance"]) * 100.0  # type: ignore[arg-type]
-    spec = FixedBondSpec(
-        coupon=coupon_pct / 100.0,
-        issue_date=day,
-        maturity=maturity,
-        frequency=ASSUMED_FREQUENCY,
-        day_count=ASSUMED_DAY_COUNT,
+    name = row.get("nport:name")
+    return BondInputs(
+        spec=FixedBondSpec(
+            coupon=coupon_pct / 100.0,
+            issue_date=day,
+            maturity=maturity,
+            frequency=ASSUMED_FREQUENCY,
+            day_count=ASSUMED_DAY_COUNT,
+        ),
+        price=price,
+        report_date=day,
+        issuer=str(name) if isinstance(name, str) else None,
+        coupon_pct=coupon_pct,
     )
+
+
+def bond_spreads(store: DuckStore, *, identifier: str, as_of: datetime) -> BondSpread:
+    """The three spreads for one bond, each against its own benchmark.
+
+    **I-spread is computed by `g_spread` against the swap curve.** They are
+    the same operation — a yield less a benchmark rate at the bond's
+    maturity — and only the curve differs. Writing a second implementation
+    would be writing a second chance to get the compounding conversion
+    wrong, which is precisely the error that function was just fixed for.
+    """
+    from treble.analytics.bonds.pricing import g_spread, yield_from_price, z_spread
+    from treble.tapi.swap_market import (
+        SwapMarketUnavailableError,
+        build_usd_discount_curve,
+    )
+
+    inputs = bond_pricing_inputs(store, identifier=identifier, as_of=as_of)
+    spec, price, day = inputs.spec, inputs.price, inputs.report_date
+    maturity = spec.maturity
     quoted_yield = yield_from_price.__wrapped__(spec, price, as_of=day)  # type: ignore[attr-defined]
 
     govt: float | None = None
@@ -230,12 +263,11 @@ def bond_spreads(store: DuckStore, *, identifier: str, as_of: datetime) -> BondS
             z = None
         break
 
-    name = row.get("nport:name")
     return BondSpread(
         identifier=identifier,
-        issuer=str(name) if isinstance(name, str) else None,
+        issuer=inputs.issuer,
         maturity=maturity,
-        coupon_pct=coupon_pct,
+        coupon_pct=inputs.coupon_pct,
         price=price,
         yield_pct=quoted_yield * 100.0,
         g_spread_bp=govt,
@@ -326,9 +358,11 @@ __all__ = [
     "GOVT_DAY_COUNT",
     "MIN_GOVT_NODES",
     "MIN_GOVT_TENOR_YEARS",
+    "BondInputs",
     "BondNotPriceableError",
     "BondSpread",
     "GovtCurveUnavailableError",
+    "bond_pricing_inputs",
     "bond_spreads",
     "build_govt_curve",
     "govt_curve_dates",

@@ -764,7 +764,58 @@ yields 3.22%, which is through Treasuries. `TVAL` independently flags the
 same bond as anomalously rich. The main tab carries the warning that the
 price is an implied mark, not a traded level.
 
-`OAS1` remains unbuilt and data-blocked — see above.
+### `OAS1` ships as a sensitivity (2026-08-11)
+
+**It does not report your bonds' option-adjusted spreads, and it cannot.**
+N-PORT has no call schedule field, so without one OAS is identically the
+Z-spread: an `OAS1` on this store would either repeat `SPRD`'s Z column
+under a new heading, or price a schedule somebody invented and present it as
+the bond's terms.
+
+Every row is a conditional — *if* this bond were callable on the stated
+structure, at the stated volatility, the option would cost this much. The
+structure and the vol are **columns, not hidden parameters**, because the
+moment either becomes a default the answer starts reading as a measurement.
+That is the treatment ADR-0003 already gives volatility, extended to the
+schedule.
+
+Live on an ABN AMRO 2027, bullet Z +168.4bp:
+
+| structure | vol | OAS | option cost |
+|---|---|---|---|
+| par call, 0.25y before maturity | 0.50% | +159.1bp | +9.2bp |
+| par call, 0.25y before maturity | 1.50% | +152.4bp | +16.0bp |
+| callable at par, last 1y | 0.50% | +43.0bp | +125.4bp |
+| callable at par, last 1y | 1.50% | +40.5bp | +127.9bp |
+
+The three-year structure is refused: the bond has eighteen months of life
+and no three-year non-call period exists on it. Skipped rows carry their
+reason, because a dropped row reads as a structure that cost nothing.
+
+**Option cost is the product, not OAS.** OAS alone invites comparison with
+`SPRD`'s Z-spread as though they measured the same bond. The difference is
+what callability is worth, and it is the figure that survives being wrong
+about the exact call date.
+
+**The sign is not negotiable.** A call right belongs to the issuer, so it
+can only narrow the holder's spread — option cost is non-negative for every
+structure and every vol, and a negative one is flagged on the row as a
+broken input rather than shown as a market oddity.
+
+Two mutations verify the grid is not decorative: giving every structure the
+same call date fails the wider-window test, and flipping the sign fails
+three. A lattice ignoring the schedule would otherwise look entirely
+plausible — all the cells populate, all the numbers are in range.
+
+`bond_pricing_inputs` was extracted from `SPRD` so both screens assemble a
+bond exactly once. Two copies would be two places to decide what an implied
+mark is and which report to read, and the screens would drift apart on the
+bond where it mattered without either looking wrong.
+
+Also corrected: the `SPRD` conformance cases carried `US00206RKD35`, an ISIN
+this author invented, which fails its own check digit. Caught by running
+`OAS1` against it and watching resolution refuse — the validation added two
+days ago doing its job on its author.
 
 **`OAS1` is data-blocked and this is now measured rather than assumed.**
 N-PORT publishes `maturityDt`, `couponKind`, `isPaidKind` and thirty other

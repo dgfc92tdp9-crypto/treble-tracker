@@ -1,0 +1,24 @@
+OPTION-ADJUSTED SPREAD · WHAT THIS RESTS ON
+────────────────────────────────────────────────────────────────────────────
+What is measured, what is assumed, and which is which.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:oas1_method]                                                |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Option cost must be positive: a call right belongs to the issuer.

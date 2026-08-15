@@ -1,0 +1,76 @@
+# OAS1 — Option-adjusted spread, as a sensitivity (spec §10.2).
+#
+# **This screen does not report your bonds' option-adjusted spreads.** It
+# cannot: N-PORT publishes no call schedule — the schema has no such field —
+# and without one OAS is identically the Z-spread. An OAS1 built on this
+# store would either repeat SPRD's Z column under a new heading, or price a
+# call schedule somebody invented and present it as the bond's terms.
+#
+# So every row is a conditional: *if* this bond were callable on the stated
+# structure, at the stated volatility, the option would cost this much. The
+# structure and the vol are columns, not hidden parameters — the moment
+# either becomes a default the answer starts reading as a measurement.
+#
+# That is the treatment ADR-0003 already gives volatility, extended to the
+# call schedule.
+#
+# **Option cost is the product, not OAS.** OAS alone invites comparison with
+# SPRD's Z-spread as though they measured the same bond. The difference is
+# what callability is worth, it must be non-negative — a call belongs to the
+# issuer — and it survives being wrong about the exact call date.
+mnemonic: OAS1
+title: Option-Adjusted Spread
+rows: 24
+cols: 80
+namespaces: [Corp, Govt]
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "OPTION-ADJUSTED SPREAD · SENSITIVITY, NOT A MEASUREMENT"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "If this bond were callable on the stated structure, at the stated vol."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 18, width: 80}
+        pane_type: table_scroll
+        binding: "sys:oas1_grid"
+
+      - kind: static
+        at: {row: 23, col: 0}
+        text: "No call schedule is published by N-PORT. These structures are assumptions."
+        attrs: [label, warning]
+
+  - name: method
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "OPTION-ADJUSTED SPREAD · WHAT THIS RESTS ON"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "What is measured, what is assumed, and which is which."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 18, width: 80}
+        pane_type: table_scroll
+        binding: "sys:oas1_method"
+
+      - kind: static
+        at: {row: 23, col: 0}
+        text: "Option cost must be positive: a call right belongs to the issuer."
+        attrs: [label]

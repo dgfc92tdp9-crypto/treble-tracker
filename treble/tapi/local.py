@@ -354,6 +354,8 @@ class LocalTapi:
         "sys:tval_values",
         "sys:tval_method",
         "sys:tval_snapshots",
+        "sys:oas1_grid",
+        "sys:oas1_method",
         "sys:sprd_spreads",
         "sys:sprd_method",
         "sys:ddis_ladder",
@@ -601,6 +603,8 @@ class LocalTapi:
             return self._allq(security, binding, as_of=as_of)
         if binding in ("sys:port_summary", "sys:port_factors", "sys:port_exposures"):
             return self._port(binding, as_of=as_of)
+        if binding in ("sys:oas1_grid", "sys:oas1_method"):
+            return self._oas1(security, binding, as_of=as_of)
         if binding in ("sys:sprd_spreads", "sys:sprd_method"):
             return self._sprd(security, binding, as_of=as_of)
         if binding in ("sys:ddis_ladder", "sys:ddis_method"):
@@ -899,6 +903,88 @@ class LocalTapi:
         )
 
     # -- TVAL (spec §15.1) ----------------------------------------------
+
+    def _oas1(
+        self, security: SecurityQuery | None, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`OAS1` — what callability would cost, under a stated structure.
+
+        Every row is a conditional. N-PORT publishes no call schedule, so
+        the structure is an assumption named in the row rather than the
+        bond's terms, and the volatility is user-supplied in the way
+        ADR-0003 already requires.
+        """
+        from treble.tapi.option_cost import (
+            MIN_OPTION_YEARS,
+            STRUCTURES,
+            VOLATILITIES,
+            OptionCostUnavailableError,
+            option_cost_grid,
+        )
+        from treble.tapi.spreads import BondNotPriceableError
+
+        if security is None:
+            return (("no security selected: OAS1 prices one bond", None, None, None, None),)
+        try:
+            subject = self.resolve(security)
+            grid = option_cost_grid(self._store, identifier=str(subject), as_of=as_of)
+        except (
+            SecurityNotFoundError,
+            BondNotPriceableError,
+            OptionCostUnavailableError,
+        ) as error:
+            return ((str(error), None, None, None, None),)
+
+        if binding == "sys:oas1_method":
+            return (
+                ("Bond", grid.identifier),
+                ("Issuer", grid.issuer or "—"),
+                ("Maturity", grid.maturity.isoformat()),
+                ("Price", f"{grid.price:.4f} — implied mark, not a traded level"),
+                ("Bullet Z-spread", f"{grid.z_spread_bp:+.1f}bp — the bond as it actually is"),
+                ("Discount curve", f"USD SOFR OIS, {grid.curve_date}"),
+                ("MEASURED", "the price, the coupon, the maturity, the curve"),
+                ("ASSUMED", "the call schedule and the volatility — both are columns"),
+                (
+                    "Why assumed",
+                    "N-PORT has no call schedule field; without one OAS equals Z",
+                ),
+                ("Structures tested", "; ".join(label for label, _ in STRUCTURES)),
+                ("Volatilities", ", ".join(f"{v:.2%}" for v in VOLATILITIES)),
+                ("Model", "Hull-White lattice, mean reversion 3%"),
+                ("Option cost", "bullet Z less OAS; positive because the call is the issuer's"),
+                (
+                    "Minimum option life",
+                    f"{MIN_OPTION_YEARS:g}y — shorter is step size, not structure",
+                ),
+                ("Skipped", "; ".join(f"{k}: {v}" for k, v in grid.skipped) or "none"),
+            )
+
+        rows: list[tuple[str | float | int | None, ...]] = [
+            (
+                row.structure,
+                f"{row.volatility:.2%}",
+                round(row.oas_bp, 1),
+                round(row.option_cost_bp, 1),
+                # Flagged rather than hidden. A call right belongs to the
+                # issuer, so it can only narrow the holder's spread; a
+                # negative cost means the lattice, the schedule or the vol
+                # is wrong, not that the market is unusual.
+                "" if row.option_cost_bp >= 0.0 else "NEGATIVE — check the inputs",
+            )
+            for row in grid.rows
+        ]
+        rows.insert(
+            0,
+            (
+                "BULLET (as it actually is)",
+                "—",
+                round(grid.z_spread_bp, 1),
+                0.0,
+                "no call: Z-spread is the OAS",
+            ),
+        )
+        return tuple(rows)
 
     def _sprd(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime
