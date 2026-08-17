@@ -343,6 +343,60 @@ resumable. A `discover` mode is the follow-up.
 
 ## Phases 3–5
 
+Broken down 2026-08-11: **14 ledger items, one per gate criterion**, matching
+the Phase 2 principle that the criteria in `CLAUDE.md` §8 *are* the
+deliverables. Inventing a work-package plan beside them would put a second
+set of numbers next to the gate's own.
+
+**This did not change the reported figure, and a claim made earlier in this
+log was wrong.** I twice stated that 54.94% was "measured against an
+incomplete denominator". It was not. `weights` already reserves 45 points for
+Phases 3–5 — 15, 20 and 10 — and those points were simply unearned. The
+percentage has been honest all along. What was missing was the *plan*: the
+ledger said nothing about what these phases contain or what blocks them.
+
+Every entry carries a `blocker` kind, because the kinds need different
+responses and read identically as prose:
+
+| kind | meaning | items |
+|---|---|---|
+| `code` | engineering only, nothing external needed | P3_1, P3_2, P3_4, P4_1, P5_2, P5_4, P5_5 |
+| `data` | needs a source this install does not have | P3_5, P4_2, P4_4, P5_3 |
+| `terms` | a source exists; its licence forbids or is unread | P4_3 |
+| `cost` | cannot be done for nothing, which this project forbids | P5_1 |
+| `unverified` | **the assessment itself is unchecked** | P3_3 |
+
+Seven of fourteen are pure engineering. The one marked `unverified` is the
+one to probe first: `EMS` FIX connectivity needs a simulator, `ems` was
+deferred out of Phase 2 on the assumption a free one exists, and **nobody
+has checked**. Recording that as `code` would have been a guess dressed as
+an assessment.
+
+`P4_3` is the KBRA lesson waiting to happen again: Fannie Mae and Freddie
+Mac publish agency loan-level performance data at no charge behind a
+registration and a data licence, and whether those terms permit this use is
+**unread**. Read them before assuming either way.
+
+### A defect the breakdown exposed
+
+`scripts/completion.py` credited earlier phases their **full weight**, on
+the stated assumption that "earlier phases are complete by definition of the
+phase gates". That is false the moment a phase gates with a criterion
+legitimately short of 1.0 — and Phase 2 will, because P2_4's ratings and
+P2_8's execution venue are blocked outside this repository rather than
+unbuilt.
+
+Moving `active_phase` to `phase_3` would have taken the figure from **54.94%
+to 55.00% with no commit in between**: a silent gift of the 0.06 those two
+criteria never earned. Every phase is now credited pro rata. The change is
+behaviour-preserving today (Phase 1 is 16 entries all at 1.0, so its 30
+points are earned either way) and it is regression-tested by advancing the
+gate on a synthetic ledger and asserting the figure does not move.
+
+A weighted phase with no entries is now refused outright — which is what
+Phases 3–5 were until today.
+
+
 Not started. Criteria in `CLAUDE.md` §8. Do not begin a phase until the previous one is fully green.
 
 ---

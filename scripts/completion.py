@@ -78,12 +78,34 @@ def compute(data: dict[str, Any] | None = None) -> Completion:
     total = len(packages)
     fraction = completed / total
 
-    # Earlier phases are complete by definition of the phase gates; the
-    # active phase contributes its own weight pro rata.
+    # Every phase contributes its weight pro rata, including the ones behind
+    # the active gate.
+    #
+    # This used to credit earlier phases their *full* weight, on the stated
+    # assumption that "earlier phases are complete by definition of the phase
+    # gates". That assumption is false the moment a phase is gated with a
+    # criterion legitimately short of 1.0 — and Phase 2 will be, because
+    # P2_4's ratings and P2_8's execution venue are blocked outside this
+    # repository rather than unbuilt. Advancing `active_phase` to phase_3
+    # would have moved the figure from 54.94% to 55.00% with no work done:
+    # a silent gift of the 0.06 those two criteria never earned.
+    #
+    # Found while breaking Phases 3-5 into ledger items, which is what put
+    # every phase in the file and made the uniform form possible. It is
+    # behaviour-preserving today — Phase 1 is 16 entries all at 1.0, so its
+    # 30 points are earned either way — and it stops the figure crediting
+    # work that was never done later.
     weights = data["weights"]
-    ordered = sorted(weights)
-    earlier = sum(weights[name] for name in ordered if name < phase)
-    overall = earlier + fraction * weights[phase]
+    overall = 0.0
+    for name, weight in weights.items():
+        entries = data.get(name)
+        if not entries:
+            raise LedgerError(
+                f"{name} has a weight of {weight} and no ledger entries. A phase that "
+                "carries weight and lists no deliverables makes the figure a statement "
+                "about an unwritten plan"
+            )
+        overall += weight * sum(e["done"] for e in entries.values()) / len(entries)
 
     return Completion(
         overall=overall,

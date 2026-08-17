@@ -1040,3 +1040,130 @@ phase_2:
                   replay chain and only the second is a defect. Mutation-
                   checked: hard-coding the restriction flag and dropping the
                   echoed hash each fail a test"}
+
+# Phases 3-5 track one entry per gate criterion, for the reason Phase 2 does:
+# the criteria in CLAUDE.md §8 *are* the deliverables, and inventing a
+# work-package plan beside them would put a second set of numbers next to the
+# gate's own.
+#
+# Every entry is 0.0. Adding them does not change the reported figure and is
+# not meant to: `weights` already reserves 45 points for these phases and they
+# were always unearned, so the percentage has been measured against a complete
+# denominator all along. What was missing was the *plan*, not the arithmetic —
+# this file said nothing about what these phases contain or what blocks them,
+# and that is the gap being closed.
+#
+# `blocker` classifies what stands in the way, because the kinds need different
+# responses and read identically when written as prose:
+#   code       — engineering only; nothing external is needed
+#   data       — needs a source this install does not have
+#   terms      — a source exists and its licence forbids or is unread
+#   cost       — cannot be done for nothing, which the project forbids
+#   unverified — the assessment itself has not been checked; do not trust it
+phase_3:
+  P3_1:  {done: 0.0, blocker: code,
+          name: "IM on Matrix with verified identity; local Synapse in Docker",
+          notes: "Synapse is open source and runs locally, so this needs no paid
+                  service. The invariant work is identity: `verified` in Matrix means
+                  cross-signed device keys, and a chat showing a name without proving
+                  the key behind it is the compliance equivalent of an unsourced
+                  price. Docker becomes a new environment dependency nothing else
+                  here assumes — an ADR question before a coding one."}
+  P3_2:  {done: 0.0, blocker: code,
+          name: "PEOP, TVault WORM archiving with retention tests",
+          notes: "The store already holds most of the mechanism: PayloadStore is
+                  content-addressed and rejects differing bytes for an existing hash,
+                  and IngestLog is append-only. WORM is those properties plus a
+                  retention clock and a deletion path that refuses. The test that
+                  matters is the one that tries to overwrite, and to delete early,
+                  and is refused — a retention policy nothing enforces is a
+                  document."}
+  P3_3:  {done: 0.0, blocker: unverified,
+          name: "EMS FIX connectivity against a simulator",
+          notes: "The spec asks for a simulator rather than a venue, so this is
+                  reachable in principle. NOT VERIFIED: which free FIX simulator is
+                  available and under what licence. Probe that before planning the
+                  work. P2_8's remaining 0.01 is this criterion's dependency, and
+                  `ems` was deferred to Phase 3 on the assumption a simulator
+                  exists — an assumption nobody has tested."}
+  P3_4:  {done: 0.0, blocker: code,
+          name: "PMS compliance DSL: version-controlled, unit-testable rules",
+          notes: "Pure engineering, and the closest thing here to a solved shape: the
+                  TQL grammar and the closed conditional-attribute predicate set in
+                  the screen contract are both small DSLs built with the no-eval
+                  discipline this needs. A compliance rule that could not be
+                  unit-tested would be a rule nobody can prove fires."}
+  P3_5:  {done: 0.0, blocker: data,
+          name: "TCA",
+          notes: "Transaction cost analysis needs executions to analyse, and this
+                  install has no trade or position store — the same gap that leaves
+                  §12.1's total-return swap unfed. It also needs a benchmark price at
+                  execution time, which for corporate bonds means the intraday quotes
+                  measured absent on 2026-08-09. Blocked twice; the trade store is
+                  the half that is buildable."}
+
+phase_4:
+  P4_1:  {done: 0.0, blocker: code,
+          name: "DLIB with TPay compiler and AAD greeks",
+          notes: "Engineering only, and the largest single item in the ledger. AAD
+                  means differentiating the payoff evaluator rather than bumping it,
+                  which is a different program from anything built so far — the
+                  existing greeks are finite-difference, see bonds.effective_duration
+                  and its bump parameter. The @model registry already supplies the I3
+                  envelope a compiled payoff would have to carry."}
+  P4_2:  {done: 0.0, blocker: data,
+          name: "RISK XVA",
+          notes: "Curves and a volatility surface both exist. What XVA needs beyond
+                  them is counterparty credit — CDS spreads — and that is the wall
+                  CDSW already hit: zero credit subjects in the store, DTCC's credit
+                  slice 403s, no free spread source found. A CVA computed from an
+                  assumed hazard rate would be a number about an assumption."}
+  P4_3:  {done: 0.0, blocker: terms,
+          name: "Mortgage stack: prepayment model fitted to agency loan-level data, CMO waterfalls"}
+  P4_4:  {done: 0.0, blocker: data,
+          name: "TIDX",
+          notes: "Index construction needs constituents and their weights. No free
+                  source for major index membership has been identified, and the
+                  vendors who publish it license it as their product. An index built
+                  over the N-PORT universe would be constructible and would not be
+                  TIDX — it would be an index of what funds happen to hold."}
+
+phase_5:
+  P5_1:  {done: 0.0, blocker: cost,
+          name: "ASK with mandatory grounding and the numeric-substitution guard",
+          notes: "Needs a language model. A hosted API breaks the zero-external-cost
+                  constraint, so this means a local model and therefore a machine that
+                  can run one — hardware rather than subscription. The guard is the
+                  part that is pure engineering and the part that matters: §9 requires
+                  every figure in an answer to be substituted from a TAPI read rather
+                  than generated, which is a mechanism, not a prompt. Build the guard
+                  and its tests first; it is testable against a stub returning fixed
+                  text, with no model present at all."}
+  P5_2:  {done: 0.0, blocker: code,
+          name: "Published evaluation harness with results",
+          notes: "Depends on P5_1 existing to evaluate, but the harness is code and
+                  the discipline is familiar — this is the conformance suite applied
+                  to answers instead of screens. `Published` is the load-bearing word:
+                  a harness whose results are not stated is a harness nobody can
+                  check."}
+  P5_3:  {done: 0.0, blocker: data,
+          name: "TI dashboards",
+          notes: "Trade-information dashboards need traffic to aggregate. A one-user
+                  local install has none, which is the shape of ALLQ's empty book: the
+                  honest rendering is a screen that says so. Whether that satisfies the
+                  criterion is a question for the phase gate rather than for the code."}
+  P5_4:  {done: 0.0, blocker: code,
+          name: "Node federation",
+          notes: "Engineering, and §22.1's entitlement model is its prerequisite — the
+                  local HTTP surface binds to loopback with no authentication precisely
+                  because federating it without entitlements would publish a store. The
+                  contribution API is the natural first federated service: it already
+                  has a wire format and a correct-when-empty screen."}
+  P5_5:  {done: 0.0, blocker: code,
+          name: "Mobile",
+          notes: "The screen contract was built for this — one definition, many
+                  renderers — and a third renderer is the test of whether that held.
+                  The conformance suite should extend to it unchanged, which would be
+                  the strongest available evidence that I6 earned its cost. Panes are
+                  where it will hurt: an 80x22 grid does not fit a phone, and §5.3 has
+                  layouts follow a user across machines."}

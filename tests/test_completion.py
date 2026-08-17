@@ -112,3 +112,94 @@ class TestLedgerIsSelfConsistent:
         for name, entry in load_ledger()["phase_1"].items():
             if 0.0 < entry["done"] < 1.0:
                 assert entry.get("basis"), f"{name} is partial without a basis"
+
+
+class TestEveryPhaseIsCreditedProRata:
+    """Advancing the gate must not credit work that was never done.
+
+    The computation used to credit earlier phases their *full* weight, on the
+    stated assumption that "earlier phases are complete by definition of the
+    phase gates". That assumption fails the moment a phase is gated with a
+    criterion legitimately short of 1.0 — and Phase 2 will be, because
+    P2_4's ratings and P2_8's execution venue are blocked outside this
+    repository rather than unbuilt.
+
+    Moving `active_phase` to phase_3 would have taken the figure from 54.94%
+    to 55.00% with no commit in between.
+    """
+
+    @staticmethod
+    def _ledger() -> dict[str, object]:
+        return {
+            "weights": {"phase_1": 50, "phase_2": 50},
+            "active_phase": "phase_1",
+            "phase_1": {"A": {"done": 1.0, "name": "a"}},
+            # Deliberately short of 1.0, as Phase 2 will be at its gate.
+            "phase_2": {"B": {"done": 0.5, "name": "b", "basis": "half"}},
+        }
+
+    def test_an_incomplete_earlier_phase_is_not_rounded_up(self) -> None:
+        from scripts.completion import compute
+
+        ledger = self._ledger()
+        ledger["active_phase"] = "phase_2"
+        before = compute(ledger).overall
+        # Advance the gate without changing a single `done`.
+        ledger["active_phase"] = "phase_1"
+        after = compute(ledger).overall
+        assert before == pytest.approx(75.0)
+        assert after == pytest.approx(before), "the figure moved without any work"
+
+    def test_the_figure_is_the_weighted_sum_of_every_phase(self) -> None:
+        """Stated as arithmetic so the property is checkable by hand rather
+        than by rerunning the implementation."""
+        from scripts.completion import compute
+
+        assert compute(self._ledger()).overall == pytest.approx(50 * 1.0 + 50 * 0.5)
+
+    def test_a_weighted_phase_with_no_entries_is_refused(self) -> None:
+        """A phase carrying weight and listing no deliverables makes the
+        figure a statement about an unwritten plan. Phases 3-5 were exactly
+        that until they were broken down."""
+        from scripts.completion import LedgerError, compute
+
+        ledger = self._ledger()
+        del ledger["phase_2"]
+        with pytest.raises(LedgerError, match="no ledger entries"):
+            compute(ledger)
+
+
+class TestPhasesThreeToFiveAreFullyEnumerated:
+    def test_every_gate_criterion_has_an_entry(self) -> None:
+        """One entry per criterion in CLAUDE.md §8 — 5, 4 and 5. A phase
+        missing a criterion would report a completion it had not earned the
+        denominator for."""
+        from scripts.completion import load_ledger
+
+        ledger = load_ledger()
+        assert len(ledger["phase_3"]) == 5
+        assert len(ledger["phase_4"]) == 4
+        assert len(ledger["phase_5"]) == 5
+
+    def test_each_names_what_blocks_it(self) -> None:
+        """The blocker kinds need different responses and read identically
+        as prose. `unverified` is the honest option and must stay available:
+        P3_3 uses it because nobody has checked whether a free FIX simulator
+        exists, and recording that as `code` would be a guess dressed as an
+        assessment."""
+        from scripts.completion import load_ledger
+
+        ledger = load_ledger()
+        allowed = {"code", "data", "terms", "cost", "unverified"}
+        for phase in ("phase_3", "phase_4", "phase_5"):
+            for name, entry in ledger[phase].items():
+                assert entry["blocker"] in allowed, (name, entry.get("blocker"))
+
+    def test_they_are_all_zero(self) -> None:
+        """Nothing in them has been built. A non-zero entry here without a
+        commit behind it is the failure this ledger exists to prevent."""
+        from scripts.completion import load_ledger
+
+        ledger = load_ledger()
+        for phase in ("phase_3", "phase_4", "phase_5"):
+            assert all(e["done"] == 0.0 for e in ledger[phase].values()), phase
