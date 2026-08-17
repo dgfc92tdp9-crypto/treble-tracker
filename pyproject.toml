@@ -27,6 +27,11 @@ dependencies = [
   "highspy>=1.7",
   # grammar / parsing
   "lark>=1.2",
+  # FIX message encoding for the EMS session layer (P3_3). MIT, pure
+  # Python, no build step. Chosen as an *external* check: it computes
+  # BodyLength and CheckSum itself, disagreed with a message this author
+  # hand-wrote, and was right on both when they were recomputed by hand.
+  "simplefix>=1.0",
   "pyyaml>=6.0",
   # ingest
   "httpx>=0.27",
@@ -119,7 +124,7 @@ ignore_errors = true
 follow_imports = "skip"
 
 [[tool.mypy.overrides]]
-module = ["QuantLib.*", "xlwings.*", "scipy.*", "pyarrow.*", "grpc.*", "aiokafka.*", "sklearn.*"]
+module = ["QuantLib.*", "xlwings.*", "scipy.*", "simplefix.*", "pyarrow.*", "grpc.*", "aiokafka.*", "sklearn.*"]
 ignore_missing_imports = true
 # xlwings re-exports its decorators (`func`, `arg`, `ret`) implicitly, which
 # strict mode rejects. Relaxed for this dependency only rather than

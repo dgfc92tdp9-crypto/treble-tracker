@@ -53,6 +53,12 @@ AWAITING_WIRING: dict[str, str] = {
         "data question."
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
+    "treble.ems.simulator": (
+        "The FIX acceptor P3_3's session layer is tested against. Ships in the package "
+        "rather than under tests/ because the gate criterion is connectivity *against a "
+        "simulator*, so it is a tool a user runs and not only a fixture. No CLI command "
+        "starts it yet, which is the wiring that is missing."
+    ),
 }
 
 ALLOWED_UNREACHABLE = {**ENTRY_POINTS, **AWAITING_WIRING}

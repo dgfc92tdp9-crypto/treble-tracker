@@ -195,11 +195,39 @@ class TestPhasesThreeToFiveAreFullyEnumerated:
             for name, entry in ledger[phase].items():
                 assert entry["blocker"] in allowed, (name, entry.get("blocker"))
 
-    def test_they_are_all_zero(self) -> None:
-        """Nothing in them has been built. A non-zero entry here without a
-        commit behind it is the failure this ledger exists to prevent."""
+    def test_any_progress_states_what_was_counted(self) -> None:
+        """This asserted every Phase 3-5 entry was 0.0, which was true when
+        written and stopped being true when P3_3 reached 0.5.
+
+        The replacement is the property actually worth holding: a partial
+        anywhere must carry a `basis`. It also found a real gap — the ledger
+        validator checked only the *active* phase, so a partial in Phase 3
+        while Phase 2 was active needed no basis at all. A guess in an
+        inactive phase is exactly as much a guess.
+        """
         from scripts.completion import load_ledger
 
         ledger = load_ledger()
         for phase in ("phase_3", "phase_4", "phase_5"):
-            assert all(e["done"] == 0.0 for e in ledger[phase].values()), phase
+            for name, entry in ledger[phase].items():
+                if 0.0 < entry["done"] < 1.0:
+                    assert entry.get("basis"), f"{name} is partial with no basis"
+
+    def test_the_validator_rejects_a_partial_with_no_basis_in_any_phase(self) -> None:
+        """The gap the test above uncovered, pinned so it cannot return."""
+        import copy
+
+        import yaml
+
+        from scripts.completion import LEDGER, LedgerError, load_ledger
+
+        raw = yaml.safe_load(LEDGER.read_text())
+        broken = copy.deepcopy(raw)
+        broken["phase_5"]["P5_5"] = {"done": 0.5, "name": "Mobile"}
+        path = Path(__file__).parent / "_broken_ledger.yaml"
+        path.write_text(yaml.safe_dump(broken))
+        try:
+            with pytest.raises(LedgerError, match="needs a `basis`"):
+                load_ledger(path)
+        finally:
+            path.unlink()

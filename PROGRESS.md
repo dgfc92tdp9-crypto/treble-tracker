@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 54.94%**
+**Completion: 56.44%**
 
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
@@ -340,6 +340,58 @@ not the multi-curve CSA-aware discounting the criterion names.
 Keeping the curve current means extending `dtcc_report_dates` in `config/universe.yaml`; dates
 are explicit rather than a rolling window so each step has a predictable URI and population stays
 resumable. A `discover` mode is the follow-up.
+
+## Phase 3 begins: EMS session layer and simulator (2026-08-11)
+
+**P3_3's `unverified` marking is resolved, and resolving it caught me
+inventing evidence.** I wrote a FIX Logon in a probe script, described it in
+the code as "a published FIX 4.2 Logon, byte-for-byte from the protocol's
+own examples", and it was nothing of the sort — I had made it up, with a
+body length of 65 where the correct answer is 68 and a checksum to match.
+`simplefix` disagreed, and recomputing by hand confirmed `simplefix`.
+
+That is why it was chosen. It is MIT, pure Python, needs no build step, and
+it computes BodyLength and CheckSum *itself* — so the session layer is
+checked against someone else's reading of the protocol. **A session built on
+a home-made encoder and tested against that same encoder would have agreed
+with itself forever.**
+
+### The session half is where the money is lost
+
+An order that is rejected is visible. A message that was never delivered is
+not. `treble/ems/session.py` refuses rather than absorbs:
+
+- **A sequence gap raises**, naming both numbers, and raises *before* the
+  counter moves — so a caller that catches it and requests a resend still
+  points at the first missing message. A counterparty sending 5 after 3 is
+  saying 4 exists and you do not have it; if 4 was an execution report you
+  hold a fill you do not know about, and every position, P&L and risk figure
+  downstream is wrong while looking entirely normal.
+- **A bad checksum is refused before the sequence number is read**, because
+  a corrupt message has no trustworthy field to reason from.
+- **A duplicate is accepted without advancing**, because FIX permits them
+  during resend and rejecting them would reject a legitimate recovery.
+
+### The simulator is deliberately hostile
+
+A simulator this author wrote, driven by a client this author wrote, is a
+closed loop. Three things break it: `simplefix` on both sides; checksums
+computed **by hand** in the tests rather than read from the encoder; and a
+simulator that can be told to **skip a sequence number or corrupt a
+checksum** on demand. A simulator that only ever behaves well tests the
+happy path twice and calls it coverage.
+
+Mutation-checked: absorbing gaps fails four tests, skipping checksum
+verification fails one.
+
+**A defect caught by reading bytes off a fill:** a 1,000,000 quantity was
+being encoded as `1e+06` by `%g`. That is not a FIX quantity — a venue
+rejects it or reads it as something else, and a one-million order arriving
+as anything but one million is the worst outcome on this path.
+
+P3_3 is at **0.5**. Outstanding: no CLI command starts the simulator, there
+is no transport (this is bytes in and bytes out, not a socket), no order
+state machine beyond send-and-fill, and no cancel or replace.
 
 ## Phases 3–5
 

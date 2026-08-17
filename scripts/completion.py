@@ -58,14 +58,21 @@ def load_ledger(path: Path = LEDGER) -> dict[str, Any]:
     if phase not in weights:
         raise LedgerError(f"active_phase {phase!r} has no weight")
 
-    for name, entry in data[phase].items():
-        done = entry["done"]
-        if not 0.0 <= done <= 1.0:
-            raise LedgerError(f"{name}: done={done} is outside [0, 1]")
-        # A partial must say what was counted. Without this the ledger
-        # would just relocate the guesswork rather than remove it.
-        if 0.0 < done < 1.0 and not entry.get("basis"):
-            raise LedgerError(f"{name}: partial completion needs a `basis`")
+    # Every phase, not just the active one. This checked `data[phase]` alone,
+    # which was harmless while the other phases held nothing — and stopped
+    # being harmless the moment Phase 3 took a partial value while Phase 2
+    # was still active. A partial in an inactive phase is exactly as capable
+    # of being a guess as one in the active phase, and was exactly as
+    # unchecked.
+    for phase_name in weights:
+        for name, entry in data.get(phase_name, {}).items():
+            done = entry["done"]
+            if not 0.0 <= done <= 1.0:
+                raise LedgerError(f"{name}: done={done} is outside [0, 1]")
+            # A partial must say what was counted. Without this the ledger
+            # would just relocate the guesswork rather than remove it.
+            if 0.0 < done < 1.0 and not entry.get("basis"):
+                raise LedgerError(f"{name}: partial completion needs a `basis`")
     return data
 
 

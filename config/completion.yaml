@@ -1078,14 +1078,41 @@ phase_3:
                   matters is the one that tries to overwrite, and to delete early,
                   and is refused — a retention policy nothing enforces is a
                   document."}
-  P3_3:  {done: 0.0, blocker: unverified,
+  P3_3:  {done: 0.5, blocker: code,
           name: "EMS FIX connectivity against a simulator",
-          notes: "The spec asks for a simulator rather than a venue, so this is
-                  reachable in principle. NOT VERIFIED: which free FIX simulator is
-                  available and under what licence. Probe that before planning the
-                  work. P2_8's remaining 0.01 is this criterion's dependency, and
-                  `ems` was deferred to Phase 3 on the assumption a simulator
-                  exists — an assumption nobody has tested."}
+          basis: "the session layer and a simulator ship; the order path round-trips.
+                  The `unverified` marking is resolved: `simplefix` is MIT, pure
+                  Python, needs no build step, and — the reason it was chosen — it
+                  computes BodyLength and CheckSum itself. It disagreed with a Logon
+                  this author hand-wrote and claimed was a published example; the body
+                  length was 68 and not 65, and recomputing by hand confirmed
+                  simplefix. A session built on a home-made encoder and tested against
+                  that same encoder would have agreed with itself forever.
+                  treble/ems/session.py is the session half, which is where the money
+                  is lost: an order that is rejected is visible, a message never
+                  delivered is not. A sequence gap raises rather than being absorbed,
+                  and raises *before* the counter moves so a resend still points at
+                  the first missing message. A counterparty sending 5 after 3 is
+                  saying 4 exists and you do not have it; if 4 was an execution report
+                  you hold a fill you do not know about and every position, P&L and
+                  risk figure downstream is wrong while looking normal. Duplicates are
+                  accepted without advancing, because FIX permits them during resend
+                  and rejecting them would reject a legitimate recovery.
+                  treble/ems/simulator.py is an acceptor CI can run with no network,
+                  as §7 requires. A simulator this author wrote driven by a client
+                  this author wrote is a closed loop, so it is deliberately hostile on
+                  demand: it can skip a sequence number or corrupt a checksum, which
+                  makes the client's refusals exercised rather than asserted. A
+                  simulator that only behaves well tests the happy path twice.
+                  Checksums in the tests are computed by hand, byte by byte, not read
+                  from the encoder. Mutation-checked: absorbing gaps fails four tests,
+                  skipping checksum verification fails one. A defect caught by reading
+                  bytes off a fill: a 1,000,000 quantity was being encoded `1e+06` by
+                  %g, which is not a FIX quantity — a venue rejects it or reads it as
+                  something else. Outstanding, and why this is 0.5: no CLI command
+                  starts the simulator, there is no transport (this is bytes in and
+                  bytes out, not a socket), no order state machine beyond
+                  send-and-fill, and no cancel or replace."}
   P3_4:  {done: 0.0, blocker: code,
           name: "PMS compliance DSL: version-controlled, unit-testable rules",
           notes: "Pure engineering, and the closest thing here to a solved shape: the

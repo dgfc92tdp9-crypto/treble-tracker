@@ -2525,6 +2525,15 @@ wheels = [
 ]
 
 [[package]]
+name = "simplefix"
+version = "1.0.17"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/9a/e17706ff04ca5d0f7d10fbefe957bd85c11bb9d47ffd7a3b0f125c5f4c0f/simplefix-1.0.17.tar.gz", hash = "sha256:d7f86666f508b11a8839d26ad66d63eaa5e53e6d0d4e23f5ef065feead60e658", size = 32985, upload-time = "2023-09-12T08:43:42.124Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/20/e3/cabeb722e75488b53a5d509d4ee1a0ad30683ade7210e6ea593c654ed410/simplefix-1.0.17-py2.py3-none-any.whl", hash = "sha256:da15798755447b9719f8688ca4cc29ee20c6d94d3227f22f60e04dcf347a2c68", size = 27268, upload-time = "2023-09-12T08:43:39.982Z" },
+]
+
+[[package]]
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2747,6 +2756,7 @@ dependencies = [
     { name = "rich" },
     { name = "scikit-learn" },
     { name = "scipy" },
+    { name = "simplefix" },
     { name = "statsmodels" },
     { name = "tenacity" },
     { name = "textual" },
@@ -2812,6 +2822,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = "==0.16.0" },
     { name = "scikit-learn", specifier = ">=1.5" },
     { name = "scipy", specifier = ">=1.14" },
+    { name = "simplefix", specifier = ">=1.0" },
     { name = "statsmodels", specifier = ">=0.14" },
     { name = "syrupy", marker = "extra == 'dev'", specifier = ">=4.7" },
     { name = "tenacity", specifier = ">=9.0" },
