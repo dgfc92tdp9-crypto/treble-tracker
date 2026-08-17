@@ -58,10 +58,46 @@ LEAVES_QTY = 151
 AVG_PX = 6
 
 NEW_ORDER_SINGLE = "D"
+CANCEL_REQUEST = "F"
+CANCEL_REPLACE_REQUEST = "G"
 EXECUTION_REPORT = "8"
+CANCEL_REJECT = "9"
+
+ORIG_CL_ORD_ID = 41
+CXL_REJ_REASON = 102
+CXL_REJ_RESPONSE_TO = 434
+TEXT = 58
+
+#: ExecType / OrdStatus values.
+NEW = "0"
+CANCELED = "4"
+REPLACED = "5"
 
 #: ExecType/OrdStatus for a complete fill.
 FILLED = "2"
+
+
+@dataclass
+class RestingOrder:
+    """An order the simulator is holding rather than filling."""
+
+    order_id: str
+    symbol: str
+    side: str
+    quantity: float
+    price: float
+    filled: float = 0.0
+    status: str = NEW
+
+    @property
+    def live(self) -> bool:
+        """Whether the order can still be cancelled or replaced.
+
+        A filled or cancelled order cannot. This is the property the two
+        refusals below turn on, and getting it wrong is how a trader comes
+        to believe a position was cancelled when it was filled.
+        """
+        return self.status == NEW
 
 
 @dataclass
@@ -76,8 +112,16 @@ class Simulator:
     skip_outbound: frozenset[int] = frozenset()
     #: Corrupt the checksum of these outbound sequence numbers.
     corrupt_outbound: frozenset[int] = frozenset()
+    #: When False, orders rest instead of filling, so cancel and replace can
+    #: be exercised. A simulator that filled everything instantly would make
+    #: every cancel arrive too late and the refusals untestable — true, and
+    #: true for the wrong reason.
+    fill_immediately: bool = True
+    #: Live orders by ClOrdID.
+    book: dict[str, RestingOrder] = field(default_factory=dict)
     session: Session = field(init=False)
     fills: int = 0
+    reports: int = 0
 
     def __post_init__(self) -> None:
         self.session = Session(sender=self.sender, target=self.target)
@@ -124,30 +168,158 @@ class Simulator:
             )
             return out
         elif msg_type == NEW_ORDER_SINGLE:
-            out.append(self._fill(message, now=now))
+            out.append(self._accept(message, now=now))
+        elif msg_type == CANCEL_REQUEST:
+            out.append(self._cancel(message, now=now))
+        elif msg_type == CANCEL_REPLACE_REQUEST:
+            out.append(self._replace(message, now=now))
 
         return [sent for sent in (self._emit(raw) for raw in out) if sent is not None]
 
-    def _fill(self, order: simplefix.FixMessage, *, now: datetime) -> bytes:
-        """One complete fill at the order's own price."""
+    def _accept(self, order: simplefix.FixMessage, *, now: datetime) -> bytes:
+        """Fill the order, or rest it, depending on the configured mode."""
+        order_id = (order.get(CL_ORD_ID) or b"").decode()
+        if order_id in self.book:
+            # A ClOrdID must be unique per session. Reusing one makes every
+            # later cancel ambiguous, and a venue that accepted it would
+            # leave two orders answering to one name.
+            return self._cancel_reject(
+                order_id, order_id, "duplicate ClOrdID", response_to=NEW_ORDER_SINGLE, now=now
+            )
+        resting = RestingOrder(
+            order_id=order_id,
+            symbol=(order.get(SYMBOL) or b"").decode(),
+            side=(order.get(SIDE) or b"").decode(),
+            quantity=float((order.get(ORDER_QTY) or b"0").decode()),
+            price=float((order.get(PRICE) or b"0").decode()),
+        )
+        self.book[order_id] = resting
+        if not self.fill_immediately:
+            return self._report(resting, NEW, now=now, last_qty=0.0)
         self.fills += 1
-        quantity = (order.get(ORDER_QTY) or b"0").decode()
-        price = (order.get(PRICE) or b"0").decode()
+        resting.filled = resting.quantity
+        resting.status = FILLED
+        return self._report(resting, FILLED, now=now, last_qty=resting.quantity)
+
+    def _cancel(self, request: simplefix.FixMessage, *, now: datetime) -> bytes:
+        """Cancel a resting order, or refuse and say why.
+
+        **The refusal is the point.** A cancel that arrives after the fill
+        must be rejected, never acknowledged: a trader who believes an order
+        was cancelled when it was filled is long or short something they
+        think they are flat, and every downstream number agrees with them.
+        """
+        order_id = (request.get(CL_ORD_ID) or b"").decode()
+        original = (request.get(ORIG_CL_ORD_ID) or b"").decode()
+        resting = self.book.get(original)
+        if resting is None:
+            return self._cancel_reject(
+                order_id, original, "unknown order", response_to=CANCEL_REQUEST, now=now
+            )
+        if not resting.live:
+            return self._cancel_reject(
+                order_id,
+                original,
+                f"too late to cancel: already {resting.status}",
+                response_to=CANCEL_REQUEST,
+                now=now,
+            )
+        resting.status = CANCELED
+        return self._report(resting, CANCELED, now=now, last_qty=0.0, order_id=order_id)
+
+    def _replace(self, request: simplefix.FixMessage, *, now: datetime) -> bytes:
+        """Amend a resting order's quantity or price, or refuse."""
+        order_id = (request.get(CL_ORD_ID) or b"").decode()
+        original = (request.get(ORIG_CL_ORD_ID) or b"").decode()
+        resting = self.book.get(original)
+        if resting is None:
+            return self._cancel_reject(
+                order_id, original, "unknown order", response_to=CANCEL_REPLACE_REQUEST, now=now
+            )
+        if not resting.live:
+            return self._cancel_reject(
+                order_id,
+                original,
+                f"too late to replace: already {resting.status}",
+                response_to=CANCEL_REPLACE_REQUEST,
+                now=now,
+            )
+        new_quantity = float((request.get(ORDER_QTY) or b"0").decode())
+        if new_quantity < resting.filled:
+            # Reducing below what is already done is not an amendment, it is
+            # an instruction to un-execute. Refused rather than clamped: a
+            # silent clamp would leave the trader believing a smaller
+            # position than they hold.
+            return self._cancel_reject(
+                order_id,
+                original,
+                f"quantity {new_quantity:g} is below {resting.filled:g} already filled",
+                response_to=CANCEL_REPLACE_REQUEST,
+                now=now,
+            )
+        replaced = RestingOrder(
+            order_id=order_id,
+            symbol=resting.symbol,
+            side=resting.side,
+            quantity=new_quantity,
+            price=float((request.get(PRICE) or b"0").decode()) or resting.price,
+            filled=resting.filled,
+        )
+        # The original leaves the book under its own id and the replacement
+        # enters under the new one. Keeping both live would make a later
+        # cancel ambiguous, which is the defect the duplicate check above
+        # exists to prevent.
+        resting.status = REPLACED
+        self.book[order_id] = replaced
+        return self._report(replaced, REPLACED, now=now, last_qty=0.0, original=original)
+
+    def _report(
+        self,
+        order: RestingOrder,
+        exec_type: str,
+        *,
+        now: datetime,
+        last_qty: float,
+        order_id: str | None = None,
+        original: str | None = None,
+    ) -> bytes:
+        self.reports += 1
+        fields: list[tuple[int, str | int]] = [
+            (CL_ORD_ID, order_id or order.order_id),
+            (EXEC_ID, f"E{self.reports}"),
+            (EXEC_TYPE, exec_type),
+            (ORD_STATUS, exec_type),
+            (SYMBOL, order.symbol),
+            (SIDE, order.side),
+            (ORDER_QTY, _decimal(order.quantity)),
+            (LAST_QTY, _decimal(last_qty)),
+            (LAST_PX, _decimal(order.price if last_qty else 0.0)),
+            (CUM_QTY, _decimal(order.filled)),
+            (LEAVES_QTY, _decimal(max(order.quantity - order.filled, 0.0) if order.live else 0.0)),
+            (AVG_PX, _decimal(order.price if order.filled else 0.0)),
+        ]
+        if original is not None:
+            fields.insert(1, (ORIG_CL_ORD_ID, original))
+        return self.session.encode(EXECUTION_REPORT, tuple(fields), now=now)
+
+    def _cancel_reject(
+        self, order_id: str, original: str, reason: str, *, response_to: str, now: datetime
+    ) -> bytes:
+        """Say no, and say why.
+
+        A rejection carrying no reason is one a trader cannot act on: they
+        do not know whether to retry, to re-send with a different id, or to
+        check their position because the order already filled.
+        """
         return self.session.encode(
-            EXECUTION_REPORT,
+            CANCEL_REJECT,
             (
-                (CL_ORD_ID, (order.get(CL_ORD_ID) or b"").decode()),
-                (EXEC_ID, f"E{self.fills}"),
-                (EXEC_TYPE, FILLED),
-                (ORD_STATUS, FILLED),
-                (SYMBOL, (order.get(SYMBOL) or b"").decode()),
-                (SIDE, (order.get(SIDE) or b"").decode()),
-                (ORDER_QTY, quantity),
-                (LAST_QTY, quantity),
-                (LAST_PX, price),
-                (CUM_QTY, quantity),
-                (LEAVES_QTY, 0),
-                (AVG_PX, price),
+                (CL_ORD_ID, order_id),
+                (ORIG_CL_ORD_ID, original),
+                (ORD_STATUS, self.book[original].status if original in self.book else "8"),
+                (CXL_REJ_RESPONSE_TO, "1" if response_to == CANCEL_REQUEST else "2"),
+                (CXL_REJ_REASON, "0"),
+                (TEXT, reason),
             ),
             now=now,
         )
@@ -200,10 +372,62 @@ def new_order_single(
     )
 
 
+def cancel_request(
+    session: Session, *, order_id: str, original_id: str, symbol: str, side: str, now: datetime
+) -> bytes:
+    """Ask to cancel a resting order."""
+    return session.encode(
+        CANCEL_REQUEST,
+        (
+            (CL_ORD_ID, order_id),
+            (ORIG_CL_ORD_ID, original_id),
+            (SYMBOL, symbol),
+            (SIDE, side),
+        ),
+        now=now,
+    )
+
+
+def cancel_replace_request(
+    session: Session,
+    *,
+    order_id: str,
+    original_id: str,
+    symbol: str,
+    side: str,
+    quantity: float,
+    price: float,
+    now: datetime,
+) -> bytes:
+    """Ask to amend a resting order's quantity or price."""
+    return session.encode(
+        CANCEL_REPLACE_REQUEST,
+        (
+            (CL_ORD_ID, order_id),
+            (ORIG_CL_ORD_ID, original_id),
+            (SYMBOL, symbol),
+            (SIDE, side),
+            (ORDER_QTY, _decimal(quantity)),
+            (ORD_TYPE, "2"),
+            (PRICE, _decimal(price)),
+        ),
+        now=now,
+    )
+
+
 __all__ = [
+    "CANCELED",
+    "CANCEL_REJECT",
+    "CANCEL_REPLACE_REQUEST",
+    "CANCEL_REQUEST",
     "EXECUTION_REPORT",
     "FILLED",
+    "NEW",
     "NEW_ORDER_SINGLE",
+    "REPLACED",
+    "RestingOrder",
     "Simulator",
+    "cancel_replace_request",
+    "cancel_request",
     "new_order_single",
 ]

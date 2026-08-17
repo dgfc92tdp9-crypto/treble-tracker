@@ -1078,7 +1078,7 @@ phase_3:
                   matters is the one that tries to overwrite, and to delete early,
                   and is refused — a retention policy nothing enforces is a
                   document."}
-  P3_3:  {done: 0.5, blocker: code,
+  P3_3:  {done: 0.75, blocker: code,
           name: "EMS FIX connectivity against a simulator",
           basis: "the session layer and a simulator ship; the order path round-trips.
                   The `unverified` marking is resolved: `simplefix` is MIT, pure
@@ -1109,10 +1109,42 @@ phase_3:
                   skipping checksum verification fails one. A defect caught by reading
                   bytes off a fill: a 1,000,000 quantity was being encoded `1e+06` by
                   %g, which is not a FIX quantity — a venue rejects it or reads it as
-                  something else. Outstanding, and why this is 0.5: no CLI command
-                  starts the simulator, there is no transport (this is bytes in and
-                  bytes out, not a socket), no order state machine beyond
-                  send-and-fill, and no cancel or replace."}
+                  something else. A loopback socket now carries it, which the word
+                  *connectivity* in the criterion asks for and a hand-off test cannot
+                  prove. Framing is the whole job: TCP has no message boundaries, so a
+                  read returns half a message or three, and a receiver assuming one
+                  read is one message works perfectly on loopback with small messages
+                  and fails the first time a venue sends quickly. FIX is
+                  self-delimiting through BodyLength and simplefix buffers on it; the
+                  loop drains every complete message before reading again, because
+                  yielding only the first leaves the rest buffered until the next read
+                  — which never comes if the peer is waiting for a reply, a deadlock
+                  that looks like a slow venue. Tested by splitting one message across
+                  8-byte reads and by delivering three in a single read. Bound to
+                  127.0.0.1: there is no authentication here, and a FIX acceptor
+                  reachable from a network is one anybody can send orders to.
+                  The order state machine ships with cancel and replace, and its
+                  refusals are the deliverable. A cancel arriving after the fill is
+                  rejected and never acknowledged: a trader who believes an order was
+                  cancelled when it was filled is long or short something they think
+                  they are flat, and position, P&L and risk all agree with them. A
+                  replace below the already-filled quantity is refused rather than
+                  clamped, because a silent clamp leaves the trader believing a
+                  smaller position than they hold; the replacement carries the filled
+                  quantity forward, since losing it would reset cumulative quantity to
+                  zero. A duplicate ClOrdID is rejected, because two orders answering
+                  to one name make every later cancel ambiguous. Every rejection
+                  carries its reason: one without is a rejection a trader cannot act
+                  on, not knowing whether to retry, resend under a new id, or check
+                  their position because the order already filled. The simulator can
+                  be told to rest orders rather than fill them — filling everything
+                  instantly would make every cancel arrive too late and the refusals
+                  would all pass for the wrong reason. Mutation-checked: accepting a
+                  cancel whatever the state fails four tests, forgetting the filled
+                  quantity on replace fails one. Outstanding, and why this is 0.75: no
+                  CLI command starts the simulator, no partial fills, no heartbeat
+                  timer driving the session clock, and no reconnect or sequence reset
+                  after a dropped connection."}
   P3_4:  {done: 0.0, blocker: code,
           name: "PMS compliance DSL: version-controlled, unit-testable rules",
           notes: "Pure engineering, and the closest thing here to a solved shape: the

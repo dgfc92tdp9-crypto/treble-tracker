@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 56.44%**
+**Completion: 57.19%**
 
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
@@ -389,9 +389,51 @@ being encoded as `1e+06` by `%g`. That is not a FIX quantity — a venue
 rejects it or reads it as something else, and a one-million order arriving
 as anything but one million is the worst outcome on this path.
 
-P3_3 is at **0.5**. Outstanding: no CLI command starts the simulator, there
-is no transport (this is bytes in and bytes out, not a socket), no order
-state machine beyond send-and-fill, and no cancel or replace.
+### A socket, because the criterion says *connectivity*
+
+Framing is the whole job, and the part a hand-off test cannot prove. TCP has
+no message boundaries: a read returns half a message, or three, and a
+receiver assuming one read is one message **works perfectly on loopback with
+small messages** and fails the first time a venue sends quickly.
+
+The loop drains every complete message before reading again. Yielding only
+the first would leave the rest buffered until the next read — which never
+comes if the peer is waiting for a reply. That is a deadlock that looks like
+a slow venue. Tested by splitting one message across 8-byte reads and by
+delivering three in a single read.
+
+Bound to 127.0.0.1. There is no authentication on this path, and a FIX
+acceptor reachable from a network is one anybody can send orders to.
+
+### Cancel and replace: the refusals are the deliverable
+
+**A cancel arriving after the fill is rejected, never acknowledged.** A
+trader who believes an order was cancelled when it was filled is long or
+short something they think they are flat — and position, P&L and risk all
+agree with them. That is the single most expensive thing here and it is one
+`if`.
+
+- **A replace below the already-filled quantity is refused, not clamped.** A
+  silent clamp leaves the trader believing a smaller position than they hold.
+- **The replacement carries the filled quantity forward.** Losing it would
+  reset cumulative quantity to zero and report a position that does not
+  exist.
+- **A duplicate ClOrdID is rejected**, because two orders answering to one
+  name make every later cancel ambiguous.
+- **Every rejection carries its reason.** One without is a rejection a
+  trader cannot act on: retry, resend under a new id, or check the position
+  because it already filled?
+
+The simulator can be told to **rest** orders rather than fill them. Filling
+everything instantly would make every cancel arrive too late, and the
+refusals would all pass for the wrong reason.
+
+Mutation-checked: accepting a cancel whatever the state fails four tests,
+forgetting the filled quantity on replace fails one.
+
+P3_3 is at **0.75**. Outstanding: no CLI command starts the simulator, no
+partial fills, no heartbeat timer driving the session clock, and no
+reconnect or sequence reset after a dropped connection.
 
 ## Phases 3–5
 
