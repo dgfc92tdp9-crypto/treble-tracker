@@ -1069,16 +1069,47 @@ phase_3:
                   the key behind it is the compliance equivalent of an unsourced
                   price. Docker becomes a new environment dependency nothing else
                   here assumes — an ADR question before a coding one."}
-  P3_2:  {done: 0.0, blocker: code,
+  P3_2:  {done: 0.7, blocker: code,
           name: "PEOP, TVault WORM archiving with retention tests",
-          notes: "The store already holds most of the mechanism: PayloadStore is
-                  content-addressed and rejects differing bytes for an existing hash,
-                  and IngestLog is append-only. WORM is those properties plus a
-                  retention clock and a deletion path that refuses. The test that
-                  matters is the one that tries to overwrite, and to delete early,
-                  and is refused — a retention policy nothing enforces is a
-                  document."}
-  P3_3:  {done: 0.75, blocker: code,
+          basis: "TVault ships; PEOP does not. treble/vault/worm.py builds on
+                  PayloadStore, so write-once is a property of content addressing
+                  rather than a check that could be forgotten: re-archiving identical
+                  bytes is a no-op and archiving different bytes under an existing key
+                  is impossible by construction.
+                  What the store did not have is the retention half, and the refusals
+                  are the deliverable. Retention runs from the date the record
+                  *concerns*, not the date it was archived — a record archived six
+                  years late would otherwise be retained six years too long, and being
+                  wrong in the safe direction is still being wrong about a date
+                  somebody may have to certify. A legal hold outranks expiry, because
+                  the hold exists precisely for when the schedule says destroy and an
+                  obligation says keep; a hold expiry could override would be no hold.
+                  The two refusals are distinct exception types on purpose: `not yet`
+                  and `under hold` call for different actions — wait, or ask counsel —
+                  and one type would leave the caller unable to tell which. Hold is
+                  checked first because it is the stronger and longer-lived reason.
+                  Due records are listed, never destroyed on a timer: the schedule says
+                  *may*, not *must*.
+                  It is NOT WORM media and says so in the first paragraph of the
+                  module. SEC 17a-4(f) contemplates storage physically incapable of
+                  alteration; this is a directory and `rm` defeats it. What is enforced
+                  is that the application refuses, which is a smaller and honest claim
+                  than the phrase usually carries.
+                  Mutation-checked: bypassing the hold fails two tests, rounding a leap
+                  -day retention back to 28 February instead of forward to 1 March
+                  fails one — retention must never end earlier than the term states —
+                  and letting a repeat archive replace the original terms fails one,
+                  which is destruction by another route. The EMS acceptor archives into it, which is
+                  what it is for: books-and-records rules require order records and
+                  communications to be retained and a FIX session is both. Raw bytes
+                  are archived rather than parsed fields — the record a regulator asks
+                  for is what crossed the wire, not this parser's reading of it, and
+                  the two can differ precisely when it matters. Both directions are
+                  retained. Archiving is opt-in; a transport retaining by default would
+                  put every test run under a seven-year schedule. Outstanding, and why
+                  this is 0.7: PEOP is not built and there is no screen over the
+                  vault."}
+  P3_3:  {done: 0.9, blocker: code,
           name: "EMS FIX connectivity against a simulator",
           basis: "the session layer and a simulator ship; the order path round-trips.
                   The `unverified` marking is resolved: `simplefix` is MIT, pure
@@ -1141,10 +1172,38 @@ phase_3:
                   instantly would make every cancel arrive too late and the refusals
                   would all pass for the wrong reason. Mutation-checked: accepting a
                   cancel whatever the state fails four tests, forgetting the filled
-                  quantity on replace fails one. Outstanding, and why this is 0.75: no
-                  CLI command starts the simulator, no partial fills, no heartbeat
-                  timer driving the session clock, and no reconnect or sequence reset
-                  after a dropped connection."}
+                  quantity on replace fails one. Reconnect ships. Sequence numbers are
+                  per *session*, not per connection, so a process restarting at 1
+                  while the peer expects 47 is not resuming — it is claiming
+                  forty-six messages never happened. treble/ems/store.py persists both
+                  counters after every message rather than at shutdown, because a
+                  crash is exactly the case it exists for and a counter flushed at
+                  exit is correct except when it matters. `logged_on` is deliberately
+                  not restored: a session resumes its counters, never its
+                  authentication, and treating a remembered logon as live would let a
+                  business message through before the peer identified itself on this
+                  connection.
+                  SequenceReset is the one door FIX leaves open for a counterparty to
+                  insist on a counter, and the refusal is the same decision as
+                  refusing to absorb a gap arriving through it. Backwards is refused
+                  outright: the next message would duplicate one already processed,
+                  and a fill counted twice is a position nobody holds. Forward is
+                  legal, lossy, and *counted* — a session that lost eleven messages to
+                  an administrative reset and reported nothing looks identical to one
+                  that lost none. GapFill loses nothing and is not counted as loss.
+                  Mutation-checked, and the third mutation exposed an unfailable check
+                  of the kind this repository has now made twice: the atomicity test
+                  asserted only that no .partial file remained, which is equally true
+                  of a plain write_text, so replacing the atomic save with a direct
+                  one passed all fifteen tests. render/layout.py had already found and
+                  fixed exactly this, and the note about it was written by the same
+                  author who then repeated it. The test now interrupts the rename and
+                  asserts the *previous* counters survive, which is the property
+                  atomicity buys. Cleaning up that mutation also failed silently —
+                  `git checkout` cannot restore an untracked file — and the mutant was
+                  nearly committed; the restore is asserted now. Outstanding, and why
+                  this is 0.9: no CLI command starts the simulator, no partial fills,
+                  and no heartbeat timer driving the session clock."}
   P3_4:  {done: 0.0, blocker: code,
           name: "PMS compliance DSL: version-controlled, unit-testable rules",
           notes: "Pure engineering, and the closest thing here to a solved shape: the

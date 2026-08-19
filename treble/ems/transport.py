@@ -25,10 +25,13 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 
 import simplefix
 
 from treble.ems.simulator import Simulator
+from treble.ems.store import resume, save
+from treble.vault.worm import Vault
 
 #: Loopback only. See the module docstring.
 HOST = "127.0.0.1"
@@ -66,19 +69,67 @@ async def read_messages(
 class SimulatorServer:
     """The simulator behind a socket."""
 
-    def __init__(self, simulator: Simulator | None = None) -> None:
+    def __init__(
+        self,
+        simulator: Simulator | None = None,
+        *,
+        state_dir: Path | None = None,
+        vault: Vault | None = None,
+    ) -> None:
         self.simulator = simulator or Simulator()
+        #: Where the acceptor's sequence counters are persisted. A real
+        #: acceptor survives its own restart: counters are per session, not
+        #: per connection, so one that began again at 1 would be telling
+        #: every client their history never happened.
+        self.state_dir = state_dir
+        #: Where every message is archived, if anywhere. This is what TVault
+        #: is *for*: books-and-records rules require order records and
+        #: communications to be retained, and a FIX session is both. Archived
+        #: as raw bytes rather than as parsed fields — the record a regulator
+        #: asks for is what crossed the wire, not this parser's reading of
+        #: it, and the two can differ precisely when it matters.
+        self.vault = vault
         self._server: asyncio.AbstractServer | None = None
         self.port = 0
 
     async def _serve(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
             async for raw in read_messages(reader):
-                for reply in self.simulator.respond(raw, now=datetime.now(UTC)):
+                now = datetime.now(UTC)
+                self._archive(raw, now=now)
+                for reply in self.simulator.respond(raw, now=now):
+                    self._archive(reply, now=now)
                     writer.write(reply)
                 await writer.drain()
+                if self.state_dir is not None:
+                    # After every exchange, not at shutdown: a crash is the
+                    # case this exists for, and a counter flushed at exit is
+                    # correct except when it matters.
+                    save(self.simulator.session, self.state_dir)
         finally:
             writer.close()
+
+    def _archive(self, raw: bytes, *, now: datetime) -> None:
+        """Retain one message under the books-and-records schedule.
+
+        The event date is *today* here because a FIX message's event is its
+        transmission — unlike a trade confirmation, whose record concerns an
+        earlier date. Callers archiving reconstructed history must pass the
+        date the record concerns instead, which is why `Vault.archive` takes
+        it rather than assuming.
+        """
+        if self.vault is None:
+            return
+        self.vault.archive(raw, kind="fix", event_date=now.date(), now=now)
+
+    def _resume(self) -> None:
+        """Adopt persisted counters, if any were left by a previous run."""
+        if self.state_dir is None:
+            return
+        session = self.simulator.session
+        self.simulator.session = resume(
+            self.state_dir, sender=session.sender, target=session.target
+        )
 
     async def start(self) -> int:
         """Bind an ephemeral port and return it.
@@ -86,6 +137,7 @@ class SimulatorServer:
         Port 0 rather than a fixed one: a fixed port makes two test runs on
         one machine collide, and the failure reads as a protocol bug.
         """
+        self._resume()
         self._server = await asyncio.start_server(self._serve, HOST, 0)
         self.port = self._server.sockets[0].getsockname()[1]
         return self.port
@@ -100,9 +152,12 @@ class SimulatorServer:
 @asynccontextmanager
 async def running_simulator(
     simulator: Simulator | None = None,
+    *,
+    state_dir: Path | None = None,
+    vault: Vault | None = None,
 ) -> AsyncIterator[SimulatorServer]:
     """A simulator listening on loopback, stopped on exit."""
-    server = SimulatorServer(simulator)
+    server = SimulatorServer(simulator, state_dir=state_dir, vault=vault)
     await server.start()
     try:
         yield server

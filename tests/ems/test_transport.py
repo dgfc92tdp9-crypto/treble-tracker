@@ -98,3 +98,74 @@ async def test_the_server_binds_loopback_only() -> None:
         assert server.port > 0
         _reader, writer = await asyncio.open_connection(HOST, server.port)
         writer.close()
+
+
+async def test_the_acceptor_resumes_its_counters_across_a_restart(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """A real acceptor survives its own restart. Counters are per session,
+    not per connection, so one that began again at 1 would be telling every
+    client their history never happened.
+
+    Written because `treble.ems.store` had no caller in the package — the
+    persistence existed and nothing used it, which is the shape this
+    repository keeps finding. Wiring it here is the fix; this is the proof.
+    """
+    from treble.ems.store import resume
+
+    async with running_simulator(state_dir=tmp_path) as server:
+        reader, writer = await asyncio.open_connection(HOST, server.port)
+        client = Session(sender="TREBLE", target="SIM")
+        writer.write(client.logon(now=NOW))
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.close()
+        after_first = server.simulator.session.outbound_seq
+
+    assert after_first > 1
+    saved = resume(tmp_path, sender="SIM", target="TREBLE")
+    assert saved.outbound_seq == after_first
+
+    # A second server on the same directory picks the counters back up.
+    async with running_simulator(state_dir=tmp_path) as second:
+        assert second.simulator.session.outbound_seq == after_first
+
+
+async def test_every_message_is_archived_when_a_vault_is_given(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Books-and-records rules require order records and communications to
+    be retained, and a FIX session is both. Raw bytes are archived rather
+    than parsed fields: the record a regulator asks for is what crossed the
+    wire, not this parser's reading of it, and the two can differ precisely
+    when it matters.
+
+    Written because `treble.vault.worm` had no caller in the package — the
+    retention machinery existed and nothing archived into it.
+    """
+    from treble.vault.worm import Vault
+
+    vault = Vault(tmp_path / "vault")
+    async with running_simulator(vault=vault) as server:
+        reader, writer = await asyncio.open_connection(HOST, server.port)
+        client = Session(sender="TREBLE", target="SIM")
+        writer.write(client.logon(now=NOW))
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.close()
+
+    # The client's Logon and the acceptor's reply: both directions retained.
+    assert len(vault) == 2
+    assert all(record.kind == "fix" for record in vault.due_for_destruction(today=NOW.date()) or [])
+
+
+async def test_nothing_is_archived_without_a_vault(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Archiving is opt-in. A transport that retained by default would put
+    every test run under a seven-year schedule."""
+    from treble.vault.worm import Vault
+
+    vault = Vault(tmp_path / "unused")
+    async with running_simulator() as server:
+        reader, writer = await asyncio.open_connection(HOST, server.port)
+        client = Session(sender="TREBLE", target="SIM")
+        writer.write(client.logon(now=NOW))
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.close()
+    assert len(vault) == 0

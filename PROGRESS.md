@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 57.19%**
+**Completion: 59.74%**
 
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
@@ -431,9 +431,110 @@ refusals would all pass for the wrong reason.
 Mutation-checked: accepting a cancel whatever the state fails four tests,
 forgetting the filled quantity on replace fails one.
 
-P3_3 is at **0.75**. Outstanding: no CLI command starts the simulator, no
-partial fills, no heartbeat timer driving the session clock, and no
-reconnect or sequence reset after a dropped connection.
+### Reconnect: counters are per session, not per connection
+
+A process restarting at 1 while the peer expects 47 is not resuming a
+session — it is claiming forty-six messages never happened. Both counters
+persist **after every message**, not at shutdown: a crash is exactly the
+case this exists for, and a counter flushed at exit is correct except when
+it matters.
+
+`logged_on` is deliberately **not** restored. A session resumes its
+counters, never its authentication; treating a remembered logon as live
+would let a business message through before the peer identified itself on
+*this* connection.
+
+`SequenceReset` is the one door FIX leaves open for a counterparty to insist
+on a counter, and the refusal is the gap decision arriving through it:
+
+- **Backwards is refused outright** — the next message would duplicate one
+  already processed, and a fill counted twice is a position nobody holds.
+- **Forward is legal, lossy, and counted.** A session that lost eleven
+  messages to an administrative reset and reported nothing looks identical
+  to one that lost none.
+- **GapFill loses nothing** and is not counted as loss.
+
+### The same unfailable check, made twice by the same author
+
+The third mutation found that the atomicity test asserted only that no
+`.partial` file remained — **which is equally true of a plain
+`write_text`**. Replacing the atomic save with a direct one passed all
+fifteen tests.
+
+`render/layout.py` had already found and fixed exactly this, and the note
+recording it was written by the same author who then repeated it. The test
+now interrupts the rename and asserts the *previous* counters survive, which
+is the property atomicity actually buys — and it fails on the mutant.
+
+Cleaning that mutation up then failed silently too: `git checkout` cannot
+restore an untracked file, so the mutant sat in the working tree and was
+nearly committed. The restore is asserted now.
+
+P3_3 is at **0.9**. Outstanding: no CLI command starts the simulator, no
+partial fills, and no heartbeat timer driving the session clock.
+
+## Phase 3: TVault WORM archiving (2026-08-19)
+
+P3_2 to **0.6**. The store already had write-once: `PayloadStore` is
+content-addressed and rejects differing bytes for an existing hash, so a
+repeat is a no-op and archiving *different* bytes under an existing key is
+impossible by construction rather than by check.
+
+What was missing is the retention half, and the refusals are the deliverable.
+
+**Retention runs from the date the record concerns, not the date it was
+archived.** A record archived six years late would otherwise be retained six
+years too long — and being wrong in the safe direction is still being wrong
+about a date somebody may have to certify.
+
+**A legal hold outranks expiry.** The hold exists precisely for when the
+schedule says destroy and an obligation says keep; one that expiry could
+override would be no hold at all. It is checked *before* expiry, because it
+is the stronger and longer-lived reason — reporting the date instead would
+invite waiting for a day that changes nothing.
+
+**The two refusals are distinct exception types.** "Not yet" and "under
+hold" call for different actions — wait, or go and ask counsel — and one
+type would leave the caller unable to tell which.
+
+**Due records are listed, never destroyed on a timer.** The schedule says
+*may*, not *must*.
+
+### It is not WORM media, and says so first
+
+SEC 17a-4(f) contemplates storage physically incapable of alteration. This
+is a directory on a disk and `rm` defeats it. What is enforced is that the
+*application* refuses — a smaller and honest claim than the phrase usually
+carries, and stated in the module's opening paragraph rather than left for a
+reader to discover.
+
+Mutation-checked: bypassing the hold fails two tests; rounding a leap-day
+retention **back** to 28 February rather than forward to 1 March fails one
+(retention must never end earlier than the term states); letting a repeat
+archive replace the original terms fails one, since that is destruction by
+another route.
+
+### The EMS archives into it
+
+`treble.vault.worm` had no caller either — retention machinery with nothing
+retained. The FIX acceptor now archives **every message in both directions**,
+which is exactly the use case: books-and-records rules cover order records
+and communications, and a FIX session is both.
+
+Raw bytes, not parsed fields. The record a regulator asks for is what
+crossed the wire, not this parser's reading of it, and the two can differ
+precisely when it matters. Archiving is opt-in — a transport retaining by
+default would put every test run under a seven-year schedule.
+
+Outstanding: PEOP is not built, and there is no screen over the vault.
+
+### `treble.ems.store` had no caller
+
+The persistence written last turn was imported only by its tests — the shape
+this repository keeps finding. Rather than allowlist it, the acceptor now
+persists its counters after every exchange and adopts them on start, with a
+test that restarts a server on the same directory and asserts the numbers
+continue.
 
 ## Phases 3–5
 

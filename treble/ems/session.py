@@ -111,6 +111,21 @@ class ChecksumError(SessionError):
     """The trailing checksum does not match the bytes before it."""
 
 
+class SequenceResetError(SessionError):
+    """A SequenceReset asked to move the inbound counter backwards.
+
+    FIX's SequenceReset-Reset is an administrative override: it tells the
+    other side "your next expected number is now N", and everything between
+    the old expectation and N is gone. Forward is legal and lossy. Backwards
+    is not legal at all — it would make the next message a duplicate of one
+    already processed, and a fill counted twice is a position that does not
+    exist.
+
+    This is the same decision as refusing to absorb a gap, arriving through
+    the one door FIX leaves open for a counterparty to insist.
+    """
+
+
 @dataclass
 class Session:
     """One FIX session's state, from either side of the wire.
@@ -128,6 +143,11 @@ class Session:
     #: Next number this side *expects* to receive.
     inbound_seq: int = 1
     logged_on: bool = False
+    #: How many inbound messages a SequenceReset-Reset discarded. Counted
+    #: rather than silently absorbed: a session that lost eleven messages to
+    #: an administrative reset and reports nothing looks identical to one
+    #: that lost none.
+    discarded: int = 0
     #: Every message sent, by sequence number, so a resend can be answered.
     #: A session that cannot resend is one whose counterparty's gap is
     #: unrecoverable — and the gap is usually theirs, not yours.
@@ -221,6 +241,12 @@ class Session:
             # advancing: the alternative is rejecting a legitimate resend.
             return message
 
+        if msg_type == MsgType.SEQUENCE_RESET.value:
+            # Handled before the logon check, because a reset may legitimately
+            # arrive while re-establishing a session.
+            self._apply_sequence_reset(message)
+            return message
+
         if msg_type == MsgType.LOGON.value:
             self.logged_on = True
             negotiated = message.get(HEARTBEAT_INTERVAL)
@@ -235,6 +261,45 @@ class Session:
 
         self.inbound_seq += 1
         return message
+
+    def _apply_sequence_reset(self, message: simplefix.FixMessage) -> None:
+        """Apply a SequenceReset, or refuse it.
+
+        Two shapes wear one message type and they are not the same thing:
+
+        * **GapFill** (`123=Y`) is a placeholder for administrative messages
+          that were never worth resending. It consumes the numbers it covers
+          and loses nothing.
+        * **Reset** (`123=N` or absent) is an override that says "your next
+          expected number is N", discarding everything in between. Forward
+          is legal and lossy; backwards is refused, because the next message
+          would then duplicate one already processed and a fill counted
+          twice is a position nobody holds.
+        """
+        new_seq = message.get(NEW_SEQ_NO)
+        if new_seq is None:
+            raise SequenceResetError("SequenceReset carries no NewSeqNo")
+        target = int(new_seq)
+        gap_fill = (message.get(GAP_FILL_FLAG) or b"N").decode().upper() == "Y"
+        if target < self.inbound_seq:
+            raise SequenceResetError(
+                f"SequenceReset asks to move the inbound counter from {self.inbound_seq} "
+                f"back to {target}. The next message would duplicate one already "
+                "processed, and a fill counted twice is a position nobody holds"
+            )
+        if not gap_fill and target > self.inbound_seq:
+            # Legal, lossy, and recorded on the session so a caller can see
+            # that messages were discarded rather than delivered.
+            self.discarded += target - self.inbound_seq
+        self.inbound_seq = target
+
+    def sequence_reset(self, *, new_seq_no: int, gap_fill: bool, now: datetime) -> bytes:
+        """Build a SequenceReset. `gap_fill` distinguishes the two shapes."""
+        return self.encode(
+            MsgType.SEQUENCE_RESET,
+            ((NEW_SEQ_NO, new_seq_no), (GAP_FILL_FLAG, "Y" if gap_fill else "N")),
+            now=now,
+        )
 
 
 def verify_checksum(raw: bytes) -> None:
@@ -267,6 +332,7 @@ __all__ = [
     "MsgType",
     "NotLoggedOnError",
     "SequenceGapError",
+    "SequenceResetError",
     "Session",
     "SessionError",
     "verify_checksum",
