@@ -1204,13 +1204,62 @@ phase_3:
                   nearly committed; the restore is asserted now. Outstanding, and why
                   this is 0.9: no CLI command starts the simulator, no partial fills,
                   and no heartbeat timer driving the session clock."}
-  P3_4:  {done: 0.0, blocker: code,
+  P3_4:  {done: 0.75, blocker: code,
           name: "PMS compliance DSL: version-controlled, unit-testable rules",
-          notes: "Pure engineering, and the closest thing here to a solved shape: the
-                  TQL grammar and the closed conditional-attribute predicate set in
-                  the screen contract are both small DSLs built with the no-eval
-                  discipline this needs. A compliance rule that could not be
-                  unit-tested would be a rule nobody can prove fires."}
+          basis: "the engine ships with six predicates, content-hashed rulesets and a
+                  test suite that is mostly one property.
+                  **A rule that cannot be evaluated never reports a pass.** That is
+                  the design and everything follows from it. An engine that silently
+                  skipped a rule it lacked data for would produce a clean report, and
+                  a clean report is what a portfolio manager acts on and a compliance
+                  officer signs. `No holdings rated below BBB-` evaluated against a
+                  store with no ratings is not compliant, it is unchecked, and the two
+                  are indistinguishable on a screen printing PASS for both. So
+                  NOT_EVALUABLE is a third outcome, it is not a pass, and a report
+                  containing one is not clean. This repository has met the same shape
+                  three times — an analytic with no data reporting a price, a
+                  similarity metric dropping two of three dimensions, a catalogue
+                  claiming HICP stored on a store holding none — and here the cost is
+                  a mandate breach nobody was told about. MIN_RATING is in the
+                  predicate set deliberately and is evaluable nowhere: a mandate that
+                  cares about ratings should see NOT EVALUABLE rather than a rule
+                  quietly missing from its report.
+                  Rules are data, never code. The predicate set is closed for the
+                  reason the screen contract's conditional attributes are closed: eval
+                  makes every rule a program, and a rule that can do anything cannot
+                  be reviewed by the person whose mandate it encodes. It also makes a
+                  rule comparable, hashable and diffable, which is what
+                  version-controlled has to mean. A ruleset is hashed over its
+                  canonical form and a report names that hash, so a report and the
+                  rules that produced it cannot drift — without it, `we were compliant
+                  in March` is a claim about a file nobody can reproduce.
+                  Issuer concentration aggregates across positions: two lines from one
+                  issuer are one exposure, and testing positions individually would
+                  let a 45/45 pair pass a 50% issuer cap. Weights are measured on
+                  market value, since face would let a deep-discount bond breach a
+                  limit it is nowhere near. Limits are exclusive — `no more than 50%`
+                  permits 50%. Mutation-checked: treating unevaluable as clean fails
+                  one test, measuring issuer concentration per position fails two.
+                  treble/tapi/mandate.py connects it to the store, and the live run is
+                  the argument for the whole design. Of 686 positions: 686 carry no
+                  rating, 445 no maturity, 321 no currency, 243 no issuer — the
+                  portfolio is not all bonds and a derivative record does not populate
+                  the fields a bond rule reads. Four of five rules in a plausible
+                  mandate come back NOT EVALUABLE and one genuine breach is found. An
+                  engine that skipped what it could not test would have reported one
+                  breach and four passes: a near-clean bill of health on a portfolio
+                  where most of the mandate was never checked. Holdings are
+                  deliberately not filtered to straight debt — a mandate covers
+                  everything the fund holds, and narrowing the input until the rules
+                  pass answers an easier question than the one the mandate asks. The
+                  seam's tests were first written by grepping the function's source for
+                  phrases, which asserts that a comment exists rather than that the
+                  code behaves, and one then failed for the wrong reason: it read
+                  `assetCat` in the source and concluded the function filtered by it
+                  when the function merely populates the field the category rule reads.
+                  They are behavioural now. Outstanding, and why this is 0.75: rules are
+                  constructed in code rather than loaded from a version-controlled
+                  file, and no screen shows a report."}
   P3_5:  {done: 0.0, blocker: data,
           name: "TCA",
           notes: "Transaction cost analysis needs executions to analyse, and this

@@ -6,6 +6,7 @@ adapters are built on. The replay property here: facts derived from the log
 via a pure parser reconstruct exactly after wiping the derived store.
 """
 
+import gzip
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -33,7 +34,31 @@ class TestPayloadStore:
         store = PayloadStore(tmp_path)
         key = store.put(b"original")
         # Simulate on-disk corruption behind the store's back.
-        (tmp_path / key[:2] / key[2:4] / key).write_bytes(b"tampered")
+        #
+        # Corrupts the file the store actually *serves*. Payloads are now
+        # stored gzipped, and this wrote to the uncompressed path — which
+        # `get` no longer reads while a compressed one exists, so the test
+        # quietly stopped testing anything and still passed. Found by
+        # running it after the change rather than by reading it.
+        #
+        # Valid gzip whose contents are wrong, so the failure is the content
+        # address rejecting it rather than the decompressor: those are two
+        # different guards and this one is for the address.
+        served = tmp_path / key[:2] / key[2:4] / (key + ".gz")
+        served.write_bytes(gzip.compress(b"tampered"))
+        with pytest.raises(PayloadIntegrityError):
+            store.get(key)
+
+    def test_corruption_of_a_legacy_uncompressed_payload_is_also_detected(
+        self, tmp_path: Path
+    ) -> None:
+        """The other branch of `get`. A store part-way through migration
+        serves uncompressed payloads, and they need the same guard."""
+        store = PayloadStore(tmp_path)
+        key = payload_hash(b"original")
+        legacy = tmp_path / key[:2] / key[2:4] / key
+        legacy.parent.mkdir(parents=True, exist_ok=True)
+        legacy.write_bytes(b"tampered")
         with pytest.raises(PayloadIntegrityError):
             store.get(key)
 

@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 59.74%**
+**Completion: 61.99%**
 
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
@@ -535,6 +535,99 @@ this repository keeps finding. Rather than allowlist it, the acceptor now
 persists its counters after every exchange and adopts them on start, with a
 test that restarts a server on the same directory and asserts the numbers
 continue.
+
+## Phase 3: PMS compliance rules (2026-08-19)
+
+P3_4 to **0.6**, and the whole design is one property.
+
+**A rule that cannot be evaluated never reports a pass.** An engine that
+silently skipped a rule it lacked data for would produce a *clean* report —
+and a clean report is what a portfolio manager acts on and a compliance
+officer signs. "No holdings rated below BBB-" evaluated against a store with
+no ratings is not compliant, it is **unchecked**, and the two are
+indistinguishable on a screen printing PASS for both.
+
+So `NOT_EVALUABLE` is a third outcome, it is not a pass, and a report
+containing one is not clean. `MIN_RATING` is in the predicate set
+deliberately and is evaluable nowhere — a mandate that cares about ratings
+should see NOT EVALUABLE rather than a rule quietly missing from its report.
+
+This is the fourth appearance of one shape: an analytic with no data
+reporting a price; a similarity metric dropping two of three dimensions; a
+catalogue claiming "HICP stored" on a store holding none. Here the cost is a
+mandate breach nobody was told about.
+
+### Rules are data, never code
+
+The predicate set is **closed**, for the reason the screen contract's
+conditional attributes are closed: `eval` makes every rule a program, and a
+compliance rule that can do anything cannot be reviewed by the person whose
+mandate it encodes. It also makes a rule comparable, hashable and diffable —
+which is what "version-controlled" has to mean if it is to mean anything.
+
+A ruleset is hashed over its canonical form and every report names that
+hash, so a report and the rules that produced it cannot drift apart. Without
+it, "we were compliant in March" is a claim about a file nobody can
+reproduce.
+
+Two details that decide whether the numbers mean anything: **issuer
+concentration aggregates across positions** (two lines from one issuer are
+one exposure; testing positions individually lets a 45/45 pair pass a 50%
+cap), and **weights are market value** (face would let a deep-discount bond
+breach a limit it is nowhere near).
+
+Mutation-checked: treating unevaluable as clean fails one test, measuring
+issuer concentration per position fails two.
+
+### Run against the live portfolio, four of five rules cannot be tested
+
+`tapi/mandate.py` connects the engine to the store, and the live run is the
+argument for the whole design. Of **686 positions**: 686 carry no rating,
+445 no maturity, 321 no currency, 243 no issuer — the portfolio is not all
+bonds, and a derivative record does not populate the fields a bond rule
+reads.
+
+**Four of five rules in a plausible mandate come back NOT EVALUABLE, and one
+genuine breach is found.** An engine that skipped what it could not test
+would have reported *one breach and four passes* — a near-clean bill of
+health on a portfolio where most of the mandate was never checked.
+
+Holdings are deliberately **not** filtered to straight debt. A mandate covers
+everything the fund holds, and narrowing the input until the rules pass
+answers an easier question than the one the mandate asks.
+
+Outstanding: rules are constructed in code rather than loaded from a
+version-controlled file, and no screen shows a report.
+
+## Payload compression (2026-08-19)
+
+The disk filled to 144MB free mid-session and the gate could not write its
+coverage database. Payloads are now stored gzipped: **1.774 GB → 0.594 GB on
+the live store, 3.0x, 1.181 GB reclaimed** across 353 payloads.
+
+**The key is still the hash of the original bytes.** Hashing the compressed
+form would have been simpler and would have invalidated every
+`provenance.payload_hash` already stored — millions of facts pointing at
+addresses that no longer resolve — and would make the address depend on the
+compression level, so re-compressing a payload would move it. The address is
+a property of the source's bytes, not of how this repository keeps them.
+
+Verified after migration: **all 390 logged payloads resolve to their content
+address**, and the Treasury adapter replayed **5,569 facts from stored bytes
+with no network**, giving the same 10Y of 4.65% on 2026-08-07 as the live
+figure. I5 holds.
+
+The migration compresses one file at a time, reads it back through the public
+path, and only then unlinks the original — so it needs one file's headroom
+rather than a second copy of the store, which matters when the reason for
+running it is a full disk. An interruption leaves either the original or a
+verified replacement, never neither. A mixed store stays readable.
+
+**A test stopped testing anything and still passed.** `test_corruption_
+detected_on_get` corrupted the uncompressed path, which `get` no longer reads
+while a compressed one exists. Found by running it after the change rather
+than by reading it; it now corrupts the file actually served, and a second
+test covers the legacy branch.
 
 ## Phases 3–5
 
