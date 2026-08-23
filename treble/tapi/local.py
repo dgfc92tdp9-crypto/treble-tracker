@@ -25,6 +25,7 @@ from datetime import UTC, date, datetime, timedelta
 from treble.analytics._ql import DayCount
 from treble.analytics.bonds.spec import FixedBondSpec, Frequency
 from treble.analytics.derivatives.swap import SwapSpec
+from treble.compliance.rules import BASIS
 from treble.core.facts import Fact
 from treble.core.identifiers import (
     TUID,
@@ -376,6 +377,8 @@ class LocalTapi:
         "sys:tval_residual",
         "sys:price_series",
         "sys:price_basis",
+        "sys:pms_summary",
+        "sys:pms_rules",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -614,6 +617,8 @@ class LocalTapi:
             "sys:swpm_basis",
         ):
             return self._swpm(binding, as_of=as_of)
+        if binding in ("sys:pms_summary", "sys:pms_rules"):
+            return self._pms(binding, as_of=as_of)
         if binding in ("sys:price_series", "sys:price_basis"):
             return self._prices(security, binding, as_of=as_of)
         if binding in ("sys:allq", "sys:allq_composites"):
@@ -693,6 +698,70 @@ class LocalTapi:
     def contributions(self) -> ContributionService:
         """The contribution API surface — the only write path in TAPI."""
         return self._contributions
+
+    def _pms(
+        self, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`PMS` — a mandate, evaluated against the portfolio the store holds.
+
+        Portfolio-wide rather than per-security, like `PORT`: a mandate
+        constrains the fund, and asking it about one holding would answer a
+        different question.
+        """
+        from treble.compliance import loader
+        from treble.compliance.loader import MandateError, load_ruleset
+        from treble.compliance.rules import Outcome
+        from treble.tapi.mandate import check_mandate, holdings_from_store
+
+        # Through the module, not a from-import: the directory is resolved
+        # at call time so a caller — or a test — can point it elsewhere.
+        mandates = loader.available()
+        if not mandates:
+            return ((f"no mandate files in {loader.MANDATE_DIR}", None, None),)
+        try:
+            ruleset = load_ruleset(mandates[0])
+        except MandateError as error:
+            # The file is broken, so no report is produced at all. A screen
+            # that fell back to a subset of the rules would show a verdict
+            # about rules nobody wrote.
+            return ((str(error), None, None),)
+
+        holdings = holdings_from_store(self._store, as_of=as_of)
+        report = check_mandate(self._store, ruleset, as_of=as_of)
+
+        if binding == "sys:pms_summary":
+            # "Not clean" rather than "breach", because a report with no
+            # breach and an untested rule is also not clean, and a verdict
+            # that said BREACH: 0 would read as a pass.
+            verdict = (
+                "CLEAN"
+                if report.clean
+                else f"NOT CLEAN — {len(report.breaches)} breach, "
+                f"{len(report.not_evaluable)} not evaluable"
+            )
+            rows = [
+                ("Mandate", report.ruleset),
+                ("Verdict", verdict),
+                ("Ruleset hash", report.ruleset_hash[:16]),
+                ("As of", report.as_of.isoformat()),
+                ("Holdings", f"{len(holdings):,}"),
+                ("Basis", BASIS),
+                ("File", mandates[0].name),
+            ]
+            if len(mandates) > 1:
+                # Named, because a screen quietly showing one of several
+                # mandates is a screen covering less than it appears to.
+                rows.append(("Others on file", ", ".join(p.stem for p in mandates[1:])))
+            return tuple(rows)
+
+        # Breaches first, then the rules nobody could test, then the passes.
+        # A report ordered by rule number buries the one line somebody has
+        # to act on among the ones they do not.
+        order = {Outcome.BREACH: 0, Outcome.NOT_EVALUABLE: 1, Outcome.PASS: 2}
+        return tuple(
+            (result.outcome.value.upper(), result.rule.name, result.detail)
+            for result in sorted(report.results, key=lambda r: (order[r.outcome], r.rule.name))
+        )
 
     def _prices(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime

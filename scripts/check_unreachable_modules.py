@@ -52,13 +52,6 @@ AWAITING_WIRING: dict[str, str] = {
         "data question."
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
-    "treble.tapi.mandate": (
-        "The seam between N-PORT holdings and the compliance rules (P3_4). Deliberately "
-        "separate so the rules stay unit-testable against synthetic portfolios: an "
-        "engine exercisable only through a store is one nobody can write a failing case "
-        "for. Waiting on a PMS screen to display a report, which the ledger records as "
-        "the reason P3_4 is 0.75 rather than higher."
-    ),
 }
 
 ALLOWED_UNREACHABLE = {**ENTRY_POINTS, **AWAITING_WIRING}

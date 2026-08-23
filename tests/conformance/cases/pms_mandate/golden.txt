@@ -1,0 +1,22 @@
+MANDATE COMPLIANCE
+────────────────────────────────────────────────────────────────────────────
++----------------------------------------------------------------------+
+|[table_scroll:sys:pms_summary]                                        |
+|                                                                      |
+|                                                                      |
+|                                                                      |
+|                                                                      |
+|                                                                      |
++----------------------------------------------------------------------+
+
+OUTCOME        RULE                                 DETAIL
++------------------------------------------------------------------------------+
+|[table_scroll:sys:pms_rules]                                                  |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+PORT  Portfolio exposures
+NOT EVALUABLE is not a pass: the rule could not be tested against this data.
+Rules load from config/mandates/. Edit there and re-run; the hash changes.

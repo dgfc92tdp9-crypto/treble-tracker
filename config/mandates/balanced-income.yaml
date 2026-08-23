@@ -1,0 +1,40 @@
+# A worked mandate, in the form an investment management agreement states
+# its restrictions. Version-controlled on purpose: this file is the thing a
+# compliance officer reviews and an auditor asks for, and a rule encoded in
+# Python is reviewable by neither.
+#
+# The rules are chosen to be *answerable by this store where possible and
+# honestly unanswerable where not*, because a mandate curated until every
+# rule passes tests the curation rather than the portfolio. Run against the
+# live N-PORT holdings this produces a genuine breach and several NOT
+# EVALUABLE rows, which is the correct report for a portfolio the store
+# holds partial reference data for.
+name: Balanced Income
+description: >
+  Diversified income mandate: issuer and position concentration limits,
+  a maturity ceiling, permitted currencies, and a credit floor.
+
+rules:
+  - name: No issuer above 10%
+    predicate: max_issuer_weight
+    limit: 10.0
+
+  - name: No position above 5%
+    predicate: max_position_weight
+    limit: 5.0
+
+  - name: Nothing maturing beyond 30 years
+    predicate: max_maturity_years
+    limit: 30.0
+
+  - name: Developed-market currencies only
+    predicate: permitted_currencies
+    limit: [USD, EUR, GBP, JPY, CHF, CAD, AUD]
+
+  # Deliberately included and evaluable nowhere: no rating source this
+  # repository may use has been found. A mandate that cares about credit
+  # quality must show NOT EVALUABLE rather than have the rule quietly
+  # absent, which is the whole argument of compliance/rules.py.
+  - name: Nothing rated below BBB-
+    predicate: min_rating
+    limit: BBB-

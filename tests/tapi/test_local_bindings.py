@@ -446,3 +446,104 @@ class TestTheEmptyAllqBookStatesItself:
         assert len(rows) == 1
         assert "no contributor is quoting" in str(rows[0][0])
         assert "never quoted" in str(rows[0][0])
+
+
+class TestThePmsPanels:
+    """`sys:pms_summary` / `sys:pms_rules` — the mandate report on screen.
+
+    The screen is where the module's one property either survives or dies:
+    a summary reading "BREACHES: 0" on a report containing a rule nobody
+    could test would undo everything `compliance/rules.py` argues for, on
+    the one surface a compliance officer actually reads.
+    """
+
+    @staticmethod
+    def _tapi(tmp_path: Path, mandate: str) -> LocalTapi:
+        from treble.store.duck import DuckStore
+        from treble.tapi.local import LocalTapi as Tapi
+
+        (tmp_path / "mandates").mkdir(exist_ok=True)
+        (tmp_path / "mandates" / "m.yaml").write_text(mandate)
+        store = DuckStore(tmp_path / "pms.db")
+        return Tapi(store)  # type: ignore[call-arg, return-value]
+
+    def test_an_untestable_rule_makes_the_verdict_not_clean(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No breaches and one unevaluable rule. The verdict must not read
+        as a pass — this is the whole point of the screen."""
+        from treble.compliance import loader
+
+        (tmp_path / "m.yaml").write_text(
+            "name: M\nrules:\n  - {name: Ratings, predicate: min_rating, limit: BBB-}\n"
+        )
+        monkeypatch.setattr(loader, "MANDATE_DIR", tmp_path)
+        tapi = _empty_tapi(tmp_path)
+        summary = dict(tapi.series(None, "sys:pms_summary", as_of=LATER))  # type: ignore[arg-type]
+        assert "NOT CLEAN" in summary["Verdict"]
+        assert "not evaluable" in summary["Verdict"]
+
+    def test_the_ruleset_hash_is_on_screen(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Without it, "we were compliant in March" is a claim about a file
+        nobody can reproduce."""
+        from treble.compliance import loader
+
+        (tmp_path / "m.yaml").write_text(
+            "name: M\nrules:\n  - {name: R, predicate: max_issuer_weight, limit: 10}\n"
+        )
+        monkeypatch.setattr(loader, "MANDATE_DIR", tmp_path)
+        summary = dict(
+            _empty_tapi(tmp_path).series(None, "sys:pms_summary", as_of=LATER)  # type: ignore[arg-type]
+        )
+        assert len(summary["Ruleset hash"]) == 16
+
+    def test_breaches_sort_above_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A report ordered by rule number buries the one line somebody has
+        to act on among the ones they do not."""
+        from treble.compliance import loader
+
+        (tmp_path / "m.yaml").write_text(
+            "name: M\nrules:\n"
+            "  - {name: Zebra rating, predicate: min_rating, limit: BBB-}\n"
+            "  - {name: Alpha currencies, predicate: permitted_currencies, limit: [USD]}\n"
+        )
+        monkeypatch.setattr(loader, "MANDATE_DIR", tmp_path)
+        rows = _empty_tapi(tmp_path).series(None, "sys:pms_rules", as_of=LATER)  # type: ignore[arg-type]
+        outcomes = [r[0] for r in rows]
+        assert outcomes == sorted(
+            outcomes, key=lambda o: {"BREACH": 0, "NOT EVALUABLE": 1}.get(str(o), 2)
+        )
+
+    def test_a_broken_mandate_file_produces_no_verdict_at_all(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A screen that fell back to the rules it *could* parse would show
+        a verdict about rules nobody wrote."""
+        from treble.compliance import loader
+
+        (tmp_path / "m.yaml").write_text(
+            "name: M\nrules:\n  - {name: R, predicate: max_sector_weight, limit: 10}\n"
+        )
+        monkeypatch.setattr(loader, "MANDATE_DIR", tmp_path)
+        rows = _empty_tapi(tmp_path).series(None, "sys:pms_summary", as_of=LATER)  # type: ignore[arg-type]
+        assert len(rows) == 1
+        assert "unknown predicate" in str(rows[0][0])
+
+    def test_no_mandate_files_says_where_it_looked(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from treble.compliance import loader
+
+        monkeypatch.setattr(loader, "MANDATE_DIR", tmp_path / "absent")
+        rows = _empty_tapi(tmp_path).series(None, "sys:pms_summary", as_of=LATER)  # type: ignore[arg-type]
+        assert "no mandate files" in str(rows[0][0])
+
+
+def _empty_tapi(tmp_path: Path) -> LocalTapi:
+    from treble.store.duck import DuckStore
+
+    return LocalTapi(DuckStore(tmp_path / "pms.db"))  # type: ignore[call-arg]

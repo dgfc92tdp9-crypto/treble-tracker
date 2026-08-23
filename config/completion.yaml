@@ -1250,7 +1250,7 @@ phase_3:
                   corrected: the ordering of the disconnect and test-request checks in
                   `due` is *not* load-bearing, since their guards are mutually
                   exclusive; what matters is that the heartbeat is checked last."}
-  P3_4:  {done: 0.75, blocker: code,
+  P3_4:  {done: 1.0, blocker: code,
           name: "PMS compliance DSL: version-controlled, unit-testable rules",
           basis: "the engine ships with six predicates, content-hashed rulesets and a
                   test suite that is mostly one property.
@@ -1303,9 +1303,47 @@ phase_3:
                   code behaves, and one then failed for the wrong reason: it read
                   `assetCat` in the source and concluded the function filtered by it
                   when the function merely populates the field the category rule reads.
-                  They are behavioural now. Outstanding, and why this is 0.75: rules are
-                  constructed in code rather than loaded from a version-controlled
-                  file, and no screen shows a report."}
+                  They are behavioural now. Outstanding, and why this was 0.75: rules
+                  were constructed in code rather than loaded from a version-controlled
+                  file, and no screen showed a report. Both ship. Mandates are YAML in
+                  config/mandates/, which is the form the criterion asks for and the
+                  form a compliance officer can review, diff in a pull request and
+                  point an auditor at; a mandate encoded in Python is reviewable by
+                  none of those. The loader refuses rather than skips, and that is the
+                  whole module: a rule silently dropped at load time does the same
+                  damage as a rule silently skipped at evaluation, one step earlier and
+                  harder to notice because the report will not even name what went
+                  missing. So an unknown predicate raises and lists what exists, a
+                  missing or wrongly-shaped limit raises, duplicate rule names raise
+                  because a reader cannot tell which constraint a PASS refers to, and
+                  an empty rule list raises because a mandate with no rules reports
+                  clean against any portfolio -- the most dangerous document the loader
+                  could produce. `limit: true` is refused specifically: bool subclasses
+                  int, so it would otherwise load as a 1% cap, breach on nearly every
+                  holding, and read as a data problem rather than a typo. The content
+                  hash is over the canonical rules and not the file bytes, so
+                  reformatting the YAML leaves a report's hash unchanged while
+                  changing a limit changes it -- a hash over bytes would make every
+                  whitespace edit look like a mandate change and teach readers to
+                  ignore the field. The shipped example carries a MIN_RATING rule that
+                  is evaluable nowhere, on purpose: a mandate curated until every rule
+                  passes tests the curation rather than the portfolio. PMS displays the
+                  report, portfolio-wide with no yellow key, and its verdict line reads
+                  NOT CLEAN rather than a breach count -- a summary reading BREACHES: 0
+                  on a report containing a rule nobody could test would undo this
+                  module's entire argument on the one surface a compliance officer
+                  reads. Breaches and unevaluable rules sort above passes, because a
+                  report ordered by rule number buries the line somebody must act on. A
+                  broken mandate file produces no verdict at all rather than a partial
+                  one. Against the live store: 685 holdings, 1 genuine breach (6
+                  positions above the 5% cap, largest 10.83%) and 4 NOT EVALUABLE.
+                  Mutation-checked: 9 mutants, all killed. One survived first and was
+                  the familiar shape -- the unclassified-predicate fallthrough cannot
+                  fire while every predicate is classified, so it now has a test that
+                  unclassifies one to reach it. A real defect surfaced by a test that
+                  would not take: MANDATE_DIR was a *default argument*, bound at import,
+                  so the mandate directory could never be redirected by any caller. It
+                  resolves at call time now."}
   P3_5:  {done: 0.0, blocker: data,
           name: "TCA",
           notes: "Transaction cost analysis needs executions to analyse, and this

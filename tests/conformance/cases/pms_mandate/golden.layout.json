@@ -1,0 +1,172 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "MANDATE COMPLIANCE"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        11,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "OUTCOME        RULE                                 DETAIL"
+    },
+    {
+      "at": [
+        19,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "PORT",
+      "provenance": null,
+      "text": "PORT  Portfolio exposures"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label",
+        "warning"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "NOT EVALUABLE is not a pass: the rule could not be tested against this data."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Rules load from config/mandates/. Edit there and re-run; the hash changes."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "PMS",
+  "panes": [
+    {
+      "binding": "sys:pms_summary",
+      "data": [
+        [
+          "Mandate",
+          "Balanced Income"
+        ],
+        [
+          "Verdict",
+          "NOT CLEAN — 1 breach, 4 not evaluable"
+        ],
+        [
+          "Ruleset hash",
+          "dc8e55bfe9636a9a"
+        ],
+        [
+          "As of",
+          "2026-07-30"
+        ],
+        [
+          "Holdings",
+          "685"
+        ],
+        [
+          "Basis",
+          "market value"
+        ],
+        [
+          "File",
+          "balanced-income.yaml"
+        ]
+      ],
+      "region": [
+        2,
+        0,
+        8,
+        72
+      ],
+      "type": "table_scroll"
+    },
+    {
+      "binding": "sys:pms_rules",
+      "data": [
+        [
+          "BREACH",
+          "No position above 5%",
+          "6 above the 5% limit, by market value"
+        ],
+        [
+          "NOT EVALUABLE",
+          "Developed-market currencies only",
+          "321 holding(s) report no currency"
+        ],
+        [
+          "NOT EVALUABLE",
+          "No issuer above 10%",
+          "242 holding(s) carry no issuer"
+        ],
+        [
+          "NOT EVALUABLE",
+          "Nothing maturing beyond 30 years",
+          "444 holding(s) report no maturity"
+        ],
+        [
+          "NOT EVALUABLE",
+          "Nothing rated below BBB-",
+          "685 of 685 holdings carry no rating"
+        ]
+      ],
+      "region": [
+        12,
+        0,
+        7,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

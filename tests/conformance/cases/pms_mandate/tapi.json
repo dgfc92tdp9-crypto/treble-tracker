@@ -1,0 +1,62 @@
+{
+  "fields": {},
+  "series": {
+    "sys:pms_summary": [
+      [
+        "Mandate",
+        "Balanced Income"
+      ],
+      [
+        "Verdict",
+        "NOT CLEAN \u2014 1 breach, 4 not evaluable"
+      ],
+      [
+        "Ruleset hash",
+        "dc8e55bfe9636a9a"
+      ],
+      [
+        "As of",
+        "2026-07-30"
+      ],
+      [
+        "Holdings",
+        "685"
+      ],
+      [
+        "Basis",
+        "market value"
+      ],
+      [
+        "File",
+        "balanced-income.yaml"
+      ]
+    ],
+    "sys:pms_rules": [
+      [
+        "BREACH",
+        "No position above 5%",
+        "6 above the 5% limit, by market value"
+      ],
+      [
+        "NOT EVALUABLE",
+        "Developed-market currencies only",
+        "321 holding(s) report no currency"
+      ],
+      [
+        "NOT EVALUABLE",
+        "No issuer above 10%",
+        "242 holding(s) carry no issuer"
+      ],
+      [
+        "NOT EVALUABLE",
+        "Nothing maturing beyond 30 years",
+        "444 holding(s) report no maturity"
+      ],
+      [
+        "NOT EVALUABLE",
+        "Nothing rated below BBB-",
+        "685 of 685 holdings carry no rating"
+      ]
+    ]
+  }
+}

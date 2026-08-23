@@ -1,0 +1,64 @@
+# PMS — Mandate Compliance (spec §14, Phase 3 P3_4).
+#
+# Portfolio-wide, like PORT: a mandate constrains the fund, so asking it
+# about one security would answer a different question. No yellow key.
+#
+# **The verdict line says NOT CLEAN, never "0 breaches".** A report with no
+# breach and a rule nobody could test is not a pass — that is the single
+# property compliance/rules.py exists for, and a summary reading
+# "BREACHES: 0" would undo it on the one screen a compliance officer
+# actually reads. Unevaluable rules are counted in the verdict and sorted
+# to the top of the table beside the breaches, because both are things
+# somebody has to do something about.
+#
+# The ruleset hash is on screen so a report and the rules that produced it
+# cannot drift: without it, "we were compliant in March" is a claim about a
+# file nobody can reproduce.
+mnemonic: PMS
+title: Mandate Compliance
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "MANDATE COMPLIANCE"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 2, col: 0, height: 8, width: 72}
+        pane_type: table_scroll
+        binding: "sys:pms_summary"
+        order: asc
+
+      - kind: static
+        at: {row: 11, col: 0}
+        text: "OUTCOME        RULE                                 DETAIL"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 12, col: 0, height: 7, width: 80}
+        pane_type: table_scroll
+        binding: "sys:pms_rules"
+        order: asc
+
+      - kind: link
+        at: {row: 19, col: 0}
+        text: "PORT  Portfolio exposures"
+        command: "PORT"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "NOT EVALUABLE is not a pass: the rule could not be tested against this data."
+        attrs: [label, warning]
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Rules load from config/mandates/. Edit there and re-run; the hash changes."
+        attrs: [label]

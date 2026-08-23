@@ -15,7 +15,7 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
-**Completion: 62.29%**
+**Completion: 63.04%**
 
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
