@@ -70,6 +70,7 @@ TEXT = 58
 
 #: ExecType / OrdStatus values.
 NEW = "0"
+PARTIALLY_FILLED = "1"
 CANCELED = "4"
 REPLACED = "5"
 
@@ -87,17 +88,33 @@ class RestingOrder:
     quantity: float
     price: float
     filled: float = 0.0
+    #: Traded value, for the average price. Accumulated rather than
+    #: derived from `price`, because slices of one order need not fill at
+    #: one price and an average that assumed they did would misreport the
+    #: cost of every partially filled order.
+    notional: float = 0.0
     status: str = NEW
 
     @property
     def live(self) -> bool:
         """Whether the order can still be cancelled or replaced.
 
-        A filled or cancelled order cannot. This is the property the two
+        A filled or cancelled order cannot. A **partially** filled one
+        can, and must: the unfilled remainder is still working, and a
+        venue that refused to cancel it would leave the trader unable to
+        stop an order that is still trading. This is the property the two
         refusals below turn on, and getting it wrong is how a trader comes
         to believe a position was cancelled when it was filled.
         """
-        return self.status == NEW
+        return self.status in (NEW, PARTIALLY_FILLED)
+
+    @property
+    def leaves(self) -> float:
+        return max(self.quantity - self.filled, 0.0) if self.live else 0.0
+
+    @property
+    def average_price(self) -> float:
+        return self.notional / self.filled if self.filled else 0.0
 
 
 @dataclass
@@ -117,6 +134,11 @@ class Simulator:
     #: every cancel arrive too late and the refusals untestable — true, and
     #: true for the wrong reason.
     fill_immediately: bool = True
+    #: How many execution reports an immediate fill is broken into. One
+    #: venue fills a 900-lot in one print and another in three; a client
+    #: that only ever saw the first would carry the wrong position for the
+    #: two thirds it never learned about.
+    fill_slices: int = 1
     #: Live orders by ClOrdID.
     book: dict[str, RestingOrder] = field(default_factory=dict)
     session: Session = field(init=False)
@@ -168,7 +190,7 @@ class Simulator:
             )
             return out
         elif msg_type == NEW_ORDER_SINGLE:
-            out.append(self._accept(message, now=now))
+            out.extend(self._accept(message, now=now))
         elif msg_type == CANCEL_REQUEST:
             out.append(self._cancel(message, now=now))
         elif msg_type == CANCEL_REPLACE_REQUEST:
@@ -176,16 +198,18 @@ class Simulator:
 
         return [sent for sent in (self._emit(raw) for raw in out) if sent is not None]
 
-    def _accept(self, order: simplefix.FixMessage, *, now: datetime) -> bytes:
+    def _accept(self, order: simplefix.FixMessage, *, now: datetime) -> list[bytes]:
         """Fill the order, or rest it, depending on the configured mode."""
         order_id = (order.get(CL_ORD_ID) or b"").decode()
         if order_id in self.book:
             # A ClOrdID must be unique per session. Reusing one makes every
             # later cancel ambiguous, and a venue that accepted it would
             # leave two orders answering to one name.
-            return self._cancel_reject(
-                order_id, order_id, "duplicate ClOrdID", response_to=NEW_ORDER_SINGLE, now=now
-            )
+            return [
+                self._cancel_reject(
+                    order_id, order_id, "duplicate ClOrdID", response_to=NEW_ORDER_SINGLE, now=now
+                )
+            ]
         resting = RestingOrder(
             order_id=order_id,
             symbol=(order.get(SYMBOL) or b"").decode(),
@@ -195,11 +219,44 @@ class Simulator:
         )
         self.book[order_id] = resting
         if not self.fill_immediately:
-            return self._report(resting, NEW, now=now, last_qty=0.0)
+            return [self._report(resting, NEW, now=now, last_qty=0.0)]
+        return [
+            self.fill(order_id, quantity, now=now)
+            for quantity in _slices(resting.quantity, self.fill_slices)
+        ]
+
+    def fill(
+        self, order_id: str, quantity: float, *, price: float | None = None, now: datetime
+    ) -> bytes:
+        """Execute part or all of a resting order.
+
+        Public because a partial fill is not something a client requests —
+        it is something the venue does, at a time of its choosing, and a
+        test of what the client does with the second print has to be able
+        to cause the second print.
+
+        Over-filling is refused rather than clamped. A venue reporting
+        more than was ordered is a bug, and a simulator that quietly
+        capped it would hide from the client exactly the case where it
+        would end up holding a position larger than it asked for.
+        """
+        resting = self.book[order_id]
+        if not resting.live:
+            raise ValueError(f"{order_id} is {resting.status}, not working")
+        if quantity > resting.leaves + abs(resting.quantity) * _REL_TOLERANCE:
+            raise ValueError(
+                f"{order_id}: fill of {quantity:g} exceeds {resting.leaves:g} remaining"
+            )
         self.fills += 1
-        resting.filled = resting.quantity
-        resting.status = FILLED
-        return self._report(resting, FILLED, now=now, last_qty=resting.quantity)
+        resting.filled += quantity
+        resting.notional += quantity * (resting.price if price is None else price)
+        # Compared with a tolerance, not `==`. `_slices` lands exactly, but
+        # `fill` is public and a venue reporting its own quantities need
+        # not: three hand-driven fills of a third do not accumulate back
+        # onto the whole, and an equality test would leave that order for
+        # ever one part short of filled and permanently cancellable.
+        resting.status = FILLED if _complete(resting.filled, resting.quantity) else PARTIALLY_FILLED
+        return self._report(resting, resting.status, now=now, last_qty=quantity, price=price)
 
     def _cancel(self, request: simplefix.FixMessage, *, now: datetime) -> bytes:
         """Cancel a resting order, or refuse and say why.
@@ -280,6 +337,7 @@ class Simulator:
         *,
         now: datetime,
         last_qty: float,
+        price: float | None = None,
         order_id: str | None = None,
         original: str | None = None,
     ) -> bytes:
@@ -293,10 +351,10 @@ class Simulator:
             (SIDE, order.side),
             (ORDER_QTY, _decimal(order.quantity)),
             (LAST_QTY, _decimal(last_qty)),
-            (LAST_PX, _decimal(order.price if last_qty else 0.0)),
+            (LAST_PX, _decimal((order.price if price is None else price) if last_qty else 0.0)),
             (CUM_QTY, _decimal(order.filled)),
-            (LEAVES_QTY, _decimal(max(order.quantity - order.filled, 0.0) if order.live else 0.0)),
-            (AVG_PX, _decimal(order.price if order.filled else 0.0)),
+            (LEAVES_QTY, _decimal(order.leaves)),
+            (AVG_PX, _decimal(order.average_price)),
         ]
         if original is not None:
             fields.insert(1, (ORIG_CL_ORD_ID, original))
@@ -323,6 +381,59 @@ class Simulator:
             ),
             now=now,
         )
+
+
+#: Float slack for "is this order finished", as a fraction of the order.
+#: Quantities are decimals in the protocol and floats in this process, so
+#: a sequence of fills need not accumulate back onto the order quantity.
+#:
+#: **Relative, with no absolute floor**, and both halves of that were
+#: measured rather than assumed. A fixed 1e-9 is too small at ordinary
+#: size: ten million shares in eleven fills lands 1.86e-9 *short*, and a
+#: billion in six lands 1.2e-7 short. Under a fixed tolerance those orders
+#: sit at PARTIALLY_FILLED for ever — still cancellable after being fully
+#: executed, so a trader could cancel a completed order and believe they
+#: were flat.
+#:
+#: A floor was then carried alongside the relative term, and removed
+#: because nothing could make it fire. The residue of accumulating `n`
+#: fills is about `n · 2.2e-16 · quantity`, so it exceeds `quantity ·
+#: 1e-12` only past roughly 4,500 fills of one order. A guard that cannot
+#: be reached is not caution, it is a claim nobody can check.
+#:
+#: The bound this trades away: near 1e15 the tolerance exceeds one share.
+#: No venue quotes those, and float64 cannot represent share counts
+#: exactly up there in any case.
+_REL_TOLERANCE = 1e-12
+
+
+def _complete(filled: float, quantity: float) -> bool:
+    return filled >= quantity - abs(quantity) * _REL_TOLERANCE
+
+
+def _slices(quantity: float, count: int) -> list[float]:
+    """Split a quantity into `count` parts that accumulate back onto it.
+
+    Each part is the gap between successive *exact* targets — slice `i`
+    ends at `quantity * i / count` — rather than a repeated `quantity /
+    count`, or a repeated part with the remainder dumped on the last
+    slice. Both of those were tried and measured: across 341
+    (quantity, count) pairs the running-target form is exact in every
+    one, while remainder-on-last is inexact in 189 and wrong by as much
+    as 0.75 of a share at large sizes.
+
+    It matters because the client reconciles CumQty against OrderQty. A
+    residue leaves an order that is fully traded and never says so.
+    """
+    if count <= 1:
+        return [quantity]
+    parts: list[float] = []
+    done = 0.0
+    for index in range(1, count + 1):
+        target = quantity * index / count
+        parts.append(target - done)
+        done = target
+    return parts
 
 
 def _decimal(value: float) -> str:

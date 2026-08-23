@@ -1109,7 +1109,7 @@ phase_3:
                   put every test run under a seven-year schedule. Outstanding, and why
                   this is 0.7: PEOP is not built and there is no screen over the
                   vault."}
-  P3_3:  {done: 0.9, blocker: code,
+  P3_3:  {done: 1.0, blocker: code,
           name: "EMS FIX connectivity against a simulator",
           basis: "the session layer and a simulator ship; the order path round-trips.
                   The `unverified` marking is resolved: `simplefix` is MIT, pure
@@ -1202,8 +1202,54 @@ phase_3:
                   atomicity buys. Cleaning up that mutation also failed silently —
                   `git checkout` cannot restore an untracked file — and the mutant was
                   nearly committed; the restore is asserted now. Outstanding, and why
-                  this is 0.9: no CLI command starts the simulator, no partial fills,
-                  and no heartbeat timer driving the session clock."}
+                  this was 0.9: no CLI command started the simulator, no partial
+                  fills, and no heartbeat timer driving the session clock. All three
+                  ship now. `treble simulator` binds 127.0.0.1 and nothing else,
+                  because this session layer has no authentication and an acceptor
+                  reachable from a network is one anybody on it can send orders to.
+                  Partial fills are the ordinary case on any venue with size and the
+                  place a client's position accounting goes wrong quietly, so the
+                  refusals are again the deliverable: a part-filled order stays
+                  cancellable, because its remainder is still working and a venue that
+                  refused would leave the trader unable to stop it; the cancel keeps
+                  the filled quantity, because a cancel that zeroed CumQty would report
+                  flat while the trader held stock; and over-filling raises rather than
+                  clamping, since a silent cap hides exactly the case where the client
+                  ends up holding more than it asked for. Average price is
+                  quantity-weighted over a running notional, not a mean of prices —
+                  100 at 150 and 900 at 100 is 105, and a client told 125 misvalues
+                  the position by 20%. The heartbeat is a pure decision over an
+                  injected clock: it does not sleep, because the failure it exists to
+                  catch cannot be reproduced by waiting. A test that sleeps three
+                  seconds proves a heartbeat fires and says nothing about thirty
+                  intervals elapsing between two polls, which is when a naive
+                  implementation emits thirty heartbeats or none. HeartBtInt of 0
+                  disables the clock and is handled here rather than by every caller,
+                  because an implementation reading 0 as always-due spins. Three
+                  measurements changed the code. Slicing a quantity by repeating
+                  quantity/count, or by dumping the remainder on the last slice, does
+                  not accumulate back onto the order: across 341 (quantity, count)
+                  pairs remainder-on-last is inexact in 189 and wrong by 0.75 of a
+                  share at size, while making each slice the gap between successive
+                  exact targets is exact in all 341. The completion tolerance had to
+                  become relative — ten million shares in eleven fills lands 1.86e-9
+                  short, past a fixed 1e-9 floor, at a size traded daily, and such an
+                  order would stay PARTIALLY_FILLED for ever and so stay cancellable
+                  after being fully executed. The absolute floor carried alongside it
+                  was then removed because nothing could make it fire: the residue of
+                  n fills is about n·2.2e-16·quantity, which passes quantity·1e-12
+                  only past ~4,500 fills. Three tests could not fail and were
+                  rewritten: the slice test used pytest.approx, which passes against a
+                  broken split; the large-order test used a quantity that *overshoots*,
+                  which satisfies the comparison however small the tolerance is; and
+                  nothing bounded the tolerance from above, so loosening it a
+                  millionfold — enough to call a 1,000,000-share order filled a whole
+                  share short — passed every test. Mutation-checked: 20 mutants, all
+                  killed, with two equivalent controls confirming the harness is not
+                  simply failing everything. One documented claim was wrong and is
+                  corrected: the ordering of the disconnect and test-request checks in
+                  `due` is *not* load-bearing, since their guards are mutually
+                  exclusive; what matters is that the heartbeat is checked last."}
   P3_4:  {done: 0.75, blocker: code,
           name: "PMS compliance DSL: version-controlled, unit-testable rules",
           basis: "the engine ships with six predicates, content-hashed rulesets and a

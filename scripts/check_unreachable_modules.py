@@ -60,12 +60,6 @@ AWAITING_WIRING: dict[str, str] = {
         "for. Waiting on a PMS screen to display a report, which the ledger records as "
         "the reason P3_4 is 0.75 rather than higher."
     ),
-    "treble.ems.transport": (
-        "The loopback socket P3_3's session and simulator run over. Ships in the "
-        "package because the gate criterion is FIX *connectivity*, so a wire is the "
-        "deliverable rather than a fixture. No CLI command starts it yet, which is "
-        "the wiring that is missing — `treble.ems.simulator` is reachable through it."
-    ),
 }
 
 ALLOWED_UNREACHABLE = {**ENTRY_POINTS, **AWAITING_WIRING}

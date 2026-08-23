@@ -11,6 +11,7 @@ Every command is safe to interrupt. Population resumes from the ingest log
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -25,6 +26,8 @@ from treble.cmd.env import load_env
 from treble.cmd.paths import default_data_dir
 from treble.cmd.seed import FIXTURES, seed, seed_available, seed_company_index
 from treble.core.universe import load_universe_config
+from treble.ems.simulator import Simulator
+from treble.ems.transport import HOST, SimulatorServer
 from treble.ingest.base import SourceAdapter
 from treble.ingest.health import Freshness, overdue, source_health
 from treble.ingest.populate import Populator
@@ -32,6 +35,7 @@ from treble.render.server import DEFAULT_HOST, DEFAULT_PORT
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadStore
+from treble.vault.worm import Vault
 
 if TYPE_CHECKING:
     from treble.tapi.local import LocalTapi
@@ -594,6 +598,56 @@ def compact(
             f"[yellow]Left hot — namespace not a safe file name: "
             f"{', '.join(report.skipped)}[/yellow]"
         )
+
+
+@app.command()
+def simulator(
+    port: int = typer.Option(0, help="Port to bind. 0 picks a free one and prints it."),
+    heartbeat: float = typer.Option(30.0, help="HeartBtInt in seconds. 0 disables the clock."),
+    fill_slices: int = typer.Option(1, help="Execution reports per immediate fill."),
+    rest: bool = typer.Option(False, help="Rest orders instead of filling them."),
+    state_dir: Path | None = typer.Option(None, help="Persist sequence counters here."),
+    archive: bool = typer.Option(False, help="Retain every message under the TVault schedule."),
+    data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where the vault lives, with --archive."),
+) -> None:
+    """Run the FIX 4.4 acceptor so a client can be pointed at something.
+
+    Bound to 127.0.0.1 and not configurable. There is no authentication
+    in this session layer, so an acceptor reachable from a network is one
+    anybody on that network can send orders to.
+
+    It is a simulator and says so: it fills at the order's limit price and
+    invents nothing about the market. What it is for is the session — the
+    counters, the framing, the refusals — which is where an EMS loses
+    money quietly.
+    """
+    sim = Simulator(fill_immediately=not rest, fill_slices=fill_slices)
+    vault = Vault(data_dir / "vault") if archive else None
+    if state_dir is not None:
+        state_dir.mkdir(parents=True, exist_ok=True)
+
+    async def serve() -> None:
+        server = SimulatorServer(sim, state_dir=state_dir, vault=vault, heartbeat_seconds=heartbeat)
+        bound = await server.start(port=port)
+        console.print(f"FIX 4.4 acceptor on [bold]{HOST}:{bound}[/] as {sim.sender}->{sim.target}")
+        console.print(
+            f"[dim]heartbeat {heartbeat:g}s · "
+            f"{'resting' if rest else f'filling in {fill_slices}'} · "
+            f"counters {'persisted' if state_dir else 'in memory'} · "
+            f"{'archiving' if vault else 'not archived'}[/dim]"
+        )
+        console.print("[dim]Ctrl-C to stop.[/dim]")
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await server.stop()
+
+    try:
+        asyncio.run(serve())
+    except KeyboardInterrupt:
+        # Expected: this command runs until interrupted. A traceback here
+        # would make the ordinary way of stopping it look like a crash.
+        console.print(f"\nStopped. {sim.reports} execution report(s), {sim.fills} fill(s).")
 
 
 def main() -> None:  # pragma: no cover - entry point shim

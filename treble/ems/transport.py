@@ -29,6 +29,8 @@ from pathlib import Path
 
 import simplefix
 
+from treble.ems.heartbeat import HeartbeatMonitor, Liveness
+from treble.ems.session import TEST_REQ_ID, MsgType
 from treble.ems.simulator import Simulator
 from treble.ems.store import resume, save
 from treble.vault.worm import Vault
@@ -40,6 +42,12 @@ HOST = "127.0.0.1"
 #: rather than accidentally satisfied: at 64 bytes a Logon spans several
 #: reads, which is the case a larger buffer would hide on loopback.
 READ_SIZE = 64
+
+#: How often the session clock is consulted, in seconds. Independent of
+#: the heartbeat interval: polling *at* the interval means a heartbeat is
+#: on average half an interval late, and a peer that measures strictly
+#: will test-request a session that is behaving.
+POLL_SECONDS = 0.25
 
 
 async def read_messages(
@@ -75,8 +83,15 @@ class SimulatorServer:
         *,
         state_dir: Path | None = None,
         vault: Vault | None = None,
+        heartbeat_seconds: float = 0.0,
     ) -> None:
         self.simulator = simulator or Simulator()
+        #: HeartBtInt for connections to this acceptor. Zero — the default
+        #: — disables the clock, which is a real FIX setting rather than a
+        #: way of not implementing it: a session supervised by other means
+        #: needs no filler traffic, and every test that is not about
+        #: liveness would otherwise carry a timer.
+        self.heartbeat_seconds = heartbeat_seconds
         #: Where the acceptor's sequence counters are persisted. A real
         #: acceptor survives its own restart: counters are per session, not
         #: per connection, so one that began again at 1 would be telling
@@ -91,15 +106,31 @@ class SimulatorServer:
         self.vault = vault
         self._server: asyncio.AbstractServer | None = None
         self.port = 0
+        #: Connections dropped for going silent. Counted, because a session
+        #: killed for unresponsiveness and one that closed normally are
+        #: indistinguishable from the socket alone.
+        self.dropped = 0
 
     async def _serve(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        started = datetime.now(UTC)
+        monitor = HeartbeatMonitor(
+            interval=self.heartbeat_seconds, last_sent=started, last_received=started
+        )
+        # A separate task, because the read loop below blocks. Draining the
+        # socket with a timeout instead would cancel `read_messages`
+        # mid-await and destroy the parser's buffer along with whatever
+        # partial message was in it — a framing bug that would present as a
+        # corrupt peer.
+        clock = asyncio.create_task(self._tick(monitor, writer))
         try:
             async for raw in read_messages(reader):
                 now = datetime.now(UTC)
+                monitor.received(now)
                 self._archive(raw, now=now)
                 for reply in self.simulator.respond(raw, now=now):
                     self._archive(reply, now=now)
                     writer.write(reply)
+                    monitor.sent(now)
                 await writer.drain()
                 if self.state_dir is not None:
                     # After every exchange, not at shutdown: a crash is the
@@ -107,7 +138,46 @@ class SimulatorServer:
                     # correct except when it matters.
                     save(self.simulator.session, self.state_dir)
         finally:
+            clock.cancel()
+            await asyncio.gather(clock, return_exceptions=True)
             writer.close()
+
+    async def _tick(self, monitor: HeartbeatMonitor, writer: asyncio.StreamWriter) -> None:
+        """Drive the session clock until the connection goes away.
+
+        `encode` and `write` sit adjacent with no `await` between them.
+        Both this task and the read loop send on one session, and an
+        `await` in the middle would let the other run between a sequence
+        number being consumed and the message carrying it being queued —
+        putting two messages on the wire out of order under their own
+        numbers, which the peer reads as a gap.
+        """
+        while True:
+            await asyncio.sleep(POLL_SECONDS)
+            now = datetime.now(UTC)
+            action = monitor.due(now)
+            if action is Liveness.IDLE:
+                continue
+            if action is Liveness.DISCONNECT:
+                # The peer stopped answering. Closing is the whole point: a
+                # half-open socket accepts writes for ever and reports
+                # nothing, so a session that never gave up would look
+                # healthy while delivering none of what it was sent.
+                self.dropped += 1
+                writer.close()
+                return
+            if action is Liveness.SEND_TEST_REQUEST:
+                request_id = f"TR{now.timestamp():.3f}"
+                writer.write(
+                    self.simulator.session.encode(
+                        MsgType.TEST_REQUEST, ((TEST_REQ_ID, request_id),), now=now
+                    )
+                )
+                monitor.test_request_sent(request_id, now)
+            else:
+                writer.write(self.simulator.session.heartbeat(now=now))
+                monitor.sent(now)
+            await writer.drain()
 
     def _archive(self, raw: bytes, *, now: datetime) -> None:
         """Retain one message under the books-and-records schedule.
@@ -131,14 +201,21 @@ class SimulatorServer:
             self.state_dir, sender=session.sender, target=session.target
         )
 
-    async def start(self) -> int:
-        """Bind an ephemeral port and return it.
+    async def start(self, *, port: int = 0) -> int:
+        """Bind and return the port actually bound.
 
-        Port 0 rather than a fixed one: a fixed port makes two test runs on
-        one machine collide, and the failure reads as a protocol bug.
+        Zero by default, and the default is the one tests use: a fixed
+        port makes two runs on one machine collide, and the failure reads
+        as a protocol bug rather than as two servers wanting one socket.
+        A caller running the acceptor for a real client needs to name a
+        port so the client can be pointed at it, which is the only reason
+        this is an argument at all.
+
+        The bound port is returned rather than assumed, because with 0 the
+        kernel chooses and only it knows.
         """
         self._resume()
-        self._server = await asyncio.start_server(self._serve, HOST, 0)
+        self._server = await asyncio.start_server(self._serve, HOST, port)
         self.port = self._server.sockets[0].getsockname()[1]
         return self.port
 
@@ -155,9 +232,12 @@ async def running_simulator(
     *,
     state_dir: Path | None = None,
     vault: Vault | None = None,
+    heartbeat_seconds: float = 0.0,
 ) -> AsyncIterator[SimulatorServer]:
     """A simulator listening on loopback, stopped on exit."""
-    server = SimulatorServer(simulator, state_dir=state_dir, vault=vault)
+    server = SimulatorServer(
+        simulator, state_dir=state_dir, vault=vault, heartbeat_seconds=heartbeat_seconds
+    )
     await server.start()
     try:
         yield server
@@ -167,6 +247,7 @@ async def running_simulator(
 
 __all__ = [
     "HOST",
+    "POLL_SECONDS",
     "READ_SIZE",
     "SimulatorServer",
     "read_messages",
