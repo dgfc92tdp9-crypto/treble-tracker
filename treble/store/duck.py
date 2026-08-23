@@ -6,10 +6,20 @@ Enforces at the storage boundary:
   (NOT NULL column plus an explicit existence check per batch).
 - I2 — inserts only; the only temporal predicate offered is ``as_of`` on
   knowledge time with latest-knowledge-wins resolution. There is no UPDATE
-  or DELETE statement anywhere in this module.
+  or DELETE statement anywhere in this module. Compaction moves rows
+  between tiers and therefore does delete from the hot table — that lives
+  in :mod:`treble.store.cold`, off the protocol, and only ever after the
+  same rows have been written and verified elsewhere. No fact ever stops
+  being visible.
 
 Values are stored in typed columns (numeric/int/text/bool/date) so DuckDB
 queries — and later TQL plans — operate natively rather than through JSON.
+
+Facts live in two tiers. New ones are inserted into the ``facts`` table;
+settled history is compacted out to sorted Parquet by :mod:`treble.store.cold`
+and read back through the ``all_facts`` view, which every query below goes
+through. The tiering is physical only — no read can tell which tier a fact
+came from, and none of them may try.
 """
 
 from __future__ import annotations
@@ -23,88 +33,65 @@ import pyarrow as pa
 from treble.core.facts import Fact, FactValue
 from treble.core.identifiers import TUID
 from treble.core.provenance import Provenance, ProvenanceId
-
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS provenance (
-    id                VARCHAR PRIMARY KEY,
-    source_system     VARCHAR NOT NULL,
-    source_uri        VARCHAR NOT NULL,
-    retrieved_at      TIMESTAMPTZ NOT NULL,
-    method            VARCHAR NOT NULL,
-    extractor_version VARCHAR NOT NULL,
-    confidence        DOUBLE NOT NULL,
-    locator           VARCHAR,
-    payload_hash      VARCHAR,
-    input_ids         VARCHAR[] NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS facts (
-    subject        VARCHAR NOT NULL,
-    field          VARCHAR NOT NULL,
-    value_kind     VARCHAR NOT NULL,
-    value_num      DOUBLE,
-    value_int      BIGINT,
-    value_text     VARCHAR,
-    value_bool     BOOLEAN,
-    value_date     DATE,
-    effective_from DATE NOT NULL,
-    effective_to   DATE,
-    knowledge_from TIMESTAMPTZ NOT NULL,
-    provenance_id  VARCHAR NOT NULL
-);
-CREATE INDEX IF NOT EXISTS facts_read_idx
-    ON facts (subject, field, effective_from, knowledge_from);
-"""
-
-#: Fact columns, in table order. Named explicitly in the bulk INSERT rather
-#: than relying on `SELECT *`, so a column added to the table in a later
-#: migration cannot silently shift every value one place to the left.
-_FACT_COLUMNS = (
-    "subject",
-    "field",
-    "value_kind",
-    "value_num",
-    "value_int",
-    "value_text",
-    "value_bool",
-    "value_date",
-    "effective_from",
-    "effective_to",
-    "knowledge_from",
-    "provenance_id",
+from treble.store.cold import (
+    CompactionReport,
+    cold_dir_for,
+    compact,
+    union_sql,
+)
+from treble.store.cold import (
+    reclaim as reclaim_database,
+)
+from treble.store.schema import (
+    FACT_ARROW_SCHEMA,
+    FACT_COLUMNS,
+    FACT_PROJECTION,
+    SCHEMA,
+    TIE_BREAK,
 )
 
-#: Arrow types matching the `facts` DDL above. Kept adjacent to it because
-#: the two must agree and nothing but proximity and the round-trip tests
-#: enforces that.
-_FACT_ARROW_SCHEMA = pa.schema(
-    [
-        pa.field("subject", pa.string()),
-        pa.field("field", pa.string()),
-        pa.field("value_kind", pa.string()),
-        pa.field("value_num", pa.float64()),
-        pa.field("value_int", pa.int64()),
-        pa.field("value_text", pa.string()),
-        pa.field("value_bool", pa.bool_()),
-        pa.field("value_date", pa.date32()),
-        pa.field("effective_from", pa.date32()),
-        pa.field("effective_to", pa.date32()),
-        pa.field("knowledge_from", pa.timestamp("us", tz="UTC")),
-        pa.field("provenance_id", pa.string()),
-    ]
-)
+#: The union of both tiers. Queries name this, never `facts` — reading the
+#: table directly would silently answer from the hot tier alone, which
+#: after a compaction is a store that has forgotten most of its history
+#: while still returning rows for the part it kept.
+_ALL = "all_facts"
 
 # Latest knowledge wins per effective period, visible as of the knowledge date.
-_VISIBLE = """
+#
+# This is also what makes the cold tier crash-safe: a row present in both
+# tiers shares a partition with its own copy, so `rn = 1` discards the
+# duplicate. See `cold.py` — the whole compaction ordering depends on it.
+_VISIBLE_TEMPLATE = """
 SELECT * EXCLUDE (rn) FROM (
     SELECT *, row_number() OVER (
         PARTITION BY subject, field, effective_from, coalesce(effective_to, DATE '9999-12-31')
-        ORDER BY knowledge_from DESC
+        ORDER BY {tie_break}
     ) AS rn
-    FROM facts
+    FROM {table}
     WHERE subject = ? AND field = ? AND knowledge_from <= ?
 ) WHERE rn = 1
 """
+
+# Interpolated on its own line rather than as an f-string above, because a
+# lint-suppression comment placed beside the opening triple quote lands
+# *inside* the string and gets sent to DuckDB as part of the query. That
+# happened here; the SQL began with a comment and the constant was silently
+# wrong until it was printed.
+_VISIBLE = _VISIBLE_TEMPLATE.format(table=_ALL, tie_break=TIE_BREAK)
+
+#: The same window keyed on subject alone, for the two reads that want
+#: every field. Shared with `_VISIBLE_TEMPLATE` through `TIE_BREAK` rather
+#: than restated, because these three windows must resolve visibility
+#: identically and previously did so only by having been copied.
+_BY_SUBJECT = """
+    SELECT {columns}, row_number() OVER (
+        PARTITION BY subject, field, effective_from,
+                     coalesce(effective_to, DATE '9999-12-31')
+        ORDER BY {tie_break}
+    ) AS rn
+    FROM {table}
+    WHERE subject = ? AND knowledge_from <= ?
+""".format(columns="{columns}", tie_break=TIE_BREAK, table=_ALL)  # noqa: S608
 
 
 class MissingProvenanceError(Exception):
@@ -155,9 +142,69 @@ def _recompose(
 class DuckStore:
     """Store + HistoryStore over a single DuckDB database file."""
 
-    def __init__(self, db_path: Path | str) -> None:
-        self._conn = duckdb.connect(str(db_path))
-        self._conn.execute(_SCHEMA)
+    def __init__(self, db_path: Path | str, *, cold_dir: Path | None = None) -> None:
+        self._path = Path(db_path).resolve()
+        self._cold_dir = (cold_dir or cold_dir_for(self._path)).resolve()
+        self._conn = duckdb.connect(str(self._path))
+        self._conn.execute(SCHEMA)
+        self._refresh_view()
+
+    def _refresh_view(self) -> None:
+        """Rebuild `all_facts` over the cold partitions currently on disk.
+
+        A TEMP view, rebuilt at every connect, rather than a persistent
+        one. A persistent view would bake today's absolute paths into the
+        database file, so moving the data directory — which
+        `TREBLE_DATA_DIR` exists to allow, and which the storage
+        measurements recommend doing onto an external disk — would leave
+        the store pointing at partitions that are no longer there. The
+        view costs microseconds to recreate and cannot go stale.
+        """
+        self._conn.execute(f"CREATE OR REPLACE TEMP VIEW {_ALL} AS {union_sql(self._cold_dir)}")
+
+    @property
+    def cold_dir(self) -> Path:
+        return self._cold_dir
+
+    # -- maintenance ----------------------------------------------------------
+
+    def compact(
+        self, *, before: datetime, namespaces: tuple[str, ...] | None = None
+    ) -> CompactionReport:
+        """Move facts settled before ``before`` into the cold tier.
+
+        Not on the `Store` protocol, and deliberately: compaction changes
+        where bytes live, never which facts are visible, so it is
+        maintenance rather than a store operation. Putting it on the
+        protocol would also put a deletion on an interface whose entire
+        purpose (I2) is not offering one.
+        """
+        report = compact(self._conn, self._cold_dir, before=before, namespaces=namespaces)
+        if report.moved_anything:
+            self._refresh_view()
+            # Flushes the delete to the file and puts the blocks on the
+            # free list so later writes reuse them. It does **not** return
+            # them to the filesystem: measured, the file is byte-identical
+            # before and after this call, and the live store sat at 859 MB
+            # holding 6 used blocks out of 4646. Call `reclaim` for that.
+            self._conn.execute("CHECKPOINT")
+        return report
+
+    def reclaim(self) -> tuple[int, int]:
+        """Return the space compaction freed to the filesystem.
+
+        Separate from :meth:`compact` because it replaces the database
+        file underneath the connection, which is a different kind of risk
+        from moving rows between tiers and deserves to be asked for
+        explicitly. Reopens afterwards, so the store stays usable.
+
+        Returns (bytes before, bytes after).
+        """
+        before, after = reclaim_database(self._conn, self._path)
+        self._conn = duckdb.connect(str(self._path))
+        self._conn.execute(SCHEMA)
+        self._refresh_view()
+        return before, after
 
     # -- writes (insert-only) -------------------------------------------------
 
@@ -230,7 +277,7 @@ class DuckStore:
         # place: dropping and recreating it around each write saves less
         # than it risks, since a crash mid-load would leave the store
         # without the index every read depends on.
-        columns: dict[str, list[object]] = {name: [] for name in _FACT_COLUMNS}
+        columns: dict[str, list[object]] = {name: [] for name in FACT_COLUMNS}
         for fact in facts:
             kind, num, intv, text, boolean, day = _decompose(fact.value)
             columns["subject"].append(fact.subject)
@@ -253,16 +300,16 @@ class DuckStore:
         # of one kind of value writes exactly like a batch of many.
         batch = pa.table(
             {
-                name: pa.array(values, type=_FACT_ARROW_SCHEMA.field(name).type)
+                name: pa.array(values, type=FACT_ARROW_SCHEMA.field(name).type)
                 for name, values in columns.items()
             },
-            schema=_FACT_ARROW_SCHEMA,
+            schema=FACT_ARROW_SCHEMA,
         )
         self._conn.register("_incoming_facts", batch)
         try:
             self._conn.execute(
-                f"INSERT INTO facts ({', '.join(_FACT_COLUMNS)}) "  # noqa: S608
-                f"SELECT {', '.join(_FACT_COLUMNS)} FROM _incoming_facts"
+                f"INSERT INTO facts ({', '.join(FACT_COLUMNS)}) "  # noqa: S608
+                f"SELECT {', '.join(FACT_COLUMNS)} FROM _incoming_facts"
             )
         finally:
             # Unregister even on failure: a leftover view would shadow the
@@ -279,7 +326,7 @@ class DuckStore:
         indistinguishable from a real instrument with no data.
         """
         row = self._conn.execute(
-            "SELECT 1 FROM facts WHERE subject = ? LIMIT 1", [subject]
+            "SELECT 1 FROM all_facts WHERE subject = ? LIMIT 1", [subject]
         ).fetchone()
         return row is not None
 
@@ -297,20 +344,49 @@ class DuckStore:
         known after ``as_of`` is visible.
         """
         rows = self._conn.execute(
-            """
-            SELECT DISTINCT provenance_id FROM (
-                SELECT provenance_id, row_number() OVER (
-                    PARTITION BY subject, field, effective_from,
-                                 coalesce(effective_to, DATE '9999-12-31')
-                    ORDER BY knowledge_from DESC
-                ) AS rn
-                FROM facts
-                WHERE subject = ? AND knowledge_from <= ?
-            ) WHERE rn = 1
-            """,
+            "SELECT DISTINCT provenance_id FROM ("  # noqa: S608
+            + _BY_SUBJECT.format(columns="provenance_id")
+            + ") WHERE rn = 1",
             [subject, as_of],
         ).fetchall()
         return [ProvenanceId(row[0]) for row in rows if row[0] is not None]
+
+    def ambiguous_partitions(self, *, limit: int = 20) -> list[tuple[str, str, date, int]]:
+        """Where one key holds several values and only one can be shown.
+
+        A partition — subject, field, effective period, knowledge time —
+        is assumed to identify a single value. These hold more than one,
+        so `rn = 1` picks and the rest are invisible.
+
+        On the live store there are 6,766 of these against 8.9 million
+        visible facts, and the cause is a modelling gap rather than bad
+        data: 5,996 are GLEIF relationship records, where an entity may
+        legitimately hold several at once, and 367 are `edgar:filing:form`
+        for filers who submitted more than one form on a day. The key is
+        wrong for those fields, not the sources.
+
+        Reported rather than repaired, because the repair is per-field —
+        those need a discriminator in the subject or the field — and a
+        store that quietly collapsed them would be hiding data it holds.
+
+        Returns (subject, field, effective_from, distinct value count).
+        """
+        rows = self._conn.execute(
+            """
+            SELECT subject, field, effective_from,
+                   count(DISTINCT coalesce(value_num::VARCHAR, value_int::VARCHAR,
+                                           value_text, value_bool::VARCHAR,
+                                           value_date::VARCHAR, 'null')) AS values
+            FROM all_facts
+            GROUP BY subject, field, effective_from,
+                     coalesce(effective_to, DATE '9999-12-31'), knowledge_from
+            HAVING values > 1
+            ORDER BY values DESC, subject, field
+            LIMIT ?
+            """,
+            [limit],
+        ).fetchall()
+        return [(str(r[0]), str(r[1]), r[2], int(r[3])) for r in rows]
 
     def fact_count(self) -> int:
         """How many facts the store holds.
@@ -319,8 +395,14 @@ class DuckStore:
         renders every bound cell as a dash, and a dash is indistinguishable
         from "not reported". The clients check this so an unpopulated store
         announces itself instead of looking like a company with no figures.
+
+        Counts stored rows across both tiers, not distinct facts. A
+        compaction interrupted between its rename and its delete leaves
+        rows in both tiers, and this will count those twice until the next
+        run collapses them — visible only here, because every other read
+        resolves the duplicate away.
         """
-        row = self._conn.execute("select count(*) from facts").fetchone()
+        row = self._conn.execute("select count(*) from all_facts").fetchone()
         return int(row[0]) if row else 0
 
     def subjects_with_prefix(self, prefix: str, *, as_of: datetime) -> list[TUID]:
@@ -337,7 +419,7 @@ class DuckStore:
         not yet exist.
         """
         rows = self._conn.execute(
-            "SELECT DISTINCT subject FROM facts "
+            "SELECT DISTINCT subject FROM all_facts "
             "WHERE starts_with(subject, ?) AND knowledge_from <= ? ORDER BY subject",
             [prefix, as_of],
         ).fetchall()
@@ -364,7 +446,7 @@ class DuckStore:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")
         rows = self._conn.execute(
-            "SELECT DISTINCT subject FROM facts "
+            "SELECT DISTINCT subject FROM all_facts "
             "WHERE field = ? AND value_text = ? AND knowledge_from <= ? "
             "ORDER BY subject",
             [field, value, as_of],
@@ -413,18 +495,9 @@ class DuckStore:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")
         rows = self._conn.execute(
-            """
-            SELECT * EXCLUDE (rn) FROM (
-                SELECT *, row_number() OVER (
-                    PARTITION BY subject, field, effective_from,
-                                 coalesce(effective_to, DATE '9999-12-31')
-                    ORDER BY knowledge_from DESC
-                ) AS rn
-                FROM facts
-                WHERE subject = ? AND knowledge_from <= ?
-            ) WHERE rn = 1
-            ORDER BY field, effective_from
-            """,
+            "SELECT * EXCLUDE (rn) FROM ("  # noqa: S608
+            + _BY_SUBJECT.format(columns=FACT_PROJECTION)
+            + ") WHERE rn = 1 ORDER BY field, effective_from",
             [subject, as_of],
         ).fetchall()
         return [self._fact(r) for r in rows]
