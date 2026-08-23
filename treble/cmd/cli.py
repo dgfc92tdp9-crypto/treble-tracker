@@ -306,14 +306,20 @@ def refresh(
     only: str | None = typer.Option(None, help="Refresh one source id rather than all due."),
     force: bool = typer.Option(False, help="Refresh even sources that are not yet due."),
 ) -> None:
-    """Re-run the keyless market feeds that have gone stale.
+    """Re-run the market feeds that have gone stale.
 
-    The answer to "will I have to rebuild this in six months". Every source
-    here is keyless and permissively licensed, so this needs no credential
-    and can be run on a timer; `treble status` says which are overdue and
-    this brings them back. A workstation whose data flow can only be
-    restored by remembering which script to run is one that gets rebuilt
-    instead of repaired.
+    The answer to "will I have to rebuild this in six months". `treble
+    status` says which sources are overdue and this brings them back. A
+    workstation whose data flow can only be restored by remembering which
+    script to run is one that gets rebuilt instead of repaired.
+
+    Mostly keyless, so it runs on a timer without a credential. Twelve
+    Data is the exception and is included anyway, gated on its key being
+    configured — it declares a one-day cadence and `status` reports it
+    overdue, and a health check that nothing can ever satisfy is worse
+    than no health check, because it teaches the reader to ignore the
+    column. Its 45 tickers had been fetched exactly once, by hand, on
+    2026-08-07: nothing in the package constructed the adapter at all.
 
     Deliberately not everything. The EDGAR and N-PORT adapters are driven
     by a universe — which filers, over what history — and belong to
@@ -327,7 +333,9 @@ def refresh(
     from treble.ingest.fred import FredAdapter
     from treble.ingest.gleif_isin import GleifIsinLeiAdapter
     from treble.ingest.health import Freshness, source_health
+    from treble.ingest.treasury import TreasuryAuctionsAdapter
     from treble.ingest.treasury_curve import TreasuryCurveAdapter
+    from treble.ingest.twelvedata import API_KEY_ENV, TwelveDataDailyAdapter
 
     payloads, log, store = _open_stores(data_dir)
     now = datetime.now(UTC)
@@ -347,9 +355,19 @@ def refresh(
     fred_series = _existing("fred:", drop=1)
     stored_isins = tuple(str(s) for s in store.subjects_with_prefix("isin:", as_of=now))
     crypto_products = _existing("crypto:coinbase:", drop=2)
+    equity_tickers = _existing("equity:", drop=1)
 
     builders: dict[str, Callable[[], SourceAdapter]] = {
         "treasury-curve": lambda: TreasuryCurveAdapter(payloads, log),
+        # Auctions run on a weekly cycle, so a window rather than a day.
+        # 180 back because the cost of overlap is a content-addressed
+        # re-fetch that writes nothing (I5), and the cost of too narrow a
+        # window is a permanent hole after any period the command was not
+        # run — which is exactly the state this source was found in,
+        # 27 days stale with nothing able to refresh it.
+        "treasury-auctions": lambda: TreasuryAuctionsAdapter(
+            payloads, log, since=now.date() - timedelta(days=180)
+        ),
         # The three majors the store's fx: subjects are built from. Named
         # here rather than read from the universe config because refresh is
         # about keeping existing series current, not about choosing which
@@ -379,6 +397,10 @@ def refresh(
             log,
             isins=[i.split(":", 1)[1] for i in stored_isins],
         ),
+        # The tickers the store already holds, like FRED's series and
+        # Coinbase's products above — refresh keeps existing series
+        # current; choosing new ones belongs to `populate`.
+        "twelvedata": lambda: TwelveDataDailyAdapter(payloads, log, symbols=equity_tickers),
         # The public CFTC Part 43 tape, by report date. Ten days rather
         # than one: the tape is published per trading day and a run that
         # asked only for today would leave a permanent hole after any
@@ -394,10 +416,18 @@ def refresh(
     # A source with nothing to refresh is skipped rather than run empty: an
     # adapter asked for zero series fetches nothing and logs a success,
     # which would mark it fresh and hide that it holds no data at all.
+    # Keyed sources are skipped, not failed, when the credential is absent:
+    # a missing optional key is a configuration choice, and reporting it as
+    # a broken feed would put a permanent red line in `status` for a source
+    # the user has decided not to use.
+    if not os.environ.get(API_KEY_ENV):
+        builders.pop("twelvedata", None)
+
     empty = {
         source_id
         for source_id, targets in (
             ("fred", fred_series),
+            ("twelvedata", equity_tickers),
             ("coinbase", crypto_products),
             ("gleif-isin", stored_isins),
         )

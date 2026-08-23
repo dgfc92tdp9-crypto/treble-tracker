@@ -282,6 +282,23 @@ class TestTheAllqPanels:
         assert rows["TGN (indicative)"] != rows["TCMP (executable)"]
         assert rows["Contributors"] == 2.0
 
+    @pytest.mark.parametrize("binding", ["sys:allq", "sys:allq_composites"])
+    def test_no_security_says_so_rather_than_rendering_blank(
+        self, tmp_path: Path, binding: str
+    ) -> None:
+        """The same correction the empty-book branch already carried, which
+        was applied there and missed one branch earlier.
+
+        A blank pane is indistinguishable from one that failed to load, and
+        unbound is the state ALLQ is in *every time it is opened* — so this
+        was the most frequently seen version of the defect the empty-book
+        row exists to prevent. Every other screen (DDIS, SPRD, OAS1, RELS,
+        TVAL) already said "no security selected".
+        """
+        rows = self._tapi(tmp_path, quotes=False).series(None, binding, as_of=LATER)  # type: ignore[arg-type]
+        assert len(rows) == 1, "unbound ALLQ rendered a blank pane"
+        assert "no security selected" in str(rows[0][0])
+
     def test_an_empty_book_says_how_long_it_has_been_empty(self, tmp_path: Path) -> None:
         """The Phase 2 criterion is ALLQ correct-when-empty. A screen that
         cannot distinguish "no one has ever quoted this" from "the feed

@@ -517,10 +517,20 @@ class LocalTapi:
         if binding in self.SYSTEM_BINDINGS:
             return self._system_series(security, binding, as_of=as_of)
         if security is None:
-            return ()
+            # A reason, not a blank pane — the same correction the `sys:`
+            # panels carry, applied once here so it covers every
+            # field-bound pane rather than each screen separately. GP and
+            # HP were the two that had it: both bind `PX_LAST` directly,
+            # so neither went through a `sys:` handler where the rows
+            # would have been added.
+            return ((f"no security selected: this panel plots {binding}", None),)
         definition = self._fields.get(binding)
         if definition.stored_field is None:
-            return ()
+            # The field exists in the dictionary but nothing stores it, so
+            # the panel would be permanently blank and look like a load
+            # failure. Naming the field is what lets a reader tell "not
+            # collected" from "not reported".
+            return ((f"{binding} is defined but no source populates it", None),)
         facts = self._store.history(self.resolve(security), definition.stored_field, as_of=as_of)
         return tuple(
             (f.effective_from.isoformat(), f.value)  # type: ignore[misc]
@@ -638,7 +648,12 @@ class LocalTapi:
             return self._tval_residual(as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
-            return ()
+            # A reason, not a blank pane. SPTR unbound is what a reader
+            # sees before typing a ticker, and an empty provenance panel
+            # says "nothing sourced this" rather than "nothing asked".
+            # Same correction as ALLQ above; they were the last two
+            # `sys:` panels returning zero rows for an unbound screen.
+            return (("no security selected: SPTR traces one security's values", None, None),)
         return self._provenance_rows(security, as_of=as_of)
 
     def _treasury_curve(
@@ -687,7 +702,15 @@ class LocalTapi:
         *correct-when-empty*).
         """
         if security is None:
-            return ()
+            # A reason, not zero rows — the same correction the empty-book
+            # branch below already carries, which was applied there and
+            # missed here. A blank pane is indistinguishable from one that
+            # failed to load, and ALLQ unbound is the state the screen is
+            # in every time it is first opened, so this was the *most*
+            # frequently seen version of the defect the branch below fixes.
+            columns = 7 if binding == "sys:allq" else 3
+            blanks = [None] * (columns - 1)
+            return (("no security selected: ALLQ quotes one instrument", *blanks),)
         book = self._contributions.book(str(self.resolve(security)), as_of=as_of)
 
         if binding == "sys:allq":

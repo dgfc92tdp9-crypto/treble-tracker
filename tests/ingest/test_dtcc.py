@@ -30,6 +30,7 @@ from treble.ingest.dtcc import (
     USD_SOFR_OIS,
     DtccParseError,
     DtccSdrRatesAdapter,
+    DtccUnavailableError,
     _rows_from_zip,
     curve_subject,
     frequency_months,
@@ -700,3 +701,78 @@ class TestSwaptionPrints:
             swaption_prints([self._row(**{"UPI FISN": "NA/O Call Epn OIS MXN"})], date(2026, 7, 13))
             == ()
         )
+
+
+class TestTheWindowSurvivesAWeekend:
+    """The ten-day window exists to ride over days with no file.
+
+    It could not: `raise_for_status()` on the first missing day ended the
+    generator before the other nine were tried, and **every ten-day window
+    contains a weekend**, so the source had not refreshed since
+    2026-08-10. Found by running the refresh on a Sunday and reading the
+    date in the 403 rather than the status — the URL named a Saturday.
+    """
+
+    @staticmethod
+    def _adapter(tmp_path: Path, dates: tuple[date, ...]) -> DtccSdrRatesAdapter:
+        from treble.store.ingest_log import IngestLog
+        from treble.store.payloads import PayloadStore
+
+        adapter = DtccSdrRatesAdapter(
+            PayloadStore(tmp_path / "p"), IngestLog(tmp_path / "i.db"), report_dates=dates
+        )
+        adapter._throttle = lambda: None  # type: ignore[method-assign]
+        return adapter
+
+    @staticmethod
+    def _responses(monkeypatch: pytest.MonkeyPatch, published: set[date]) -> list[str]:
+        """Serve a body only for `published` dates; 403 the rest, as S3 does."""
+        asked: list[str] = []
+
+        class Response:
+            def __init__(self, code: int) -> None:
+                self.status_code = code
+                self.content = b"PK\x03\x04 not a real zip"
+
+            def raise_for_status(self) -> None:
+                if self.status_code >= 400:
+                    raise AssertionError("raise_for_status called on a skipped day")
+
+        def get(url: str, **_: object) -> Response:
+            asked.append(url)
+            stamp = url.rsplit("_", 3)[-3:]
+            day = date(int(stamp[0]), int(stamp[1]), int(stamp[2].split(".")[0]))
+            return Response(200 if day in published else 403)
+
+        monkeypatch.setattr("treble.ingest.dtcc.httpx.get", get)
+        return asked
+
+    def test_a_missing_saturday_does_not_stop_the_friday(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        friday, saturday, sunday = date(2026, 8, 21), date(2026, 8, 22), date(2026, 8, 23)
+        asked = self._responses(monkeypatch, published={friday})
+        adapter = self._adapter(tmp_path, (sunday, saturday, friday))
+        payloads = list(adapter.fetch())
+        assert len(payloads) == 1, "the published Friday was not fetched"
+        assert "2026_08_21" in payloads[0].source_uri
+        assert len(asked) == 3, "the generator stopped early instead of trying every day"
+
+    def test_every_day_missing_is_still_an_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A broken endpoint and a long holiday look identical from one
+        request. Only the count separates them, so a window that yields
+        nothing at all must not pass for a quiet week."""
+        self._responses(monkeypatch, published=set())
+        adapter = self._adapter(tmp_path, tuple(date(2026, 8, 14 + n) for n in range(10)))
+        with pytest.raises(DtccUnavailableError, match="10 day"):
+            list(adapter.fetch())
+
+    def test_an_empty_window_is_not_an_error(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Nothing asked for is nothing missing. The guard must key off
+        days that were *tried*, not off having yielded nothing."""
+        self._responses(monkeypatch, published=set())
+        assert list(self._adapter(tmp_path, ()).fetch()) == []

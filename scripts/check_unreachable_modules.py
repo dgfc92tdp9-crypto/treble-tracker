@@ -34,7 +34,6 @@ ENTRY_POINTS: dict[str, str] = {
     "treble.plant.natsjs": "Transport chosen at deployment, not at import.",
     "treble.plant.kafka": "Transport chosen at deployment, not at import.",
     "treble.ingest.frenchdata": "Adapter run out of band by scripts/backfill_port.py.",
-    "treble.ingest.twelvedata": "Adapter run out of band by scripts/backfill_port.py.",
     "treble.ingest.trace": "Adapter run out of band against a downloaded TRACE file.",
 }
 

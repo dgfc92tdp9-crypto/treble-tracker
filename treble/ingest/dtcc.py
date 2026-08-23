@@ -99,6 +99,17 @@ LIST_URL = "https://pddata.dtcc.com/ppd/api/cumulative/{jurisdiction}/{asset_cla
 FILE_URL = "https://kgc0418-tdw-data-0.s3.amazonaws.com/cftc/eod/CFTC_CUMULATIVE_RATES_{stamp}.zip"
 
 
+#: Statuses that mean "this day has no file", as distinct from "this
+#: source is broken". S3 answers 403 rather than 404 for a key that does
+#: not exist when listing is denied, so both have to count — reading only
+#: 404 would treat every weekend as an outage.
+_NOT_PUBLISHED = frozenset({403, 404})
+
+
+class DtccUnavailableError(RuntimeError):
+    """No file was published on any day in the window."""
+
+
 def file_url(report_date: date) -> str:
     """The cumulative interest-rate file for one trading day."""
     return FILE_URL.format(stamp=report_date.strftime("%Y_%m_%d"))
@@ -546,12 +557,44 @@ class DtccSdrRatesAdapter(SourceAdapter):
         self._report_dates = report_dates
 
     def fetch(self) -> Iterator[RawPayload]:
+        """Every published day in the window, skipping the ones that are not.
+
+        A day with no file is the *normal* case, not a fault: the tape is
+        published per trading day, so weekends and holidays have nothing,
+        and the newest day has nothing until DTCC publishes it. The
+        ten-day window above exists precisely to ride over those.
+
+        It could not. `raise_for_status()` on the first missing day ended
+        the generator before the other nine were tried, and **every
+        ten-day window contains a weekend** — so the mechanism built to
+        survive weekends was defeated by the line after it, and the source
+        had not refreshed since 2026-08-10. Found by running the refresh
+        on a Sunday and reading the 403 rather than the date in it: the
+        URL named a Saturday.
+
+        A missing day is therefore skipped and counted. Missing *every*
+        day is still an error — a broken endpoint and a long holiday look
+        identical from one request, and only the count separates them.
+        """
+        missing: list[date] = []
+        published = 0
         for report_date in self._report_dates:
             self._throttle()
             url = file_url(report_date)
             response = httpx.get(url, timeout=300.0, follow_redirects=True)
+            if response.status_code in _NOT_PUBLISHED:
+                missing.append(report_date)
+                continue
             response.raise_for_status()
+            published += 1
             yield RawPayload(data=response.content, source_uri=url, fetched_at=utcnow())
+
+        if published == 0 and missing:
+            raise DtccUnavailableError(
+                f"no CFTC rates file published on any of {len(missing)} day(s) "
+                f"{missing[-1]}..{missing[0]}. A window this wide spans trading days, "
+                "so this is the endpoint or the file naming, not a holiday"
+            )
 
     @staticmethod
     def trading_days(
