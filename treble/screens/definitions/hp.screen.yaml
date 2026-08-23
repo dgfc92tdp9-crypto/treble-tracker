@@ -7,11 +7,18 @@
 # Newest first, declared on the pane rather than left to the renderer: an
 # ascending series truncated to the pane height would show the oldest rows
 # and hide today's, which is the wrong answer delivered tidily.
+#
+# Index and Equity, through the same binding GP uses, so the two screens
+# cannot come to disagree about which subject or which field they show —
+# which is exactly how a total return ends up on one screen and a price on
+# the other under the same heading. The footer here used to promise
+# unadjusted closes; that is true of FRED index levels and false of the
+# equity series, so the basis panel states it per security instead.
 mnemonic: HP
 title: Historical Price
 rows: 22
 cols: 80
-namespaces: [Index]
+namespaces: [Index, Equity]
 
 tabs:
   - name: main
@@ -24,20 +31,22 @@ tabs:
         at: {row: 1, col: 0}
         text: "────────────────────────────────────────────────────────────────────────────"
         attrs: [label]
-      - kind: static
-        at: {row: 2, col: 0}
-        text: "Closing levels, most recent first. End of day."
-        attrs: [label]
+
+      - kind: pane
+        region: {row: 2, col: 0, height: 7, width: 72}
+        pane_type: table_scroll
+        binding: "sys:price_basis"
+        order: asc
 
       - kind: static
-        at: {row: 4, col: 0}
+        at: {row: 10, col: 0}
         text: "DATE          CLOSE"
         attrs: [label, emphasis]
 
       - kind: pane
-        region: {row: 5, col: 0, height: 14, width: 40}
+        region: {row: 11, col: 0, height: 9, width: 40}
         pane_type: table_scroll
-        binding: "PX_LAST"
+        binding: "sys:price_series"
         order: desc
 
       - kind: link
@@ -46,5 +55,5 @@ tabs:
         command: "{security} GP"
       - kind: static
         at: {row: 21, col: 0}
-        text: "Unadjusted closes as published; no corporate-action adjustment applied."
+        text: "Most recent first, end of day. Adjustment basis is stated above."
         attrs: [label]

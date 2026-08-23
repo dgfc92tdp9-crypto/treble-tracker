@@ -7,7 +7,7 @@
     }
   },
   "series": {
-    "PX_LAST": [
+    "sys:price_series": [
       [
         "2026-06-18",
         7500.58
@@ -127,6 +127,36 @@
       [
         "2026-07-29",
         7316.15
+      ]
+    ],
+    "sys:price_basis": [
+      [
+        "Series",
+        "PX_LAST"
+      ],
+      [
+        "Basis",
+        "published level, not adjusted"
+      ],
+      [
+        "Last",
+        "7,316"
+      ],
+      [
+        "As of",
+        "2026-07-29"
+      ],
+      [
+        "Subject",
+        "fred:SP500"
+      ],
+      [
+        "From",
+        "2026-06-18"
+      ],
+      [
+        "Observations",
+        "28"
       ]
     ]
   }

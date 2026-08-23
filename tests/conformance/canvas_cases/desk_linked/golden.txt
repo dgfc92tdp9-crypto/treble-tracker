@@ -25,13 +25,13 @@
 + GP blue -------------------------------------------------------------------------++ SPTR CLIP ---------------------------+
 |PRICE GRAPH                                                                       ||SOURCE TRACE                          |
 |────────────────────────────────────────────────────────────────────────────      ||──────────────────────────────────────|
-|Last            7,316.15                                                          ||Every document behind the values shown|
-|                                                                                  ||                                      |
-|CLOSING LEVEL                                                                     ||SOURCE      METHOD     RETRIEVED     D|
-|+------------------------------------------------------------------------------+  ||+-------------------------------------|
-||[timeseries:PX_LAST]                                                          |  |||[table_scroll:sys:provenance]        |
-||                                                                              |  |||                                     |
-||                                                                              |  |||                                     |
+|+----------------------------------------------------------------------+          ||Every document behind the values shown|
+||[table_scroll:sys:price_basis]                                        |          ||                                      |
+||                                                                      |          ||SOURCE      METHOD     RETRIEVED     D|
+|+----------------------------------------------------------------------+          ||+-------------------------------------|
+|CLOSING LEVEL                                                                     |||[table_scroll:sys:provenance]        |
+|+------------------------------------------------------------------------------+  |||                                     |
+||[timeseries:sys:price_series]                                                 |  |||                                     |
 ||                                                                              |  |||                                     |
 ||                                                                              |  |+--------------------------------------+
 ||                                                                              |  |
@@ -40,11 +40,11 @@
 ||                                                                              |  |
 ||                                                                              |  |
 ||                                                                              |  |
+||                                                                              |  |
 |+------------------------------------------------------------------------------+  |
-|                                                                                  |
 |HP  Historical price table                                                        |
 |End of day only; no intraday feed until Phase 2.                                  |
-|Index levels from FRED. Per-equity prices need a licensed feed.                   |
+|Index levels from FRED. Equity closes from Twelve Data, adjusted — see Basis.     |
 +----------------------------------------------------------------------------------+
 unplaced FLDS green id=dict
 display 0 shown; 1 component(s) on other displays

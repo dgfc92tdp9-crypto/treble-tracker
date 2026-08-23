@@ -4,17 +4,24 @@
 # nothing here updates intraday. The blink and stale semantics exist in the
 # contract and are exercised by delayed data rather than pretended at.
 #
-# **Index namespace only, for now.** FRED publishes index levels under terms
-# that permit automated access; the free equity-price options either require
-# defeating a bot gate or breach a ToS, so per-equity GP waits for a licensed
-# key rather than shipping data we should not have taken (see PROGRESS, data
-# access findings). A screen that silently covered fewer securities than it
-# appeared to would be worse than one that says which namespace it serves.
+# **Index and Equity.** This was Index-only, and the header said why: the
+# free equity-price options either required defeating a bot gate or breached
+# a ToS, so per-equity GP waited for a licensed feed rather than shipping
+# data we should not have taken. That feed now exists — Twelve Data, keyed,
+# personal-use licensed, and marked `redistribution_restricted` so the bulk
+# export guard keeps it off the contribution API and any federated node.
+#
+# **The two namespaces do not plot the same quantity, and the screen says
+# so.** FRED publishes index levels unadjusted. Twelve Data's daily close is
+# split *and dividend* adjusted, so an equity line here is a total return.
+# That difference is invisible in the line itself and changes what the line
+# means, which is why the basis panel sits above the chart rather than in a
+# footnote — see `treble/tapi/prices.py`.
 mnemonic: GP
 title: Price Graph
 rows: 22
 cols: 80
-namespaces: [Index]
+namespaces: [Index, Equity]
 
 tabs:
   - name: main
@@ -28,27 +35,21 @@ tabs:
         text: "────────────────────────────────────────────────────────────────────────────"
         attrs: [label]
 
-      - kind: static
-        at: {row: 2, col: 0}
-        text: "Last"
-      - kind: bound
-        at: {row: 2, col: 10}
-        field: "PX_LAST"
-        format: "{:>14,.2f}"
-        width: 14
-        conditional:
-          - {when: is_stale, attrs: [stale]}
-          - {when: is_null, attrs: [stale]}
+      - kind: pane
+        region: {row: 2, col: 0, height: 4, width: 72}
+        pane_type: table_scroll
+        binding: "sys:price_basis"
+        order: asc
 
       - kind: static
-        at: {row: 4, col: 0}
+        at: {row: 6, col: 0}
         text: "CLOSING LEVEL"
         attrs: [label, emphasis]
 
       - kind: pane
-        region: {row: 5, col: 0, height: 13, width: 80}
+        region: {row: 7, col: 0, height: 12, width: 80}
         pane_type: timeseries
-        binding: "PX_LAST"
+        binding: "sys:price_series"
         order: asc
 
       - kind: link
@@ -62,5 +63,5 @@ tabs:
         attrs: [label]
       - kind: static
         at: {row: 21, col: 0}
-        text: "Index levels from FRED. Per-equity prices need a licensed feed."
+        text: "Index levels from FRED. Equity closes from Twelve Data, adjusted — see Basis."
         attrs: [label]

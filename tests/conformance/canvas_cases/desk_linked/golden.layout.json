@@ -41,31 +41,7 @@
         },
         {
           "at": [
-            2,
-            0
-          ],
-          "attrs": [
-            "label"
-          ],
-          "input": null,
-          "link": null,
-          "provenance": null,
-          "text": "Last"
-        },
-        {
-          "at": [
-            2,
-            10
-          ],
-          "attrs": [],
-          "input": null,
-          "link": null,
-          "provenance": "731abc7bae87fe3ac590a34e2cf9b575ba7bb2b1fd08643253d4b636f1ff2311",
-          "text": "      7,316.15"
-        },
-        {
-          "at": [
-            4,
+            6,
             0
           ],
           "attrs": [
@@ -114,7 +90,7 @@
           "input": null,
           "link": null,
           "provenance": null,
-          "text": "Index levels from FRED. Per-equity prices need a licensed feed."
+          "text": "Index levels from FRED. Equity closes from Twelve Data, adjusted — see Basis."
         }
       ],
       "footnotes": [],
@@ -125,7 +101,47 @@
       "mnemonic": "GP",
       "panes": [
         {
-          "binding": "PX_LAST",
+          "binding": "sys:price_basis",
+          "data": [
+            [
+              "Series",
+              "PX_LAST"
+            ],
+            [
+              "Basis",
+              "published level, not adjusted"
+            ],
+            [
+              "Last",
+              "7,316"
+            ],
+            [
+              "As of",
+              "2026-07-29"
+            ],
+            [
+              "Subject",
+              "fred:SP500"
+            ],
+            [
+              "From",
+              "2026-06-18"
+            ],
+            [
+              "Observations",
+              "28"
+            ]
+          ],
+          "region": [
+            2,
+            0,
+            4,
+            72
+          ],
+          "type": "table_scroll"
+        },
+        {
+          "binding": "sys:price_series",
           "data": [
             [
               "2026-06-18",
@@ -249,9 +265,9 @@
             ]
           ],
           "region": [
-            5,
+            7,
             0,
-            13,
+            12,
             80
           ],
           "type": "timeseries"

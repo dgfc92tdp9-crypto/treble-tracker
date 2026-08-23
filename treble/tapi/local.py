@@ -374,6 +374,8 @@ class LocalTapi:
         "sys:sptr_documents",
         "sys:allq_evaluated",
         "sys:tval_residual",
+        "sys:price_series",
+        "sys:price_basis",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -612,6 +614,8 @@ class LocalTapi:
             "sys:swpm_basis",
         ):
             return self._swpm(binding, as_of=as_of)
+        if binding in ("sys:price_series", "sys:price_basis"):
+            return self._prices(security, binding, as_of=as_of)
         if binding in ("sys:allq", "sys:allq_composites"):
             return self._allq(security, binding, as_of=as_of)
         if binding in ("sys:port_summary", "sys:port_factors", "sys:port_exposures"):
@@ -689,6 +693,44 @@ class LocalTapi:
     def contributions(self) -> ContributionService:
         """The contribution API surface — the only write path in TAPI."""
         return self._contributions
+
+    def _prices(
+        self, security: SecurityQuery | None, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`GP` and `HP` — the daily series, and what kind of series it is.
+
+        Both screens go through here so they cannot disagree about which
+        subject or which field they are showing, which is exactly the sort
+        of drift that puts a total return on one screen and a price on the
+        other under the same heading.
+        """
+        from treble.tapi.prices import NoPriceSeriesError, price_basis, price_series, price_subject
+
+        # Both panes emit (label, value) pairs, so every refusal below is a
+        # two-column row too — a reason row of the wrong width would be
+        # dropped or padded by the renderer rather than read.
+        if security is None:
+            return (("no security selected: GP and HP plot one security", None),)
+        try:
+            # `resolve` is passed rather than called: the listing is tried
+            # first and the company lookup only runs if there is none, so a
+            # ticker EDGAR spells differently still gets its chart.
+            subject = price_subject(
+                self._store, ticker=security.ticker, resolve=lambda: self.resolve(security)
+            )
+        except SecurityNotFoundError as error:
+            return ((str(error), None),)
+        try:
+            series = price_series(self._store, subject, as_of=as_of)
+        except NoPriceSeriesError as error:
+            # Named rather than blank. A security with no series and one
+            # whose feed died look identical on an empty chart, and the
+            # subject in the message is what tells them apart.
+            return ((str(error), None),)
+
+        if binding == "sys:price_basis":
+            return tuple((label, value) for label, value in price_basis(series))
+        return tuple((day.isoformat(), value) for day, value in series.points)
 
     def _allq(
         self, security: SecurityQuery | None, binding: str, *, as_of: datetime
