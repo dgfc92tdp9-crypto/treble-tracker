@@ -1,0 +1,51 @@
+{
+  "fields": {},
+  "series": {
+    "sys:vault_summary": [
+      [
+        "Records",
+        "3"
+      ],
+      [
+        "Under legal hold",
+        "1"
+      ],
+      [
+        "Past retention",
+        "1"
+      ],
+      [
+        "Retention basis",
+        "from the date the record concerns, not the archive date"
+      ],
+      [
+        "Storage",
+        "content-addressed directory \u2014 NOT WORM media; rm defeats it"
+      ],
+      [
+        "Enforced",
+        "the application refuses; the filesystem does not"
+      ]
+    ],
+    "sys:vault_records": [
+      [
+        "a1b2c3d4e5f60718",
+        "fix",
+        "2019-03-01",
+        "2026-03-01"
+      ],
+      [
+        "b2c3d4e5f6071829",
+        "fix",
+        "2020-06-15",
+        "HOLD"
+      ],
+      [
+        "c3d4e5f607182930",
+        "msg",
+        "2024-11-02",
+        "2031-11-02"
+      ]
+    ]
+  }
+}

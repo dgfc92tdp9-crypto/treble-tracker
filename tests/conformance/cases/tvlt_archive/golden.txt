@@ -1,0 +1,22 @@
+TVAULT — BOOKS AND RECORDS ARCHIVE
+────────────────────────────────────────────────────────────────────────────
++----------------------------------------------------------------------------+
+|[table_scroll:sys:vault_summary]                                            |
+|                                                                            |
+|                                                                            |
+|                                                                            |
+|                                                                            |
++----------------------------------------------------------------------------+
+
+KEY               KIND        CONCERNS      RETAINED UNTIL
++------------------------------------------------------------------------------+
+|[table_scroll:sys:vault_records]                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+A legal hold outranks expiry: the hold exists for when the schedule says destroy
+Due records are listed, never destroyed on a timer — the schedule says may, not

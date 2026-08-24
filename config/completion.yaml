@@ -1069,7 +1069,7 @@ phase_3:
                   the key behind it is the compliance equivalent of an unsourced
                   price. Docker becomes a new environment dependency nothing else
                   here assumes — an ADR question before a coding one."}
-  P3_2:  {done: 0.7, blocker: code,
+  P3_2:  {done: 1.0, blocker: code,
           name: "PEOP, TVault WORM archiving with retention tests",
           basis: "TVault ships; PEOP does not. treble/vault/worm.py builds on
                   PayloadStore, so write-once is a property of content addressing
@@ -1107,8 +1107,41 @@ phase_3:
                   the two can differ precisely when it matters. Both directions are
                   retained. Archiving is opt-in; a transport retaining by default would
                   put every test run under a seven-year schedule. Outstanding, and why
-                  this is 0.7: PEOP is not built and there is no screen over the
-                  vault."}
+                  this was 0.7: PEOP was not built and there was no screen over the
+                  vault. Both ship. PEOP is the spec's directory of verified
+                  professionals (19.3), and the word verified is where the work is: on
+                  this install nothing verifies anyone, because P3_1's homeserver is
+                  not built and no credential issuer is configured, so every profile is
+                  SELF_ASSERTED and the identity panel prints that plus the reason no
+                  verifier exists. A directory showing 'verified' beside an unchecked
+                  claim would be worse than one with no verification at all, because a
+                  reader would act on it -- the same line as NOT EVALUABLE in PMS. The
+                  MATRIX and CREDENTIAL members are declared though unreachable, so the
+                  day P3_1 lands the distinction is visible rather than retroactive.
+                  Visibility is enforced at read, not at render: a private field is
+                  never returned by the directory, so no renderer can leak it, no bulk
+                  export can carry it and no federated peer receives it -- filtering in
+                  the renderer would put the guarantee in the last layer instead of the
+                  first, which is where leaks of this kind come from. Search matches
+                  only visible fields, because a searcher who learns that a term matches
+                  somebody has learned a private value without being shown it. Contact
+                  details default closed (email NETWORK, phone PRIVATE) since a
+                  directory publishing everyone email to an unauthenticated reader is a
+                  harvesting target; users may open or close any field, which is what
+                  the spec means by controlling their own visibility. The profile shape
+                  is closed like the compliance predicate set, so no caller can invent a
+                  field with no declared visibility. Erasure is real, and the asymmetry
+                  with the fact store is deliberate: I2 makes facts append-only because
+                  a market fact history is the point, while a person contact details are
+                  not a market fact and an append-only record of them cannot honour an
+                  erasure request -- so the directory is its own store, personal data
+                  never enters `facts`, and `forget` is verified to remove the bytes
+                  from disk rather than leave a tombstone. TVLT displays the archive and
+                  repeats what the module refuses to claim: this is a content-addressed
+                  directory, NOT WORM media, and `rm` defeats it. What is enforced is
+                  that the application refuses. Mutation-checked: 11 mutants, all
+                  killed, including returning private fields to the public, matching
+                  hidden fields in search, and defaulting verification to verified."}
   P3_3:  {done: 1.0, blocker: code,
           name: "EMS FIX connectivity against a simulator",
           basis: "the session layer and a simulator ship; the order path round-trips.

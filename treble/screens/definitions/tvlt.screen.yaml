@@ -1,0 +1,57 @@
+# TVLT — TVault, the books-and-records archive (spec §19.4, SEC 17a-4).
+#
+# **This is not WORM media and the screen says so.** SEC 17a-4(f)
+# contemplates storage physically incapable of alteration; this is a
+# content-addressed directory and `rm` defeats it. What is enforced is
+# that the application refuses — destruction before the retention term,
+# and destruction under legal hold — which is a smaller and honest claim
+# than the phrase usually carries. A screen that printed "WORM-compliant"
+# over a directory would be the kind of assurance somebody signs.
+#
+# Retention runs from the date a record *concerns*, not the date it was
+# archived: a record archived six years late would otherwise be retained
+# six years too long, and being wrong in the safe direction is still being
+# wrong about a date somebody may have to certify.
+mnemonic: TVLT
+title: TVault Archive
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "TVAULT — BOOKS AND RECORDS ARCHIVE"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 2, col: 0, height: 7, width: 78}
+        pane_type: table_scroll
+        binding: "sys:vault_summary"
+        order: asc
+
+      - kind: static
+        at: {row: 10, col: 0}
+        text: "KEY               KIND        CONCERNS      RETAINED UNTIL"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 11, col: 0, height: 8, width: 80}
+        pane_type: table_scroll
+        binding: "sys:vault_records"
+        order: asc
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "A legal hold outranks expiry: the hold exists for when the schedule says destroy."
+        attrs: [label, warning]
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Due records are listed, never destroyed on a timer — the schedule says may, not must."
+        attrs: [label]

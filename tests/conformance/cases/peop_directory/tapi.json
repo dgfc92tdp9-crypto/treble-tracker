@@ -1,0 +1,39 @@
+{
+  "fields": {},
+  "series": {
+    "sys:peop_identity": [
+      [
+        "People",
+        "2"
+      ],
+      [
+        "Verified",
+        "0"
+      ],
+      [
+        "Self-asserted",
+        "2"
+      ],
+      [
+        "Verifier",
+        "none configured \u2014 no homeserver (P3_1) and no credential issuer"
+      ],
+      [
+        "Visible fields",
+        "public only; network and private withheld"
+      ]
+    ],
+    "sys:peop_directory": [
+      [
+        "jane",
+        "self-asserted",
+        "biography=Twelve years in credit., coverage=European high yield"
+      ],
+      [
+        "john",
+        "self-asserted",
+        "employer=Acme Asset Management, role=Credit analyst"
+      ]
+    ]
+  }
+}

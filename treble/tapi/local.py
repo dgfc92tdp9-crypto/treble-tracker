@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 from treble.analytics._ql import DayCount
 from treble.analytics.bonds.spec import FixedBondSpec, Frequency
@@ -175,8 +176,13 @@ class LocalTapi:
         fields: FieldDictionary | None = None,
         stale_after: timedelta = DEFAULT_STALE_AFTER,
         contributions: ContributionService | None = None,
+        data_dir: Path | None = None,
     ) -> None:
         self._store = store
+        # Where the directory and the vault live. Defaults to the store's
+        # own directory so a caller that opened a store has already said
+        # where everything is, rather than having to say it twice.
+        self._data_dir = Path(data_dir) if data_dir is not None else store.path.parent
         self._tickers = tickers
         self._fields = fields or FIELDS
         self._stale_after = stale_after
@@ -379,6 +385,10 @@ class LocalTapi:
         "sys:price_basis",
         "sys:pms_summary",
         "sys:pms_rules",
+        "sys:peop_directory",
+        "sys:peop_identity",
+        "sys:vault_records",
+        "sys:vault_summary",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -617,6 +627,10 @@ class LocalTapi:
             "sys:swpm_basis",
         ):
             return self._swpm(binding, as_of=as_of)
+        if binding in ("sys:peop_directory", "sys:peop_identity"):
+            return self._peop(binding)
+        if binding in ("sys:vault_records", "sys:vault_summary"):
+            return self._vault(binding, as_of=as_of)
         if binding in ("sys:pms_summary", "sys:pms_rules"):
             return self._pms(binding, as_of=as_of)
         if binding in ("sys:price_series", "sys:price_basis"):
@@ -698,6 +712,98 @@ class LocalTapi:
     def contributions(self) -> ContributionService:
         """The contribution API surface — the only write path in TAPI."""
         return self._contributions
+
+    def _peop(self, binding: str) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`PEOP` — who is on this network, and what actually vouches for them.
+
+        The identity panel is not decoration. The spec says identity is
+        verified; on this install nothing verifies it, so the screen says
+        `self-asserted` rather than leaving a reader to assume the word
+        in the spec describes the row in front of them.
+        """
+        from treble.people.directory import Directory, Verification, Visibility
+
+        directory = Directory(self._data_dir)
+        rows = directory.search(to=Visibility.PUBLIC)
+
+        if binding == "sys:peop_identity":
+            counts = dict.fromkeys(Verification, 0)
+            for profile, _ in rows:
+                counts[profile.verification] += 1
+            verified = sum(n for v, n in counts.items() if v.is_verified)
+            return (
+                ("People", f"{len(rows):,}"),
+                ("Verified", f"{verified:,}"),
+                ("Self-asserted", f"{counts[Verification.SELF_ASSERTED]:,}"),
+                (
+                    "Verifier",
+                    "none configured — no homeserver (P3_1) and no credential issuer",
+                ),
+                ("Visible fields", "public only; network and private withheld"),
+            )
+
+        if not rows:
+            # A reason, not a blank pane. An empty directory on a network
+            # of one is the correct answer and has to look like one.
+            return (
+                (
+                    "no profiles on this node yet",
+                    "a network of one has a directory of one once you add yourself",
+                    None,
+                ),
+            )
+        return tuple(
+            (
+                profile.handle,
+                profile.verification.value,
+                ", ".join(f"{k}={v}" for k, v in shown.items()) or "nothing public",
+            )
+            for profile, shown in rows
+        )
+
+    def _vault(
+        self, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`TVLT` — the books-and-records archive, and what it does not claim.
+
+        The module's first paragraph says this is not WORM media, and the
+        screen repeats it. SEC 17a-4(f) contemplates storage physically
+        incapable of alteration; this is a directory and `rm` defeats it.
+        What is enforced is that the application refuses, which is a
+        smaller and honest claim than the phrase usually carries.
+        """
+        from treble.vault.worm import Vault
+
+        vault = Vault(self._data_dir / "vault")
+        today = as_of.date()
+        due = vault.due_for_destruction(today=today)
+        held = vault.under_hold()
+
+        if binding == "sys:vault_summary":
+            return (
+                ("Records", f"{len(vault):,}"),
+                ("Under legal hold", f"{len(held):,}"),
+                ("Past retention", f"{len(due):,}"),
+                ("Retention basis", "from the date the record concerns, not the archive date"),
+                ("Storage", "content-addressed directory — NOT WORM media; rm defeats it"),
+                ("Enforced", "the application refuses; the filesystem does not"),
+            )
+
+        records = sorted(
+            (*due, *held) or vault.due_for_destruction(today=today.replace(year=today.year + 100)),
+            key=lambda r: r.event_date,
+        )
+        if not records:
+            return (("the vault holds no records", None, None, None),)
+        return tuple(
+            (
+                record.key[:16],
+                record.kind,
+                record.event_date.isoformat(),
+                "HOLD" if record.legal_hold else record.retained_until.isoformat(),
+            )
+            for record in records
+        )
 
     def _pms(
         self, binding: str, *, as_of: datetime

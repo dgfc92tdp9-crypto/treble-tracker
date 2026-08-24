@@ -1,0 +1,22 @@
+PEOPLE DIRECTORY
+────────────────────────────────────────────────────────────────────────────
++--------------------------------------------------------------------------+
+|[table_scroll:sys:peop_identity]                                          |
+|                                                                          |
+|                                                                          |
+|                                                                          |
++--------------------------------------------------------------------------+
+
+HANDLE              VERIFICATION     PUBLIC FIELDS
++------------------------------------------------------------------------------+
+|[table_scroll:sys:peop_directory]                                             |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+Self-asserted means nobody checked it. Verification needs P3_1 or a credential.
+Network and private fields are withheld by the directory, not by this screen.

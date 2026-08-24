@@ -1,0 +1,57 @@
+# PEOP — People directory (spec §19.3).
+#
+# The spec says "identity is verified". On this install nothing verifies
+# it: P3_1's Matrix homeserver is not built and no credential issuer is
+# configured, so every profile is self-asserted — a person typed their own
+# employer and nobody checked. The identity panel says so in those words.
+#
+# A directory printing "verified" beside an unchecked claim would be worse
+# than one with no verification at all, because a reader would act on it.
+# Same line as NOT EVALUABLE in PMS and the score on TVAL.
+#
+# Only public fields reach this screen, and that is enforced in the
+# directory rather than here: a field marked network or private is never
+# returned to the renderer at all, so no layout mistake can leak it.
+mnemonic: PEOP
+title: People
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "PEOPLE DIRECTORY"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 2, col: 0, height: 6, width: 76}
+        pane_type: table_scroll
+        binding: "sys:peop_identity"
+        order: asc
+
+      - kind: static
+        at: {row: 9, col: 0}
+        text: "HANDLE              VERIFICATION     PUBLIC FIELDS"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 10, col: 0, height: 9, width: 80}
+        pane_type: table_scroll
+        binding: "sys:peop_directory"
+        order: asc
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "Self-asserted means nobody checked it. Verification needs P3_1 or a credential."
+        attrs: [label, warning]
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Network and private fields are withheld by the directory, not by this screen."
+        attrs: [label]

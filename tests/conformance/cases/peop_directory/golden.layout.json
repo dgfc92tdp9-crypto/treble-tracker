@@ -1,0 +1,136 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "PEOPLE DIRECTORY"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        9,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "HANDLE              VERIFICATION     PUBLIC FIELDS"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label",
+        "warning"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Self-asserted means nobody checked it. Verification needs P3_1 or a credential."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Network and private fields are withheld by the directory, not by this screen."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "PEOP",
+  "panes": [
+    {
+      "binding": "sys:peop_identity",
+      "data": [
+        [
+          "People",
+          "2"
+        ],
+        [
+          "Verified",
+          "0"
+        ],
+        [
+          "Self-asserted",
+          "2"
+        ],
+        [
+          "Verifier",
+          "none configured — no homeserver (P3_1) and no credential issuer"
+        ],
+        [
+          "Visible fields",
+          "public only; network and private withheld"
+        ]
+      ],
+      "region": [
+        2,
+        0,
+        6,
+        76
+      ],
+      "type": "table_scroll"
+    },
+    {
+      "binding": "sys:peop_directory",
+      "data": [
+        [
+          "jane",
+          "self-asserted",
+          "biography=Twelve years in credit., coverage=European high yield"
+        ],
+        [
+          "john",
+          "self-asserted",
+          "employer=Acme Asset Management, role=Credit analyst"
+        ]
+      ],
+      "region": [
+        10,
+        0,
+        9,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

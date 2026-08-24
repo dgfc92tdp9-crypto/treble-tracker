@@ -1,0 +1,148 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TVAULT — BOOKS AND RECORDS ARCHIVE"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        10,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "KEY               KIND        CONCERNS      RETAINED UNTIL"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label",
+        "warning"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "A legal hold outranks expiry: the hold exists for when the schedule says destroy."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Due records are listed, never destroyed on a timer — the schedule says may, not must."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "TVLT",
+  "panes": [
+    {
+      "binding": "sys:vault_summary",
+      "data": [
+        [
+          "Records",
+          "3"
+        ],
+        [
+          "Under legal hold",
+          "1"
+        ],
+        [
+          "Past retention",
+          "1"
+        ],
+        [
+          "Retention basis",
+          "from the date the record concerns, not the archive date"
+        ],
+        [
+          "Storage",
+          "content-addressed directory — NOT WORM media; rm defeats it"
+        ],
+        [
+          "Enforced",
+          "the application refuses; the filesystem does not"
+        ]
+      ],
+      "region": [
+        2,
+        0,
+        7,
+        78
+      ],
+      "type": "table_scroll"
+    },
+    {
+      "binding": "sys:vault_records",
+      "data": [
+        [
+          "a1b2c3d4e5f60718",
+          "fix",
+          "2019-03-01",
+          "2026-03-01"
+        ],
+        [
+          "b2c3d4e5f6071829",
+          "fix",
+          "2020-06-15",
+          "HOLD"
+        ],
+        [
+          "c3d4e5f607182930",
+          "msg",
+          "2024-11-02",
+          "2031-11-02"
+        ]
+      ],
+      "region": [
+        11,
+        0,
+        8,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

@@ -163,6 +163,16 @@ class DuckStore:
         self._conn.execute(f"CREATE OR REPLACE TEMP VIEW {_ALL} AS {union_sql(self._cold_dir)}")
 
     @property
+    def path(self) -> Path:
+        """Where the database file is.
+
+        Exposed because callers that need a *data directory* — the PEOP
+        directory, the vault — should derive it from the store they were
+        given rather than be told twice and given the chance to disagree.
+        """
+        return self._path
+
+    @property
     def cold_dir(self) -> Path:
         return self._cold_dir
 
