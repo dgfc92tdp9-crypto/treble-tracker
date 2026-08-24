@@ -14,7 +14,8 @@ from pathlib import Path
 import pytest
 
 from treble.core.entity_graph import (
-    parse_relationship_status_field,
+    parse_relationship_state,
+    parse_relationship_state_field,
 )
 from treble.core.identifiers import validate_lei
 from treble.core.provenance import ExtractionMethod
@@ -45,13 +46,18 @@ def adapter(tmp_path: Path) -> GleifRelationshipAdapter:
 
 
 def _statuses_for(batch, relationship_type: str) -> set[str | None]:
-    """Every status filed for one relationship type in the batch."""
+    """Every RelationshipStatus filed for one relationship type."""
+    return {state[0] for state in _states_for(batch, relationship_type)}
+
+
+def _states_for(batch, relationship_type: str) -> set[tuple[str | None, str | None]]:
+    """Every (RelationshipStatus, RegistrationStatus) pair for one type."""
     found = set()
     for fact in batch.facts:
-        parsed = parse_relationship_status_field(fact.field)
+        parsed = parse_relationship_state_field(fact.field)
         assert parsed is not None
         if parsed[0] == relationship_type:
-            found.add(fact.value)
+            found.add(parse_relationship_state(fact.value))
     return found
 
 
@@ -78,7 +84,7 @@ class TestParse:
     ) -> None:
         batch = adapter.parse(raw(), payload_hash(raw().data))
         for fact in batch.facts:
-            parsed = parse_relationship_status_field(fact.field)
+            parsed = parse_relationship_state_field(fact.field)
             assert parsed is not None, fact.field
             _, counterparty = parsed
             validate_lei(str(counterparty).removeprefix("lei:"))
@@ -91,7 +97,7 @@ class TestParse:
         batch = adapter.parse(raw(), payload_hash(raw().data))
         types = set()
         for fact in batch.facts:
-            parsed = parse_relationship_status_field(fact.field)
+            parsed = parse_relationship_state_field(fact.field)
             assert parsed is not None
             types.add(parsed[0])
         assert types == set(RELATIONSHIP_TYPES)
@@ -120,15 +126,43 @@ class TestParse:
         batch = adapter.parse(raw(), payload_hash(raw().data))
         pairs = {}
         for fact in batch.facts:
-            parsed = parse_relationship_status_field(fact.field)
+            parsed = parse_relationship_state_field(fact.field)
             assert parsed is not None
             rel_type, counterparty = parsed
             if rel_type == "IS_DIRECTLY_CONSOLIDATED_BY":
-                pairs[str(counterparty)] = fact.value
+                pairs[str(counterparty)] = parse_relationship_state(fact.value)
+        # The registration travels with the status, in the same value, for
+        # the same reason the status travels with the counterparty: they
+        # describe one filing and must not be separable.
         assert pairs == {
-            "lei:2549003PEZXUT7MDBU41": "ACTIVE",
-            "lei:IYKCAVNFR8QGF00HV840": "NULL",
+            "lei:2549003PEZXUT7MDBU41": ("ACTIVE", "PUBLISHED"),
+            "lei:IYKCAVNFR8QGF00HV840": ("NULL", "ANNULLED"),
         }
+
+    def test_registration_status_is_carried_for_every_record(
+        self, adapter: GleifRelationshipAdapter
+    ) -> None:
+        # RegistrationStatus sits on the record's Registration block rather
+        # than the Relationship, so reading it off the wrong element yields
+        # None everywhere and nothing else in the suite would notice.
+        batch = adapter.parse(raw(), payload_hash(raw().data))
+        registrations = {parse_relationship_state(f.value)[1] for f in batch.facts}
+        assert None not in registrations
+        assert "PUBLISHED" in registrations
+
+    def test_a_relationship_can_be_active_on_a_lapsed_registration(
+        self, adapter: GleifRelationshipAdapter
+    ) -> None:
+        """Neither status can be inferred from the other.
+
+        In the live file ACTIVE sits on a LAPSED registration 99,532 times
+        — an LEI nobody renewed, not a relationship anybody retracted — so
+        a reader that treated a non-PUBLISHED registration as dead would
+        drop a sixth of the graph.
+        """
+        batch = adapter.parse(raw(), payload_hash(raw().data))
+        states = {parse_relationship_state(f.value) for f in batch.facts}
+        assert ("ACTIVE", "LAPSED") in states
 
     def test_every_lei_passes_our_own_checksum(self, adapter: GleifRelationshipAdapter) -> None:
         # Cross-validates the recorded live data against the independent
@@ -137,7 +171,7 @@ class TestParse:
         for fact in batch.facts:
             assert str(fact.subject).startswith("lei:")
             validate_lei(str(fact.subject).removeprefix("lei:"))
-            parsed = parse_relationship_status_field(fact.field)
+            parsed = parse_relationship_state_field(fact.field)
             assert parsed is not None
             validate_lei(str(parsed[1]).removeprefix("lei:"))
 

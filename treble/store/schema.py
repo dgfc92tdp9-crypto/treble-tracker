@@ -125,7 +125,7 @@ FACT_PROJECTION = ", ".join(FACT_COLUMNS)
 #: the source never made, and on the live store it named annulled parents
 #: as current ones. Nothing was multi-valued; one record had been taken
 #: apart. Re-keyed by counterparty
-#: (`core.entity_graph.relationship_status_field`), 3 partitions remain,
+#: (`core.entity_graph.relationship_state_field`), 3 partitions remain,
 #: all genuine duplicate filings naming the same counterparty.
 #:
 #: The ~6,065 `gleif:rr:*` partitions still counted here are the

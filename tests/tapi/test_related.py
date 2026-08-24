@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from treble.core.entity_graph import relationship_status_field
+from treble.core.entity_graph import relationship_state_field, relationship_state_value
 from treble.core.facts import Fact
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
@@ -97,8 +97,8 @@ def _store(
             facts.append(
                 Fact(
                     subject=f"lei:{child}",
-                    field=relationship_status_field(relationship, parent),
-                    value=parent_status,
+                    field=relationship_state_field(relationship, parent),
+                    value=relationship_state_value(parent_status, "PUBLISHED"),
                     effective_from=DAY,
                     effective_to=DAY,
                     knowledge_from=KNOWN,

@@ -23,7 +23,7 @@ entity, that is reported, never silently resolved by preferring one
 and the rest are not.** GLEIF says which through ``RelationshipStatus``,
 and that status is the only thing entitled to choose between them — so it
 travels in the fact's *key*, beside the counterparty it belongs to
-(:func:`relationship_status_field`), rather than as a separate fact that
+(:func:`relationship_state_field`), rather than as a separate fact that
 has to be joined back on. Where no record is ACTIVE, resolution refuses
 and says so (:class:`ParentOutcome`) instead of naming the lapsed one.
 """
@@ -46,12 +46,93 @@ DIRECT_PARENT_TYPE = "IS_DIRECTLY_CONSOLIDATED_BY"
 ULTIMATE_PARENT_TYPE = "IS_ULTIMATELY_CONSOLIDATED_BY"
 
 _RR_FIELD_PREFIX = "gleif:rr:"
-_STATUS_SUFFIX = ":status"
+
+#: Names what the value now holds: a record's whole state, both statuses
+#: together, not a single status.
+#:
+#: **The suffix changes whenever the value's shape does, and that is the
+#: mechanism, not a naming preference.** Nothing is deleted from this store
+#: (I2), so a replay adds its facts beside the old ones. Where the field
+#: name is reused, the two encodings land in the same partition and are
+#: read as competing values of one key: replaying v3 under v2's `:status`
+#: put `ACTIVE` and `ACTIVE/PUBLISHED` side by side, and the bare v2 value
+#: — carrying no registration, so never `withdrawn` — would have walked
+#: straight through the guard that reads it. A new suffix makes the old
+#: facts inert instead of contradictory, which is how `:status` retired
+#: v1's `gleif:rr:<TYPE>` in the first place.
+_STATE_SUFFIX = ":state"
+
+#: v2's suffix, and v1 wrote `gleif:rr:<TYPE>` with no suffix at all.
+#: Recognised only so `parse_relationship_state_field` can say "not mine"
+#: about facts that are still in the store and no longer read.
+_SUPERSEDED_SUFFIX = ":status"
 
 #: A relationship is usable for graph traversal only when GLEIF still
 #: asserts it as current. INACTIVE/NULL-status edges are kept in the fact
 #: store (nothing is dropped) but excluded from the default resolution.
 ACTIVE_STATUS = "ACTIVE"
+
+#: Separates the two halves of a relationship record's state in one value.
+#: Neither GLEIF token contains it — they are enum words over ``A-Z_``.
+_STATE_SEP = "/"
+
+#: RegistrationStatus values that say the *filing* was withdrawn, as
+#: against the relationship having ended.
+#:
+#: Counted over the 663,410-record file: ANNULLED (56,757), RETIRED
+#: (125,088) and DUPLICATE (3) carry RelationshipStatus=ACTIVE **zero**
+#: times. So the ACTIVE filter was already excluding every withdrawn
+#: filing, and this set changes no answer today — it exists so that a
+#: record claiming ACTIVE on a withdrawn registration is refused rather
+#: than believed, which is a contradiction this store should not resolve
+#: on its own.
+#:
+#: LAPSED is deliberately **not** here. It carries ACTIVE 99,532 times —
+#: a lapsed *registration* is an LEI nobody renewed, not a relationship
+#: anybody retracted — and treating it as withdrawn would silently drop a
+#: sixth of the graph. PENDING_ARCHIVAL and PENDING_TRANSFER (89 ACTIVE
+#: between them) are likewise in-flight administrative states, not
+#: retractions.
+WITHDRAWN_REGISTRATIONS = frozenset({"ANNULLED", "RETIRED", "DUPLICATE"})
+
+
+def relationship_state_value(
+    relationship_status: str | None, registration_status: str | None
+) -> str:
+    """One record's RelationshipStatus and RegistrationStatus, together.
+
+    **They travel in a single value because they describe one filing, and
+    the last thing separated from its own record cost 8,511 entities the
+    right parent.** Given their own fields they would collide exactly as
+    the counterparty and its status once did: an entity holding a live
+    record and a withdrawn one puts two values under
+    ``…:<CP>:status`` and two under ``…:<CP>:registration``, and nothing
+    says which status belongs to which registration. There is no record
+    identity in a subject/field/value store to join them back on, so the
+    pairing has to be something the store cannot take apart.
+    """
+    return f"{relationship_status or ''}{_STATE_SEP}{registration_status or ''}"
+
+
+def parse_relationship_state(value: object) -> tuple[str | None, str | None]:
+    """``"ACTIVE/PUBLISHED"`` -> ``("ACTIVE", "PUBLISHED")``.
+
+    Takes the fact's value as stored, which the store types as any of its
+    scalar kinds — the caller should not have to narrow a field it already
+    knows is text.
+
+    A value with no separator is read as a bare RelationshipStatus with no
+    registration — the shape parser v2 wrote, so a store replayed only as
+    far as v2 still resolves parents correctly rather than reading every
+    status as absent.
+    """
+    if value is None:
+        return None, None
+    status, sep, registration = str(value).partition(_STATE_SEP)
+    if not sep:
+        return (status or None), None
+    return (status or None), (registration or None)
+
 
 #: ISO 17442 shape only — the checksum is validated at ingest. Used here
 #: to tell a counterparty segment from a relationship-type segment when
@@ -60,8 +141,8 @@ ACTIVE_STATUS = "ACTIVE"
 _LEI_SHAPE = re.compile(r"^[A-Z0-9]{18}[0-9]{2}$")
 
 
-def relationship_status_field(relationship_type: str, counterparty: str) -> str:
-    """The field holding one relationship record's status.
+def relationship_state_field(relationship_type: str, counterparty: str) -> str:
+    """The field holding one relationship record's state.
 
     **The counterparty is part of the key, and that is the whole point.**
 
@@ -92,26 +173,30 @@ def relationship_status_field(relationship_type: str, counterparty: str) -> str:
 
     Putting the counterparty in the key makes each record's fields one
     partition, so a parent cannot be separated from its own status. It
-    also makes the reverse lookup exact — the children of a parent under
-    an active relationship are the subjects holding this field with value
-    ``ACTIVE``, which is one indexed query rather than a join.
+    also makes the reverse lookup direct — the children of a parent under
+    an active relationship are the subjects holding this field with a
+    value starting ``ACTIVE``, one query rather than a join. (The value
+    carries the RegistrationStatus behind it; see
+    :func:`relationship_state_value`.)
     """
-    return f"{_RR_FIELD_PREFIX}{relationship_type}:{counterparty.upper()}{_STATUS_SUFFIX}"
+    return f"{_RR_FIELD_PREFIX}{relationship_type}:{counterparty.upper()}{_STATE_SUFFIX}"
 
 
-def parse_relationship_status_field(field: str) -> tuple[str, TUID] | None:
-    """``gleif:rr:<TYPE>:<COUNTERPARTY>:status`` -> (type, counterparty).
+def parse_relationship_state_field(field: str) -> tuple[str, TUID] | None:
+    """``gleif:rr:<TYPE>:<COUNTERPARTY>:state`` -> (type, counterparty).
 
-    ``None`` for anything else, including the superseded two-fact
-    encoding. Those facts are still in the store — I2 means nothing is
-    deleted — so they are recognised and skipped rather than parsed: the
-    old ``gleif:rr:<TYPE>:status`` leaves a relationship *type* where the
-    counterparty segment belongs, and the LEI shape is what tells them
-    apart.
+    ``None`` for anything else, including both superseded encodings, whose
+    facts are still in the store because nothing is deleted from it (I2).
+
+    v2's ``…:<COUNTERPARTY>:status`` is rejected on the suffix; v1's
+    ``gleif:rr:<TYPE>:status`` would also fail the LEI shape below, since
+    it leaves a relationship *type* where the counterparty segment
+    belongs. Both checks are load-bearing: v2 shares v1's suffix and has a
+    real LEI in the right place, so only the suffix separates it.
     """
-    if not field.startswith(_RR_FIELD_PREFIX) or not field.endswith(_STATUS_SUFFIX):
+    if not field.startswith(_RR_FIELD_PREFIX) or not field.endswith(_STATE_SUFFIX):
         return None
-    body = field[len(_RR_FIELD_PREFIX) : -len(_STATUS_SUFFIX)]
+    body = field[len(_RR_FIELD_PREFIX) : -len(_STATE_SUFFIX)]
     relationship_type, _, counterparty = body.rpartition(":")
     if not relationship_type or not _LEI_SHAPE.match(counterparty):
         return None
@@ -127,8 +212,24 @@ class RelationshipEdge(BaseModel):
     parent: TUID
     relationship_type: str
     status: str | None
+    #: RegistrationStatus of the filing that carried this relationship —
+    #: whether GLEIF still publishes the *record*, as against whether the
+    #: relationship is current. `None` for facts written before parser v3.
+    registration: str | None
     knowledge_from: datetime
     provenance_id: str
+
+    @property
+    def withdrawn(self) -> bool:
+        """Whether the filing itself was retracted.
+
+        Distinct from a relationship that ended: an INACTIVE/RETIRED record
+        says the ownership stopped, an ACTIVE/ANNULLED record would say the
+        filing should never have existed while still claiming to be
+        current. The second is a contradiction, and `_visible` declines to
+        treat it as evidence of a live parent.
+        """
+        return self.registration in WITHDRAWN_REGISTRATIONS
 
 
 def edges_from_facts(facts: Iterable[Fact]) -> list[RelationshipEdge]:
@@ -143,7 +244,7 @@ def edges_from_facts(facts: Iterable[Fact]) -> list[RelationshipEdge]:
     time)``, and that key is identical for every record an entity holds of
     one type in one bulk file: the dict collapsed them and every edge came
     out wearing the last record's status. See
-    :func:`relationship_status_field` for the live record that showed it.
+    :func:`relationship_state_field` for the live record that showed it.
 
     Facts in the superseded two-fact encoding are skipped. They remain in
     the store because nothing is ever deleted from it (I2), and a store
@@ -153,16 +254,18 @@ def edges_from_facts(facts: Iterable[Fact]) -> list[RelationshipEdge]:
     """
     edges: list[RelationshipEdge] = []
     for fact in facts:
-        parsed = parse_relationship_status_field(fact.field)
+        parsed = parse_relationship_state_field(fact.field)
         if parsed is None:
             continue
         relationship_type, counterparty = parsed
+        status, registration = parse_relationship_state(fact.value)
         edges.append(
             RelationshipEdge(
                 child=fact.subject,
                 parent=counterparty,
                 relationship_type=relationship_type,
-                status=None if fact.value is None else str(fact.value),
+                status=status,
+                registration=registration,
                 knowledge_from=fact.knowledge_from,
                 provenance_id=str(fact.provenance_id),
             )
@@ -182,7 +285,11 @@ def _visible(
         for edge in edges
         if edge.relationship_type == relationship_type
         and edge.knowledge_from <= as_of
-        and (not active_only or edge.status == ACTIVE_STATUS)
+        # A withdrawn filing is not evidence of a live parent even when it
+        # calls itself ACTIVE. Never observed in the live file -- the three
+        # withdrawn states carry ACTIVE zero times -- so this drops nothing
+        # today and refuses a contradiction if the source ever files one.
+        and (not active_only or (edge.status == ACTIVE_STATUS and not edge.withdrawn))
     ]
 
 

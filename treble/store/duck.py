@@ -511,6 +511,39 @@ class DuckStore:
         ).fetchall()
         return [TUID(row[0]) for row in rows]
 
+    def subjects_with_value_prefix(
+        self, field: str, prefix: str, *, as_of: datetime, excluding: tuple[str, ...] = ()
+    ) -> list[TUID]:
+        """:meth:`subjects_with_value` where only the start of the value is known.
+
+        Exists because a value can hold several things that must not be
+        stored apart. A GLEIF relationship record's state is one such —
+        ``ACTIVE/PUBLISHED`` — so asking "who is actively consolidated by
+        this parent" is a question about the value's first component, and
+        the registration half varies freely behind it.
+
+        ``excluding`` removes named whole values that share the prefix, so
+        a caller can accept a component while rejecting specific
+        combinations without enumerating every combination it wants. The
+        entity graph uses it to keep the ACTIVE filter here identical to
+        the one on the ancestry path — two different answers to "is this
+        relationship live" would put a parent on one screen and not the
+        other.
+        """
+        if as_of.tzinfo is None:
+            raise ValueError("as_of must be timezone-aware")
+        query = (
+            "SELECT DISTINCT subject FROM all_facts "
+            "WHERE field = ? AND starts_with(value_text, ?) AND knowledge_from <= ?"
+        )
+        params: list[object] = [field, prefix, as_of]
+        if excluding:
+            placeholders = ", ".join("?" for _ in excluding)
+            query += f" AND value_text NOT IN ({placeholders})"
+            params.extend(excluding)
+        rows = self._conn.execute(query + " ORDER BY subject", params).fetchall()
+        return [TUID(row[0]) for row in rows]
+
     def read(self, subject: TUID, field: str, *, as_of: datetime) -> list[Fact]:
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")

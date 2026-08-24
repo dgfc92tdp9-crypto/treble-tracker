@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from treble.core.entity_graph import relationship_status_field
+from treble.core.entity_graph import relationship_state_field, relationship_state_value
 from treble.core.facts import Fact
 from treble.core.identifiers import TUID, SecurityQuery, YellowKey
 from treble.core.provenance import ExtractionMethod, Provenance
@@ -42,7 +42,8 @@ def _write(store: DuckStore, subject: TUID, edges: list[tuple[str, ...]]) -> Non
     """Write relationship records for `subject`.
 
     Each edge is ``(relationship_type, counterparty)``, optionally with a
-    third element giving the RelationshipStatus (default ACTIVE).
+    third element giving the RelationshipStatus (default ACTIVE) and a
+    fourth giving the RegistrationStatus (default PUBLISHED).
     """
     prov = Provenance(
         source_system="gleif-rr",
@@ -57,11 +58,12 @@ def _write(store: DuckStore, subject: TUID, edges: list[tuple[str, ...]]) -> Non
     for edge in edges:
         rel_type, target = edge[0], edge[1]
         status = edge[2] if len(edge) > 2 else "ACTIVE"
+        registration = edge[3] if len(edge) > 3 else "PUBLISHED"
         facts.append(
             Fact(
                 subject=str(subject),
-                field=relationship_status_field(rel_type, target),
-                value=status,
+                field=relationship_state_field(rel_type, target),
+                value=relationship_state_value(status, registration),
                 effective_from=date(2020, 1, 1),
                 effective_to=None,
                 knowledge_from=KNOWN,

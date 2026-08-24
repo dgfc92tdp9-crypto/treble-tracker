@@ -30,7 +30,7 @@ import httpx
 # defusedxml (spec §22.4 supply-chain and input hardening) — same as N-PORT.
 from defusedxml.ElementTree import fromstring as safe_fromstring
 
-from treble.core.entity_graph import relationship_status_field
+from treble.core.entity_graph import relationship_state_field, relationship_state_value
 from treble.core.facts import Fact
 from treble.core.identifiers import TUID
 from treble.core.provenance import ExtractionMethod, Provenance
@@ -204,7 +204,13 @@ class GleifRelationshipAdapter(SourceAdapter):
     #: written by v1 must be replayed from its stored payloads to be read
     #: by the current entity graph; nothing needs re-fetching, since the
     #: payloads are content-addressed (I5).
-    parser_version = "2"
+    #:
+    #: 3 — that fact's value now carries RegistrationStatus beside
+    #: RelationshipStatus. Same key, so a v2 store still resolves parents
+    #: (`parse_relationship_state` reads a bare status); replaying gets the
+    #: registration, which is what separates a relationship that ended from
+    #: a filing that was withdrawn.
+    parser_version = "3"
 
     def fetch(self) -> Iterator[RawPayload]:
         with httpx.Client(timeout=180.0) as client:
@@ -261,6 +267,18 @@ class GleifRelationshipAdapter(SourceAdapter):
             end_lei = _text(end.find("rr:NodeID", RR_NS)) if end is not None else ""
             relationship_type = _text(rel.find("rr:RelationshipType", RR_NS))
             status_raw = _text(rel.find("rr:RelationshipStatus", RR_NS))
+            # RegistrationStatus sits on the record's `Registration` block,
+            # not on the relationship: it describes the *filing* — whether
+            # GLEIF still publishes it — while RelationshipStatus describes
+            # the ownership. They disagree in both directions (ACTIVE on a
+            # LAPSED registration, 99,532 times; NULL on a PUBLISHED one,
+            # 313), so neither can be inferred from the other.
+            registration = record.find("rr:Registration", RR_NS)
+            registration_raw = (
+                _text(registration.find("rr:RegistrationStatus", RR_NS))
+                if registration is not None
+                else ""
+            )
             if not (start_lei and end_lei and relationship_type):
                 continue
 
@@ -318,7 +336,10 @@ class GleifRelationshipAdapter(SourceAdapter):
 
             # One fact per relationship record, not two. The counterparty
             # is in the key and the status is the value, so the two cannot
-            # be read apart -- see `relationship_status_field` for the
+            # be read apart -- see `relationship_state_field` for the
             # live-store record that proved they were being read apart.
-            emit(relationship_status_field(relationship_type, end_lei), status_raw or None)
+            emit(
+                relationship_state_field(relationship_type, end_lei),
+                relationship_state_value(status_raw or None, registration_raw or None),
+            )
         return ParsedBatch(provenance=(provenance,), facts=tuple(facts))

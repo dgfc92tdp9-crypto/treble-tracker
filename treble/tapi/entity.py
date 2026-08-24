@@ -31,11 +31,13 @@ from treble.core.entity_graph import (
     ACTIVE_STATUS,
     DIRECT_PARENT_TYPE,
     ULTIMATE_PARENT_TYPE,
+    WITHDRAWN_REGISTRATIONS,
     ParentOutcome,
     ParentResolution,
     RelationshipEdge,
     edges_from_facts,
-    relationship_status_field,
+    relationship_state_field,
+    relationship_state_value,
     resolve_parent,
 )
 from treble.core.identifiers import TUID
@@ -152,8 +154,19 @@ def children_of(
     """
     lei = str(parent).removeprefix("lei:")
     return tuple(
-        store.subjects_with_value(
-            relationship_status_field(relationship_type, lei), ACTIVE_STATUS, as_of=as_of
+        store.subjects_with_value_prefix(
+            relationship_state_field(relationship_type, lei),
+            # The value carries RegistrationStatus after the status, so the
+            # match is on the first component -- and excludes the withdrawn
+            # combinations by name, so this filter and `_visible`'s answer
+            # the same question. Diverging would list a family member the
+            # ancestry path refuses to give a parent.
+            relationship_state_value(ACTIVE_STATUS, None),
+            as_of=as_of,
+            excluding=tuple(
+                relationship_state_value(ACTIVE_STATUS, withdrawn)
+                for withdrawn in sorted(WITHDRAWN_REGISTRATIONS)
+            ),
         )
     )
 
