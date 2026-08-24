@@ -30,6 +30,7 @@ import httpx
 # defusedxml (spec §22.4 supply-chain and input hardening) — same as N-PORT.
 from defusedxml.ElementTree import fromstring as safe_fromstring
 
+from treble.core.entity_graph import relationship_status_field
 from treble.core.facts import Fact
 from treble.core.identifiers import TUID
 from treble.core.provenance import ExtractionMethod, Provenance
@@ -153,14 +154,6 @@ class GleifAdapter(SourceAdapter):
         return ParsedBatch(provenance=(provenance,), facts=tuple(facts))
 
 
-def relationship_field(relationship_type: str) -> str:
-    return f"gleif:rr:{relationship_type}"
-
-
-def relationship_status_field(relationship_type: str) -> str:
-    return f"gleif:rr:{relationship_type}:status"
-
-
 def _text(node: Element | None) -> str:
     return (node.text or "").strip() if node is not None else ""
 
@@ -206,7 +199,12 @@ class GleifRelationshipAdapter(SourceAdapter):
         redistribution_restricted=False,
         rate_limit_per_second=1.0,
     )
-    parser_version = "1"
+    #: 2 — one fact per relationship record, keyed by counterparty, in
+    #: place of the separate value and status facts v1 emitted. A store
+    #: written by v1 must be replayed from its stored payloads to be read
+    #: by the current entity graph; nothing needs re-fetching, since the
+    #: payloads are content-addressed (I5).
+    parser_version = "2"
 
     def fetch(self) -> Iterator[RawPayload]:
         with httpx.Client(timeout=180.0) as client:
@@ -318,6 +316,9 @@ class GleifRelationshipAdapter(SourceAdapter):
                     )
                 )
 
-            emit(relationship_field(relationship_type), end_lei.upper())
-            emit(relationship_status_field(relationship_type), status_raw or None)
+            # One fact per relationship record, not two. The counterparty
+            # is in the key and the status is the value, so the two cannot
+            # be read apart -- see `relationship_status_field` for the
+            # live-store record that proved they were being read apart.
+            emit(relationship_status_field(relationship_type, end_lei), status_raw or None)
         return ParsedBatch(provenance=(provenance,), facts=tuple(facts))

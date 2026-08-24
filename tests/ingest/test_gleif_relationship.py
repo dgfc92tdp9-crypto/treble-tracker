@@ -13,14 +13,15 @@ from pathlib import Path
 
 import pytest
 
+from treble.core.entity_graph import (
+    parse_relationship_status_field,
+)
 from treble.core.identifiers import validate_lei
 from treble.core.provenance import ExtractionMethod
 from treble.ingest.base import RawPayload
 from treble.ingest.gleif import (
     GleifRelationshipAdapter,
     UnsupportedRelationshipNodeError,
-    relationship_field,
-    relationship_status_field,
 )
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadStore, payload_hash
@@ -43,6 +44,17 @@ def adapter(tmp_path: Path) -> GleifRelationshipAdapter:
     return GleifRelationshipAdapter(PayloadStore(tmp_path / "p"), IngestLog(tmp_path / "l.db"))
 
 
+def _statuses_for(batch, relationship_type: str) -> set[str | None]:
+    """Every status filed for one relationship type in the batch."""
+    found = set()
+    for fact in batch.facts:
+        parsed = parse_relationship_status_field(fact.field)
+        assert parsed is not None
+        if parsed[0] == relationship_type:
+            found.add(fact.value)
+    return found
+
+
 def raw() -> RawPayload:
     return RawPayload(
         data=FIXTURE.read_bytes(),
@@ -52,12 +64,24 @@ def raw() -> RawPayload:
 
 
 class TestParse:
-    def test_parses_every_record_into_a_value_and_status_fact(
+    def test_parses_every_record_into_exactly_one_fact(
+        self, adapter: GleifRelationshipAdapter
+    ) -> None:
+        # One fact per record, not two. The counterparty is in the key and
+        # the status is the value, so there is nothing left to pair up --
+        # and nothing that can be paired up wrongly.
+        batch = adapter.parse(raw(), payload_hash(raw().data))
+        assert len(batch.facts) == 8
+
+    def test_each_fact_key_carries_its_own_counterparty(
         self, adapter: GleifRelationshipAdapter
     ) -> None:
         batch = adapter.parse(raw(), payload_hash(raw().data))
-        # 8 records * (1 value fact + 1 status fact).
-        assert len(batch.facts) == 16
+        for fact in batch.facts:
+            parsed = parse_relationship_status_field(fact.field)
+            assert parsed is not None, fact.field
+            _, counterparty = parsed
+            validate_lei(str(counterparty).removeprefix("lei:"))
 
     def test_every_relationship_type_present_is_carried_through_verbatim(
         self, adapter: GleifRelationshipAdapter
@@ -65,10 +89,12 @@ class TestParse:
         # No coined mnemonics: the field carries exactly what RR-CDF said,
         # including the file's own "IS_FUND-MANAGED_BY" spelling.
         batch = adapter.parse(raw(), payload_hash(raw().data))
-        fields = {f.field for f in batch.facts}
-        for rel_type in RELATIONSHIP_TYPES:
-            assert relationship_field(rel_type) in fields
-            assert relationship_status_field(rel_type) in fields
+        types = set()
+        for fact in batch.facts:
+            parsed = parse_relationship_status_field(fact.field)
+            assert parsed is not None
+            types.add(parsed[0])
+        assert types == set(RELATIONSHIP_TYPES)
 
     def test_null_status_preserved_as_literal_not_dropped(
         self, adapter: GleifRelationshipAdapter
@@ -77,22 +103,32 @@ class TestParse:
         # applicable"), distinct from missing data — must not collapse to
         # Python None or vanish.
         batch = adapter.parse(raw(), payload_hash(raw().data))
-        status_facts = {
-            f.value
-            for f in batch.facts
-            if f.field == relationship_status_field("IS_DIRECTLY_CONSOLIDATED_BY")
-        }
-        assert "NULL" in status_facts
-        assert "ACTIVE" in status_facts
+        assert {"NULL", "ACTIVE"} <= _statuses_for(batch, "IS_DIRECTLY_CONSOLIDATED_BY")
 
     def test_inactive_status_recorded_not_dropped(self, adapter: GleifRelationshipAdapter) -> None:
         batch = adapter.parse(raw(), payload_hash(raw().data))
-        status_facts = {
-            f.value
-            for f in batch.facts
-            if f.field == relationship_status_field("IS_FUND-MANAGED_BY")
+        assert _statuses_for(batch, "IS_FUND-MANAGED_BY") == {"ACTIVE", "INACTIVE"}
+
+    def test_each_status_stays_with_the_counterparty_it_was_filed_against(
+        self, adapter: GleifRelationshipAdapter
+    ) -> None:
+        # The defect this encoding exists to prevent: two records of one
+        # type for one entity, and a status that could be read against the
+        # wrong counterparty. Asserted against the real fixture's own
+        # IS_DIRECTLY_CONSOLIDATED_BY records, which carry both an ACTIVE
+        # and a NULL.
+        batch = adapter.parse(raw(), payload_hash(raw().data))
+        pairs = {}
+        for fact in batch.facts:
+            parsed = parse_relationship_status_field(fact.field)
+            assert parsed is not None
+            rel_type, counterparty = parsed
+            if rel_type == "IS_DIRECTLY_CONSOLIDATED_BY":
+                pairs[str(counterparty)] = fact.value
+        assert pairs == {
+            "lei:2549003PEZXUT7MDBU41": "ACTIVE",
+            "lei:IYKCAVNFR8QGF00HV840": "NULL",
         }
-        assert status_facts == {"ACTIVE", "INACTIVE"}
 
     def test_every_lei_passes_our_own_checksum(self, adapter: GleifRelationshipAdapter) -> None:
         # Cross-validates the recorded live data against the independent
@@ -101,13 +137,9 @@ class TestParse:
         for fact in batch.facts:
             assert str(fact.subject).startswith("lei:")
             validate_lei(str(fact.subject).removeprefix("lei:"))
-        value_leis = {
-            str(f.value)
-            for f in batch.facts
-            if f.field in {relationship_field(t) for t in RELATIONSHIP_TYPES}
-        }
-        for lei in value_leis:
-            validate_lei(lei)
+            parsed = parse_relationship_status_field(fact.field)
+            assert parsed is not None
+            validate_lei(str(parsed[1]).removeprefix("lei:"))
 
     def test_provenance_is_bulk_file(self, adapter: GleifRelationshipAdapter) -> None:
         batch = adapter.parse(raw(), payload_hash(raw().data))

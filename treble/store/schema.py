@@ -96,7 +96,8 @@ FACT_PROJECTION = ", ".join(FACT_COLUMNS)
 #:
 #: `knowledge_from DESC` alone is not a total order, and the live store
 #: proved it: **6,766 (subject, field, effective period, knowledge time)
-#: keys hold more than one distinct value**, so `row_number() ... WHERE
+#: keys held more than one distinct value** when this was written — 13,997
+#: today, against 9.6 million visible facts — so `row_number() ... WHERE
 #: rn = 1` was picking whichever row the storage engine returned first.
 #:
 #: That was invisible until the cold tier reordered rows on disk and the
@@ -106,18 +107,37 @@ FACT_PROJECTION = ", ".join(FACT_COLUMNS)
 #: runs of one query could disagree. `subjects_with_prefix` already sorts
 #: for exactly this reason; the visibility window needed the same.
 #:
-#: These are **not contradictions in the sources**. Almost all of them are
-#: genuinely multi-valued facts stored under a key that assumes one value:
-#: `gleif:rr:IS_ULTIMATELY_CONSOLIDATED_BY` (1,794) because GLEIF lets an
-#: entity hold several relationship records at once, and
-#: `edgar:filing:form` (367) because a filer can submit an 8-K and a Form
-#: 4 on the same day. Every value is stored; the window shows one.
+#: These are **not contradictions in the sources**, but they are not all
+#: one thing either, and reading them as one thing cost a wrong fix.
+#:
+#: Some genuinely are multi-valued facts under a key that assumes one
+#: value: `edgar:filing:form` (7,131 today) because a filer can submit an
+#: 8-K and a Form 4 on the same day. Every value is stored; the window
+#: shows one; the remedy is a key that admits several.
+#:
+#: The GLEIF relationship rows were **not** that, though they were counted
+#: as if they were. One relationship record was written as two facts — the
+#: counterparty under `gleif:rr:<TYPE>` and its status under
+#: `gleif:rr:<TYPE>:status` — so an entity holding a current record and a
+#: superseded one put two values in each key, and this ordering then chose
+#: each *independently*: the counterparty by `value_text`, the status by
+#: the null-ranking term below. The pair that came back was an assertion
+#: the source never made, and on the live store it named annulled parents
+#: as current ones. Nothing was multi-valued; one record had been taken
+#: apart. Re-keyed by counterparty
+#: (`core.entity_graph.relationship_status_field`), 3 partitions remain,
+#: all genuine duplicate filings naming the same counterparty.
+#:
+#: The ~6,065 `gleif:rr:*` partitions still counted here are the
+#: superseded two-fact encoding, kept because nothing is deleted from this
+#: store (I2) and read by nothing.
 #:
 #: The extra columns make the order total. They do not make the answer
-#: *right* — no ordering can, because the key is wrong for those fields —
-#: they make it the same every time. `DuckStore.ambiguous_partitions`
+#: *right* where the key is genuinely wrong for a field — no ordering can
+#: — they make it the same every time. `DuckStore.ambiguous_partitions`
 #: exists so the affected fields can be found and remodelled rather than
-#: silently collapsed.
+#: silently collapsed. **Its count is a prompt to look, not a diagnosis:
+#: the two causes above need opposite remedies.**
 #: A stated value outranks a null at the same knowledge time. This term
 #: is second, immediately after knowledge time, and it is not cosmetic:
 #: `value_kind` ascending puts the literal string `'null'` before

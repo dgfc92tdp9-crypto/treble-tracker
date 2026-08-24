@@ -13,11 +13,17 @@ from pathlib import Path
 
 import pytest
 
+from treble.core.entity_graph import relationship_status_field
 from treble.core.facts import Fact
 from treble.core.identifiers import TUID, SecurityQuery, YellowKey
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
-from treble.tapi.entity import EntityUnknownError, ancestry_of, children_of
+from treble.tapi.entity import (
+    EntityUnknownError,
+    ParentOutcome,
+    ancestry_of,
+    children_of,
+)
 from treble.tapi.local import LocalTapi
 
 KNOWN = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
@@ -32,7 +38,12 @@ def store(tmp_path: Path) -> DuckStore:
     return DuckStore(tmp_path / "t.db")
 
 
-def _write(store: DuckStore, subject: TUID, edges: list[tuple[str, str]]) -> None:
+def _write(store: DuckStore, subject: TUID, edges: list[tuple[str, ...]]) -> None:
+    """Write relationship records for `subject`.
+
+    Each edge is ``(relationship_type, counterparty)``, optionally with a
+    third element giving the RelationshipStatus (default ACTIVE).
+    """
     prov = Provenance(
         source_system="gleif-rr",
         source_uri="https://leidata.gleif.org/x",
@@ -43,22 +54,20 @@ def _write(store: DuckStore, subject: TUID, edges: list[tuple[str, str]]) -> Non
     )
     store.write_provenance([prov])
     facts: list[Fact] = []
-    for rel_type, target in edges:
-        for field, value in (
-            (f"gleif:rr:{rel_type}", target),
-            (f"gleif:rr:{rel_type}:status", "ACTIVE"),
-        ):
-            facts.append(
-                Fact(
-                    subject=str(subject),
-                    field=field,
-                    value=value,
-                    effective_from=date(2020, 1, 1),
-                    effective_to=None,
-                    knowledge_from=KNOWN,
-                    provenance_id=prov.id,
-                )
+    for edge in edges:
+        rel_type, target = edge[0], edge[1]
+        status = edge[2] if len(edge) > 2 else "ACTIVE"
+        facts.append(
+            Fact(
+                subject=str(subject),
+                field=relationship_status_field(rel_type, target),
+                value=status,
+                effective_from=date(2020, 1, 1),
+                effective_to=None,
+                knowledge_from=KNOWN,
+                provenance_id=prov.id,
             )
+        )
     store.write_facts(facts)
 
 
@@ -136,6 +145,92 @@ class TestDescent:
         assert children_of(
             store, TUID(f"lei:{DIRECT}"), as_of=LATER, relationship_type="IS_FUND-MANAGED_BY"
         ) == (CHILD,)
+
+    def test_a_child_whose_record_has_lapsed_is_not_in_the_family(self, store: DuckStore) -> None:
+        """Descent used to match the counterparty alone, so it returned
+        every entity that had *ever* named this parent. A family listing
+        former subsidiaries alongside current ones, indistinguishable, is
+        the same defect as naming a lapsed parent — read the other way."""
+        _write(store, CHILD, [("IS_DIRECTLY_CONSOLIDATED_BY", DIRECT, "INACTIVE")])
+        assert children_of(store, TUID(f"lei:{DIRECT}"), as_of=LATER) == ()
+
+
+class TestTwoRecordsForOneEntity:
+    """Both records must survive the store's visibility window.
+
+    They share subject, relationship type, effective period, knowledge time
+    and provenance — one bulk file — so under the old two-fact encoding
+    they landed in one partition and `row_number() ... WHERE rn = 1`
+    showed one counterparty and one status, chosen independently.
+    """
+
+    ANNULLED = "894500NGP61K2MQO3X40"
+    ACTIVE = "969500WDCPJAW65OHW35"
+
+    def _write_both(self, store: DuckStore) -> None:
+        _write(
+            store,
+            CHILD,
+            [
+                ("IS_ULTIMATELY_CONSOLIDATED_BY", self.ANNULLED, "NULL"),
+                ("IS_ULTIMATELY_CONSOLIDATED_BY", self.ACTIVE, "ACTIVE"),
+            ],
+        )
+
+    def test_both_records_are_visible_through_the_window(self, store: DuckStore) -> None:
+        self._write_both(store)
+        edges = ancestry_of(store, CHILD, as_of=LATER).edges
+        assert {str(e.parent) for e in edges} == {
+            f"lei:{self.ANNULLED}",
+            f"lei:{self.ACTIVE}",
+        }
+
+    def test_each_keeps_the_status_it_was_filed_with(self, store: DuckStore) -> None:
+        self._write_both(store)
+        edges = ancestry_of(store, CHILD, as_of=LATER).edges
+        assert {str(e.parent): e.status for e in edges} == {
+            f"lei:{self.ANNULLED}": "NULL",
+            f"lei:{self.ACTIVE}": "ACTIVE",
+        }
+
+    def test_the_active_one_is_reported_as_the_parent(self, store: DuckStore) -> None:
+        # The annulled counterparty sorts first, so this fails for any
+        # resolver that orders by LEI, arrival or provenance.
+        self._write_both(store)
+        found = ancestry_of(store, CHILD, as_of=LATER)
+        assert str(found.ultimate_parent) == f"lei:{self.ACTIVE}"
+
+    def test_only_the_active_record_makes_a_family(self, store: DuckStore) -> None:
+        self._write_both(store)
+        assert children_of(
+            store,
+            TUID(f"lei:{self.ACTIVE}"),
+            as_of=LATER,
+            relationship_type="IS_ULTIMATELY_CONSOLIDATED_BY",
+        ) == (CHILD,)
+        assert (
+            children_of(
+                store,
+                TUID(f"lei:{self.ANNULLED}"),
+                as_of=LATER,
+                relationship_type="IS_ULTIMATELY_CONSOLIDATED_BY",
+            )
+            == ()
+        )
+
+    def test_when_neither_is_active_no_parent_is_named(self, store: DuckStore) -> None:
+        _write(
+            store,
+            CHILD,
+            [
+                ("IS_ULTIMATELY_CONSOLIDATED_BY", self.ANNULLED, "NULL"),
+                ("IS_ULTIMATELY_CONSOLIDATED_BY", self.ACTIVE, "INACTIVE"),
+            ],
+        )
+        found = ancestry_of(store, CHILD, as_of=LATER)
+        assert found.ultimate_parent is None
+        assert found.ultimate.outcome is ParentOutcome.NONE_ACTIVE
+        assert len(found.ultimate.candidates) == 2
 
 
 class TestTheScreenBinding:

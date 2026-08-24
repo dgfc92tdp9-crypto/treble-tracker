@@ -368,16 +368,29 @@ class DuckStore:
         is assumed to identify a single value. These hold more than one,
         so `rn = 1` picks and the rest are invisible.
 
-        On the live store there are 6,766 of these against 8.9 million
-        visible facts, and the cause is a modelling gap rather than bad
-        data: 5,996 are GLEIF relationship records, where an entity may
-        legitimately hold several at once, and 367 are `edgar:filing:form`
-        for filers who submitted more than one form on a day. The key is
-        wrong for those fields, not the sources.
+        On the live store there are 13,997 of these against 9.6 million
+        visible facts. The cause is a modelling gap rather than bad data,
+        but **it is not one gap, and the count alone does not say which** —
+        reading this number as a single finding is how a key that had been
+        split came to be treated as a key that needed splitting further.
 
-        Reported rather than repaired, because the repair is per-field —
-        those need a discriminator in the subject or the field — and a
-        store that quietly collapsed them would be hiding data it holds.
+        7,131 are `edgar:filing:form`, where a filer submitted more than
+        one form on a day. That is one key holding several values
+        honestly, and it wants a key that admits several.
+
+        ~6,065 are `gleif:rr:*` in the superseded two-fact encoding, where
+        one relationship record was written as a counterparty fact and a
+        separate status fact. That was the opposite problem: not several
+        values needing a key, but one record needing to stay together,
+        because the window chose its two halves independently and paired
+        an annulled parent with a live status. Those facts remain (I2
+        deletes nothing) and nothing reads them; the current encoding puts
+        the counterparty in the key and leaves 3, all duplicate filings
+        naming the same counterparty.
+
+        Reported rather than repaired, because the repair is per-field and
+        differs by cause, and a store that quietly collapsed them would be
+        hiding data it holds.
 
         Returns (subject, field, effective_from, distinct value count).
         """

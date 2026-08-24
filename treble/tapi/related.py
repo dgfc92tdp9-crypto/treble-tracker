@@ -40,6 +40,7 @@ from treble.store.duck import DuckStore
 from treble.tapi.entity import (
     Ancestry,
     EntityUnknownError,
+    ParentOutcome,
     ancestry_of,
     children_of,
 )
@@ -81,6 +82,13 @@ class RelatedSet:
     lei: str
     issuer: str | None
     ultimate_parent: str | None
+    #: Set when GLEIF filed parent records for this issuer but none is
+    #: current, so no parent could be named. Distinct from
+    #: `ultimate_parent is None` with this unset, which means GLEIF filed
+    #: nothing. A screen must not render the first as "none recorded":
+    #: the entity has a parent and this store is declining to guess which,
+    #: which is a different sentence.
+    parent_unresolved: str | None
     #: Every entity GLEIF puts under the same parent, this one included,
     #: whether or not this install holds any of their paper. Counted from
     #: the registry rather than from the rows below, which is the whole
@@ -172,6 +180,7 @@ def related_securities(store: DuckStore, *, identifier: str, as_of: datetime) ->
     ultimate: str | None = None
     family_size = 0
     family: list[RelatedSecurity] = []
+    unresolved: str | None = None
     ancestry: Ancestry | None
     try:
         ancestry = ancestry_of(store, TUID(f"lei:{lei}"), as_of=as_of)
@@ -184,11 +193,18 @@ def related_securities(store: DuckStore, *, identifier: str, as_of: datetime) ->
         # sampled from this store — so taking the ultimate parent and then
         # asking for its *direct* children returns a different family, and
         # one that looks entirely reasonable.
-        parent: TUID | None
-        if ancestry.ultimate_parent is not None:
-            parent, relationship = ancestry.ultimate_parent, ULTIMATE_PARENT_TYPE
-        else:
-            parent, relationship = ancestry.direct_parent, DIRECT_PARENT_TYPE
+        #
+        # Falling back from ultimate to direct is only legitimate when
+        # GLEIF filed no ultimate record at all. When it filed one and no
+        # longer marks any of them ACTIVE, the entity *has* an ultimate
+        # parent and this store cannot say which — so it says that,
+        # rather than quietly answering a narrower question the screen
+        # will label "ultimate parent".
+        resolution = ancestry.ultimate
+        relationship = ULTIMATE_PARENT_TYPE
+        if resolution.outcome is ParentOutcome.NO_RECORD:
+            resolution, relationship = ancestry.direct, DIRECT_PARENT_TYPE
+        parent = resolution.parent
         if parent is not None:
             ultimate = str(parent)
             siblings = children_of(store, parent, as_of=as_of, relationship_type=relationship)
@@ -199,11 +215,20 @@ def related_securities(store: DuckStore, *, identifier: str, as_of: datetime) ->
                     continue
                 for ident, other in sorted(index.get(sibling_lei, [])):
                     family.append(_security("same parent", ident, other, sibling_lei))
+        elif resolution.outcome is not ParentOutcome.NO_RECORD:
+            named = ", ".join(str(c) for c in resolution.candidates)
+            unresolved = (
+                f"GLEIF holds {len(resolution.candidates)} {relationship} records for its "
+                f"issuer ({named}) and {resolution.outcome.value} — so which one is current "
+                "is not something this store can state"
+            )
 
     if not same and not family:
-        # Three distinguishable findings, and the message says which.
+        # Four distinguishable findings, and the message says which.
         if ancestry is None:
             reason = "its issuer has no GLEIF relationship record"
+        elif unresolved is not None:
+            reason = unresolved
         elif ultimate is None:
             reason = "GLEIF records no parent for its issuer"
         else:
@@ -218,6 +243,7 @@ def related_securities(store: DuckStore, *, identifier: str, as_of: datetime) ->
         lei=lei,
         issuer=str(name) if isinstance(name, str) else None,
         ultimate_parent=ultimate,
+        parent_unresolved=unresolved,
         family_size=family_size,
         same_issuer=same,
         family=tuple(family),

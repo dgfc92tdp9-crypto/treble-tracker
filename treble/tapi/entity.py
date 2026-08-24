@@ -28,12 +28,15 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from treble.core.entity_graph import (
+    ACTIVE_STATUS,
     DIRECT_PARENT_TYPE,
     ULTIMATE_PARENT_TYPE,
+    ParentOutcome,
+    ParentResolution,
     RelationshipEdge,
-    direct_parent,
     edges_from_facts,
-    ultimate_parent,
+    relationship_status_field,
+    resolve_parent,
 )
 from treble.core.identifiers import TUID
 from treble.store.duck import DuckStore
@@ -48,11 +51,24 @@ class Ancestry:
     """Who owns an entity, as GLEIF asserts it."""
 
     subject: str
-    direct_parent: TUID | None
-    ultimate_parent: TUID | None
+    #: The full resolutions, carrying *why* a parent is absent. A screen
+    #: that only has `None` cannot tell "GLEIF filed no record" from
+    #: "every record GLEIF filed has lapsed", and those need different
+    #: words: the first is silence, the second is a parent this store
+    #: declines to name.
+    direct: ParentResolution
+    ultimate: ParentResolution
     #: Every edge the entity itself asserts, so `SPTR` can show the chain
     #: rather than only its endpoints.
     edges: tuple[RelationshipEdge, ...]
+
+    @property
+    def direct_parent(self) -> TUID | None:
+        return self.direct.parent
+
+    @property
+    def ultimate_parent(self) -> TUID | None:
+        return self.ultimate.parent
 
     @property
     def parents_agree(self) -> bool:
@@ -61,8 +77,14 @@ class Ancestry:
         They often are, and where they are not that is information rather
         than a fault: GLEIF's ultimate-parent assertion may skip an
         intermediate holding company the direct edge names.
+
+        Two unresolved lookups are not agreement — an entity whose records
+        have all lapsed at both levels would otherwise report its parents
+        as agreeing, on no evidence at all.
         """
-        return self.direct_parent == self.ultimate_parent
+        if self.direct.parent is None or self.ultimate.parent is None:
+            return False
+        return self.direct.parent == self.ultimate.parent
 
 
 def ancestry_of(store: DuckStore, subject: TUID, *, as_of: datetime) -> Ancestry:
@@ -83,8 +105,8 @@ def ancestry_of(store: DuckStore, subject: TUID, *, as_of: datetime) -> Ancestry
         )
     return Ancestry(
         subject=str(subject),
-        direct_parent=direct_parent(edges, subject, as_of=as_of),
-        ultimate_parent=ultimate_parent(edges, subject, as_of=as_of),
+        direct=resolve_parent(edges, subject, DIRECT_PARENT_TYPE, as_of=as_of),
+        ultimate=resolve_parent(edges, subject, ULTIMATE_PARENT_TYPE, as_of=as_of),
         edges=tuple(edges),
     )
 
@@ -96,7 +118,7 @@ def children_of(
     as_of: datetime,
     relationship_type: str = DIRECT_PARENT_TYPE,
 ) -> tuple[TUID, ...]:
-    """Entities asserting `parent` as their parent of this type.
+    """Entities asserting `parent` as their parent of this type, actively.
 
     Answered by one reverse query rather than by walking subjects. The
     first version scanned every LEI subject and documented it as "this
@@ -109,10 +131,22 @@ def children_of(
     threshold is gone because there is nothing left to guard against.
 
     A child asserts its parent on its *own* subject, so the subjects this
-    returns are the children and the value matched is the parent.
+    returns are the children and the value matched is the status.
+
+    **The status is the value, so the ACTIVE filter is the query rather
+    than a pass afterwards.** This used to match `gleif:rr:<TYPE>` against
+    the parent's LEI, which returned every child that had *ever* asserted
+    this parent — a family swollen with lapsed members, none of them
+    distinguishable from the current ones. With the counterparty in the
+    key, asking for the value `ACTIVE` under that key is the same single
+    indexed lookup and returns only the live relationships.
     """
     lei = str(parent).removeprefix("lei:")
-    return tuple(store.subjects_with_value(f"gleif:rr:{relationship_type}", lei, as_of=as_of))
+    return tuple(
+        store.subjects_with_value(
+            relationship_status_field(relationship_type, lei), ACTIVE_STATUS, as_of=as_of
+        )
+    )
 
 
 __all__ = [
@@ -120,6 +154,8 @@ __all__ = [
     "ULTIMATE_PARENT_TYPE",
     "Ancestry",
     "EntityUnknownError",
+    "ParentOutcome",
+    "ParentResolution",
     "ancestry_of",
     "children_of",
 ]

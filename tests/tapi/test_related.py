@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from treble.core.entity_graph import relationship_status_field
 from treble.core.facts import Fact
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
@@ -40,8 +41,14 @@ def _store(
     parents: dict[str, str] | None = None,
     skip: tuple[tuple[str, str], ...] | None = None,
     name: str = "r",
+    parent_status: str = "ACTIVE",
 ) -> DuckStore:
-    """`bonds` is (isin, lei, issuer name); `parents` maps lei -> parent lei."""
+    """`bonds` is (isin, lei, issuer name); `parents` maps lei -> parent lei.
+
+    `parent_status` is the RelationshipStatus filed against every parent
+    edge — the lever for the case where GLEIF has a record and no longer
+    asserts it.
+    """
     tmp_path.mkdir(parents=True, exist_ok=True)
     store = DuckStore(tmp_path / f"{name}.db")
     record = Provenance(
@@ -83,26 +90,21 @@ def _store(
                 # disagree for three of six entities sampled from the live
                 # store, so this is the common case, not a corner.
                 continue
-            # An edge is *two* facts: the end LEI, bare, and a paired
-            # status. The first draft wrote one fact with a `lei:` prefix
-            # and every family came back empty — the parser reads the value
-            # as a bare LEI and pairs it with the status by subject,
-            # provenance and knowledge date.
-            for field, value in (
-                (f"gleif:rr:{relationship}", parent),
-                (f"gleif:rr:{relationship}:status", "ACTIVE"),
-            ):
-                facts.append(
-                    Fact(
-                        subject=f"lei:{child}",
-                        field=field,
-                        value=value,
-                        effective_from=DAY,
-                        effective_to=DAY,
-                        knowledge_from=KNOWN,
-                        provenance_id=record.id,
-                    )
+            # An edge is *one* fact: the counterparty is in the key and the
+            # RelationshipStatus is the value. The first draft wrote the
+            # counterparty with a `lei:` prefix and every family came back
+            # empty — the key carries the bare LEI, as GLEIF files it.
+            facts.append(
+                Fact(
+                    subject=f"lei:{child}",
+                    field=relationship_status_field(relationship, parent),
+                    value=parent_status,
+                    effective_from=DAY,
+                    effective_to=DAY,
+                    knowledge_from=KNOWN,
+                    provenance_id=record.id,
                 )
+            )
     store.write_facts(facts)
     return store
 
@@ -262,3 +264,55 @@ class TestTheParentRelationshipIsUsedConsistently:
         related = related_securities(store, identifier="isin:US0000000001", as_of=LATER)
         assert related.family_size == 2
         assert [r.identifier for r in related.family] == ["isin:US0000000003"]
+
+
+class TestALapsedParentIsNotNamed:
+    """RELS must not present a parent GLEIF has stopped asserting.
+
+    The screen's whole claim is "these bonds share an ultimate parent". If
+    the parent is drawn from a superseded record the claim is false, and
+    it is false in the direction that matters: the family it builds is
+    some other company's.
+    """
+
+    def test_the_family_is_not_built_from_a_lapsed_record(self, tmp_path: Path) -> None:
+        store = _store(
+            tmp_path,
+            [("US0000000001", A, "BAYER US FINANCE II"), ("US0000000002", B, "BAYER US FINANCE")],
+            parents={A: PARENT, B: PARENT},
+            parent_status="INACTIVE",
+        )
+        with pytest.raises(NoRelationsError) as caught:
+            related_securities(store, identifier="isin:US0000000001", as_of=LATER)
+        assert "no active record" in str(caught.value)
+
+    def test_the_refusal_names_the_records_it_would_not_choose_between(
+        self, tmp_path: Path
+    ) -> None:
+        store = _store(
+            tmp_path,
+            [("US0000000001", A, "BAYER US FINANCE II")],
+            parents={A: PARENT},
+            parent_status="NULL",
+        )
+        with pytest.raises(NoRelationsError) as caught:
+            related_securities(store, identifier="isin:US0000000001", as_of=LATER)
+        # Refusing is not silence: the evidence is still on screen.
+        assert PARENT in str(caught.value)
+
+    def test_a_lapsed_parent_does_not_read_as_no_parent_recorded(self, tmp_path: Path) -> None:
+        """With another bond from the same issuer the screen still renders,
+        and that is where the wrong word used to appear: `ultimate_parent`
+        is None, so the binding said "none recorded by GLEIF" about an
+        entity GLEIF has two records for."""
+        store = _store(
+            tmp_path,
+            [("US0000000001", A, "BAYER US FINANCE II"), ("US0000000003", A, "BAYER US FINANCE")],
+            parents={A: PARENT},
+            parent_status="INACTIVE",
+        )
+        related = related_securities(store, identifier="isin:US0000000001", as_of=LATER)
+        assert related.ultimate_parent is None
+        assert related.parent_unresolved is not None
+        assert PARENT in related.parent_unresolved
+        assert related.same_issuer  # the screen still has rows to show

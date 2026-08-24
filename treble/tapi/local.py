@@ -1214,7 +1214,15 @@ class LocalTapi:
                 ("Bond", related.subject),
                 ("Issuer", related.issuer or "—"),
                 ("Issuer LEI", related.lei),
-                ("Ultimate parent", related.ultimate_parent or "none recorded by GLEIF"),
+                # "none recorded" and "recorded, but none current" are
+                # different claims and only the first is silence -- see
+                # `RelatedSet.parent_unresolved`.
+                (
+                    "Ultimate parent",
+                    related.ultimate_parent
+                    or related.parent_unresolved
+                    or "none recorded by GLEIF",
+                ),
                 ("Entities under it", str(related.family_size)),
                 ("Reachable here", f"{related.reachable} security(ies) in N-PORT filings"),
                 (
@@ -1970,7 +1978,13 @@ class LocalTapi:
         would have to pick, and picking is what `core/entity_graph.py`
         refuses to do.
         """
-        from treble.tapi.entity import EntityUnknownError, ancestry_of, children_of
+        from treble.tapi.entity import (
+            EntityUnknownError,
+            ParentOutcome,
+            ParentResolution,
+            ancestry_of,
+            children_of,
+        )
 
         if security is None:
             return (("No security selected.", None),)
@@ -2005,10 +2019,21 @@ class LocalTapi:
             found = ancestry_of(self._store, lei, as_of=as_of)
         except EntityUnknownError as error:
             return ((str(error), None),)
+
+        # An em dash for a parent GLEIF never filed, and the reason for one
+        # it filed and has stopped asserting. Both used to print "—", which
+        # told a reader the registry was silent when it was not.
+        def _parent(resolution: ParentResolution) -> str:
+            if resolution.parent is not None:
+                return str(resolution.parent)
+            if resolution.outcome is ParentOutcome.NO_RECORD:
+                return "—"
+            return f"{resolution.outcome.value} of {len(resolution.candidates)} filed"
+
         return (
             ("ENTITY", str(lei)),
-            ("DIRECT PARENT", str(found.direct_parent) if found.direct_parent else "—"),
-            ("ULTIMATE PARENT", str(found.ultimate_parent) if found.ultimate_parent else "—"),
+            ("DIRECT PARENT", _parent(found.direct)),
+            ("ULTIMATE PARENT", _parent(found.ultimate)),
             ("PARENTS AGREE", "yes" if found.parents_agree else "no — see both above"),
             ("EDGES FILED", len(found.edges)),
         )
