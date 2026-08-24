@@ -95,7 +95,16 @@ def ancestry_of(store: DuckStore, subject: TUID, *, as_of: datetime) -> Ancestry
     chain to infer an ultimate parent would answer a different question
     from the one GLEIF answers.
     """
-    facts = store.subject_facts(subject, as_of=as_of)
+    # Every record, not one per key. GLEIF sometimes files a live record
+    # and a withdrawn one against the same counterparty on the same day —
+    # on the live store, three, each an ACTIVE/PUBLISHED beside a
+    # NULL/ANNULLED or NULL/PENDING_ARCHIVAL. Those share a partition, so
+    # the ordinary window returns whichever `TIE_BREAK` ranks first, and
+    # for two rows differing only in value that is `value_text` ascending:
+    # the right record was surfacing because `'ACTIVE'` happens to precede
+    # `'NULL'` in the alphabet. Weighing them is this module's job, so it
+    # asks for all of them and lets `resolve_parent` select on status.
+    facts = store.subject_facts(subject, as_of=as_of, include_ties=True)
     edges = edges_from_facts(facts)
     if not edges:
         raise EntityUnknownError(

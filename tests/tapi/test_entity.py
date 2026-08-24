@@ -317,3 +317,67 @@ class TestTheScreenBinding:
             as_of=LATER,
         )
         assert "carries no LEI" in str(rows[0][0])
+
+
+class TestTwoFilingsAgainstOneCounterparty:
+    """GLEIF files a live record and a withdrawn one on the same day.
+
+    Same child, same type, same counterparty, same relationship period, so
+    they share a partition and the ordinary visibility window returns one
+    of them. On the live store there are three, each an ACTIVE/PUBLISHED
+    beside a NULL/ANNULLED or NULL/PENDING_ARCHIVAL record:
+
+        lei:549300DNIBWLTWVNIK28 -> 5299005SPZ1QYL51JD25
+        lei:894500UD73S4NGTZLD55 -> 5299003O1XGBX95Y6O90
+        lei:300300878WUHIG688A71 -> 300300827ML7YLMPAZ49
+
+    Both rows name the *same* counterparty, so the parent was never
+    genuinely in doubt — but the store was only surfacing the live record
+    because `'ACTIVE'` sorts before `'NULL'`, which is alphabet rather
+    than evidence.
+    """
+
+    CHILD = TUID("lei:549300DNIBWLTWVNIK28")
+    PARENT = "5299005SPZ1QYL51JD25"
+
+    def _write_pair(self, store: DuckStore, live: str, withdrawn: str) -> None:
+        _write(
+            store,
+            self.CHILD,
+            [
+                ("IS_ULTIMATELY_CONSOLIDATED_BY", self.PARENT, live),
+                ("IS_ULTIMATELY_CONSOLIDATED_BY", self.PARENT, withdrawn),
+            ],
+        )
+
+    def test_both_filings_reach_the_resolver(self, store: DuckStore) -> None:
+        # The evidence must arrive intact; everything below depends on it.
+        self._write_pair(store, "ACTIVE", "NULL")
+        edges = ancestry_of(store, self.CHILD, as_of=LATER).edges
+        assert sorted(e.status or "" for e in edges) == ["ACTIVE", "NULL"]
+
+    def test_the_parent_resolves_from_the_active_filing(self, store: DuckStore) -> None:
+        self._write_pair(store, "ACTIVE", "NULL")
+        found = ancestry_of(store, self.CHILD, as_of=LATER)
+        assert str(found.ultimate_parent) == f"lei:{self.PARENT}"
+        assert found.ultimate.outcome is ParentOutcome.RESOLVED
+
+    def test_it_does_not_depend_on_the_live_status_sorting_first(self, store: DuckStore) -> None:
+        """The point of the whole exercise.
+
+        `'ACTIVE'` precedes `'NULL'` alphabetically, so a resolver riding
+        on `value_text` ordering looks correct on the real data. Here the
+        superseded record is `'ABANDONED'` — earlier in the alphabet than
+        `'ACTIVE'` — so string order now points at the *dead* filing and
+        only reading the status can still get this right.
+        """
+        self._write_pair(store, "ACTIVE", "ABANDONED")
+        found = ancestry_of(store, self.CHILD, as_of=LATER)
+        assert str(found.ultimate_parent) == f"lei:{self.PARENT}"
+
+    def test_two_withdrawn_filings_still_refuse(self, store: DuckStore) -> None:
+        # Seeing both records must not be mistaken for endorsing either.
+        self._write_pair(store, "INACTIVE", "NULL")
+        found = ancestry_of(store, self.CHILD, as_of=LATER)
+        assert found.ultimate_parent is None
+        assert found.ultimate.outcome is ParentOutcome.NONE_ACTIVE

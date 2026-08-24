@@ -93,6 +93,41 @@ _BY_SUBJECT = """
     WHERE subject = ? AND knowledge_from <= ?
 """.format(columns="{columns}", tie_break=TIE_BREAK, table=_ALL)  # noqa: S608
 
+#: The same window, keeping *every* row tied at the winning knowledge time
+#: rather than one of them.
+#:
+#: `TIE_BREAK` exists to make the single-row choice repeatable, and it does
+#: — but repeatable is not the same as right, and for two rows that differ
+#: only in value it is settled by `value_text` ascending. That is alphabet,
+#: not evidence. On the live store three GLEIF relationship partitions hold
+#: an ACTIVE record and a superseded one filed against the same
+#: counterparty on the same day; `'ACTIVE' < 'NULL'` is the only reason the
+#: right one was surfacing, and a source that had used a word later in the
+#: alphabet for the live state would have surfaced the dead one.
+#:
+#: A caller that intends to *weigh* the rows needs them all. Ordering by
+#: `knowledge_from DESC` alone, with `rank`, keeps later knowledge winning
+#: while treating rows that arrived together as what they are: concurrent
+#: evidence, for the caller to reconcile on its own terms
+#: (`core.entity_graph.resolve_parent` selects the ACTIVE record).
+#:
+#: `DISTINCT` is what keeps this safe for the cold tier. A row present in
+#: both tiers is byte-identical in every projected column, so it collapses
+#: here exactly as `rn = 1` collapses it above — the crash-safety property
+#: the compaction depends on survives, while genuinely differing rows do
+#: not get silently dropped.
+_BY_SUBJECT_WITH_TIES = """
+    SELECT DISTINCT {columns} FROM (
+        SELECT {columns}, rank() OVER (
+            PARTITION BY subject, field, effective_from,
+                         coalesce(effective_to, DATE '9999-12-31')
+            ORDER BY knowledge_from DESC
+        ) AS rnk
+        FROM {table}
+        WHERE subject = ? AND knowledge_from <= ?
+    ) WHERE rnk = 1
+""".format(columns="{columns}", table=_ALL)  # noqa: S608
+
 
 class MissingProvenanceError(Exception):
     """A fact references a provenance id that has not been stored (I1)."""
@@ -506,7 +541,9 @@ class DuckStore:
         rows = self._conn.execute(query + " ORDER BY effective_from", params).fetchall()
         return [self._fact(r) for r in rows]
 
-    def subject_facts(self, subject: TUID, *, as_of: datetime) -> list[Fact]:
+    def subject_facts(
+        self, subject: TUID, *, as_of: datetime, include_ties: bool = False
+    ) -> list[Fact]:
         """Every visible fact for a subject, across all fields.
 
         Backs bulk export (spec §8.5), where the caller wants a whole
@@ -514,15 +551,32 @@ class DuckStore:
         as :meth:`history` and the same required ``as_of`` (I2) — a bulk
         transport that could see facts the screen path could not would be a
         second source of truth wearing a protocol as a disguise.
+
+        ``include_ties`` returns every row tied at the winning knowledge
+        time instead of the one `TIE_BREAK` ranks first. Default off: a
+        screen showing one value per field wants one row, and getting two
+        would double a line rather than inform anyone.
+
+        Turn it on when the caller's job is to *weigh* concurrent records
+        rather than display a value. The single-row form settles a tie on
+        `value_text` ascending, which is alphabet rather than evidence, and
+        a caller that can read the records properly should not be handed
+        the alphabet's answer. See `_BY_SUBJECT_WITH_TIES`.
         """
         if as_of.tzinfo is None:
             raise ValueError("as_of must be timezone-aware")
-        rows = self._conn.execute(
-            "SELECT * EXCLUDE (rn) FROM ("  # noqa: S608
-            + _BY_SUBJECT.format(columns=FACT_PROJECTION)
-            + ") WHERE rn = 1 ORDER BY field, effective_from",
-            [subject, as_of],
-        ).fetchall()
+        if include_ties:
+            query = (
+                _BY_SUBJECT_WITH_TIES.format(columns=FACT_PROJECTION)
+                + " ORDER BY field, effective_from"
+            )
+        else:
+            query = (
+                "SELECT * EXCLUDE (rn) FROM ("  # noqa: S608
+                + _BY_SUBJECT.format(columns=FACT_PROJECTION)
+                + ") WHERE rn = 1 ORDER BY field, effective_from"
+            )
+        rows = self._conn.execute(query, [subject, as_of]).fetchall()
         return [self._fact(r) for r in rows]
 
     def provenance(self, provenance_id: ProvenanceId) -> Provenance:
