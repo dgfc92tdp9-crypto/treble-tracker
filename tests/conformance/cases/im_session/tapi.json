@@ -1,0 +1,39 @@
+{
+  "fields": {},
+  "series": {
+    "sys:im_session": [
+      [
+        "Homeserver",
+        "http://127.0.0.1:8008"
+      ],
+      [
+        "Encryption",
+        "none \u2014 unencrypted rooms only; no olm, no key escrow"
+      ],
+      [
+        "Identity",
+        "a domain proves homeserver control, not employer"
+      ],
+      [
+        "Deployment",
+        "deploy/synapse/compose.yaml \u2014 shipped, never run"
+      ],
+      [
+        "Client",
+        "verified against treble/im/simulator.py, not against Synapse"
+      ]
+    ],
+    "sys:im_timeline": [
+      [
+        "09:14:02",
+        "@dealer:acme.com",
+        "5mm IBM 4.15 39s offered at 98.25"
+      ],
+      [
+        "09:13:41",
+        "@jack:treble.invalid",
+        "morning \u2014 any axe in IBM 4.15 39s?"
+      ]
+    ]
+  }
+}

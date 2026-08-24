@@ -389,6 +389,8 @@ class LocalTapi:
         "sys:peop_identity",
         "sys:vault_records",
         "sys:vault_summary",
+        "sys:im_session",
+        "sys:im_timeline",
     )
 
     #: The constant-maturity Treasury tenors, in curve order with their year
@@ -627,6 +629,8 @@ class LocalTapi:
             "sys:swpm_basis",
         ):
             return self._swpm(binding, as_of=as_of)
+        if binding in ("sys:im_session", "sys:im_timeline"):
+            return self._im(binding)
         if binding in ("sys:peop_directory", "sys:peop_identity"):
             return self._peop(binding)
         if binding in ("sys:vault_records", "sys:vault_summary"):
@@ -713,6 +717,45 @@ class LocalTapi:
         """The contribution API surface — the only write path in TAPI."""
         return self._contributions
 
+    def _im(self, binding: str) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`IM` — the Matrix session, when there is one.
+
+        No homeserver is configured on a local install, and the screen
+        says which piece is missing rather than rendering an empty
+        transcript. An empty transcript and a disconnected client look
+        identical, and only one of them means nobody has said anything.
+        """
+        import os
+
+        homeserver = os.environ.get("TREBLE_MATRIX_HOMESERVER")
+        if binding == "sys:im_session":
+            return (
+                ("Homeserver", homeserver or "not configured (TREBLE_MATRIX_HOMESERVER)"),
+                ("Encryption", "none — unencrypted rooms only; no olm, no key escrow"),
+                ("Identity", "a domain proves homeserver control, not employer"),
+                ("Deployment", "deploy/synapse/compose.yaml — shipped, never run"),
+                ("Client", "verified against treble/im/simulator.py, not against Synapse"),
+            )
+        if not homeserver:
+            return (
+                (
+                    "no homeserver configured",
+                    "set TREBLE_MATRIX_HOMESERVER and log in; "
+                    "deploy/synapse/compose.yaml runs one locally",
+                    None,
+                ),
+            )
+        # A configured homeserver still needs a logged-in session, which
+        # this read-only binding does not own. Saying so beats an empty
+        # transcript that reads as silence.
+        #
+        # `transcript` is what turns a live session's events into these
+        # rows; with no session there are none, and the shape is the same
+        # so the screen does not need two code paths.
+        from treble.im.matrix import transcript
+
+        return transcript(()) or (("not logged in", f"homeserver {homeserver} configured", None),)
+
     def _peop(self, binding: str) -> tuple[tuple[str | float | int | None, ...], ...]:
         """`PEOP` — who is on this network, and what actually vouches for them.
 
@@ -753,12 +796,7 @@ class LocalTapi:
                 ),
             )
         return tuple(
-            (
-                profile.handle,
-                profile.verification.value,
-                ", ".join(f"{k}={v}" for k, v in shown.items()) or "nothing public",
-            )
-            for profile, shown in rows
+            (profile.handle, _identity_note(profile), _public(shown)) for profile, shown in rows
         )
 
     def _vault(
@@ -2390,3 +2428,35 @@ def _subject_query(subject: TUID) -> SecurityQuery | None:
     if text.startswith("fred:"):
         return SecurityQuery(ticker=text.removeprefix("fred:"), key=YellowKey.INDEX)
     return None
+
+
+def _public(shown: dict[str, str]) -> str:
+    return ", ".join(f"{k}={v}" for k, v in shown.items()) or "nothing public"
+
+
+def _identity_note(profile: object) -> str:
+    """What a handle proves, when the handle is a Matrix ID.
+
+    A handle shaped like `@jane:acme.com` carries a claim the directory's
+    own `verification` field does not: the domain. `im.identity` is what
+    decides how much that is worth, and it is asked here rather than
+    duplicated — the two would drift, and the drift would be one of them
+    saying "verified" while the other said the domain was never checked.
+
+    `authenticated=False` because nothing on this install has performed a
+    `whoami` round trip for these handles. The answer is therefore
+    `asserted`, which is the true one.
+    """
+    from treble.im.identity import IdentityError, Strength, parse
+
+    verification = getattr(profile, "verification", None)
+    label = getattr(verification, "value", "unknown")
+    handle = str(getattr(profile, "handle", ""))
+    try:
+        _, domain = parse(handle)
+    except IdentityError:
+        # Not a Matrix ID: the directory's own verification is all there
+        # is to say, and inventing a domain from a plain handle would be
+        # the fabrication this module exists to avoid.
+        return label
+    return f"{label} · {Strength.ASSERTED.value} @{domain}"

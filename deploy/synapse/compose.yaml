@@ -1,0 +1,45 @@
+# A local Matrix homeserver for `IM` (spec §19.1, P3_1).
+#
+# **UNVERIFIED. Docker is not installed on the machine this was written
+# on, so none of this has been run.** It is written from Synapse's
+# published deployment documentation and is correct as far as reading can
+# make it — which is not the same as working, and the ledger records it as
+# unverified rather than done. Everything the Matrix client is *known* to
+# do, it is known to do against `treble/im/simulator.py`, which needs no
+# container at all.
+#
+# First run generates a config and a signing key:
+#
+#   docker compose run --rm synapse generate
+#   docker compose up -d
+#   docker compose exec synapse register_new_matrix_user \
+#       -c /data/homeserver.yaml http://localhost:8008
+#
+# Bound to 127.0.0.1 like the FIX acceptor, and for the same reason: a
+# homeserver reachable from a network is one anybody on that network can
+# open an account on, and this one has no federation whitelist and no rate
+# limiting configured beyond Synapse's defaults.
+services:
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: treble-synapse
+    restart: unless-stopped
+    environment:
+      SYNAPSE_SERVER_NAME: "treble.localhost"
+      SYNAPSE_REPORT_STATS: "no"
+      # Synapse writes as this uid; matching the host user keeps the
+      # generated config editable without sudo.
+      UID: "${UID:-1000}"
+      GID: "${GID:-1000}"
+    volumes:
+      - ./data:/data
+    ports:
+      # 127.0.0.1 explicitly, not 8008:8008 — the short form binds every
+      # interface, which is the difference between a local homeserver and
+      # an open one.
+      - "127.0.0.1:8008:8008"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8008/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

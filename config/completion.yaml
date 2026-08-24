@@ -1061,14 +1061,65 @@ phase_2:
 #   cost       — cannot be done for nothing, which the project forbids
 #   unverified — the assessment itself has not been checked; do not trust it
 phase_3:
-  P3_1:  {done: 0.0, blocker: code,
+  P3_1:  {done: 0.55, blocker: code,
           name: "IM on Matrix with verified identity; local Synapse in Docker",
           notes: "Synapse is open source and runs locally, so this needs no paid
                   service. The invariant work is identity: `verified` in Matrix means
                   cross-signed device keys, and a chat showing a name without proving
                   the key behind it is the compliance equivalent of an unsourced
                   price. Docker becomes a new environment dependency nothing else
-                  here assumes — an ADR question before a coding one."}
+                  here assumes — an ADR question before a coding one.",
+          basis: "the client, the identity chain and an offline homeserver ship. Synapse
+                  does not, and could not be verified: Docker is not installed on this
+                  machine, so deploy/synapse/compose.yaml is written from published
+                  deployment docs and has never been run. It says so in its own first
+                  paragraph and in its README. That alone caps this well short of 1.0 --
+                  a compose file nobody has executed is not a deployment. The ADR
+                  question these notes raised is also still open; the file was written
+                  because the instruction was to continue, not because the dependency
+                  question was settled. treble/im/matrix.py is the client-server API,
+                  hand-written for the reason the FIX session layer is: what costs money
+                  is a message the client believes it delivered and did not, and that
+                  lives in the sync token and the transaction id. The token advances only
+                  *after* the batch has been handed to the caller -- advancing on receipt
+                  means a caller that raised while processing resumes past those events,
+                  which from the client's view never arrived and which nothing reports as
+                  a gap. Every send carries a transaction id a retry reuses, so a resend
+                  after an ambiguous timeout is deduplicated rather than posted twice --
+                  in a chat VCON turns into a booked trade, not cosmetic.
+                  treble/im/simulator.py is an in-memory homeserver CI runs with no
+                  network and no container, hostile on demand (reject a token, replay a
+                  sync batch), because a client this author wrote driven by a server this
+                  author wrote agrees with itself -- which matters more here than for FIX
+                  since real Synapse could not be run at all. **These notes were right
+                  about identity and the gap is recorded rather than closed.** In Matrix,
+                  `verified` means cross-signed device keys; treble/im/identity.py proves
+                  something different -- domain control, from a whoami round trip against
+                  the homeserver that issued the MXID. That is genuinely stronger than an
+                  email From header, which the sender asserts and this the server does,
+                  but it is NOT Matrix device verification and does not prove the key
+                  behind a name. Cross-signing needs the same olm machinery E2EE does,
+                  and neither is built. The three links are kept apart -- localpart proves
+                  nothing, domain proves homeserver control, domain-to-entity is a GLEIF
+                  name match reported as a *candidate* -- because the strength PEOP prints
+                  is the strength of the weakest, and one boolean would publish the
+                  strongest. Two defects found by running it rather than reading it: the
+                  cross-reference compared the domain label against the whole legal name
+                  (KENVUE against KENVUE INC.) so it could never fire, and the strongest
+                  level was called ENTITY_MATCHED, a confident label on a coincidence --
+                  old.com matches 'Old Dominion Freight Line, Inc.'. It is
+                  ENTITY_CANDIDATE now and the screen says unconfirmed. The store holds 4
+                  GLEIF legal names, so this is real code against nearly no data. No
+                  E2EE, and IM says so on screen: an encryption claim over a plaintext
+                  transport is the worst thing this module could be wrong about.
+                  Mutation-checked: 14 mutants, all killed; one survived first because a
+                  membership event has no msgtype, so the msgtype filter caught it and
+                  deleting the *type* filter passed -- the discriminating case is an event
+                  of another type carrying text-shaped content, which a peer controls. The
+                  gate caught two computed-but-unread fields and both got real readers
+                  rather than an allowlist entry. Outstanding, and why this is 0.55:
+                  Synapse unrun, no cross-signed device verification, no E2EE, no CLI
+                  serving the simulator, and no logged-in session behind IM."}
   P3_2:  {done: 1.0, blocker: code,
           name: "PEOP, TVault WORM archiving with retention tests",
           basis: "TVault ships; PEOP does not. treble/vault/worm.py builds on

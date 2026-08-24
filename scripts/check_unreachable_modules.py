@@ -52,6 +52,14 @@ AWAITING_WIRING: dict[str, str] = {
         "data question."
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
+    "treble.im.simulator": (
+        "The in-memory Matrix homeserver P3_1's client is tested against, the counterpart "
+        "of ems/simulator.py. Reachable from tests only: unlike the FIX simulator there is "
+        "no CLI command that serves it over a socket yet, because Docker is not installed "
+        "on this machine and the real Synapse path could not be exercised to know what a "
+        "socket-level simulator would need to imitate. Wiring is `treble matrix-simulator`, "
+        "which is the same shape as `treble simulator`."
+    ),
 }
 
 ALLOWED_UNREACHABLE = {**ENTRY_POINTS, **AWAITING_WIRING}

@@ -1,0 +1,57 @@
+# IM — Instant Message over Matrix (spec §19.1, P3_1).
+#
+# **Not end-to-end encrypted, and the screen says so.** The spec asks for
+# E2EE "where the firm's compliance regime permits, with compliant key
+# escrow"; that needs olm and a key-management design, and neither is
+# built. This client speaks unencrypted rooms only. An E2EE claim over a
+# plaintext transport is the worst thing this screen could be wrong about,
+# so it is stated rather than omitted.
+#
+# The session panel shows what actually vouches for the person you are
+# talking to: a Matrix ID is domain-control evidence in a way an email
+# address is not, because the server authenticated it rather than the
+# sender asserting it. What it is *not* is proof of employer — the GLEIF
+# cross-reference is a name match and is labelled unconfirmed.
+mnemonic: IM
+title: Instant Message
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "INSTANT MESSAGE"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 2, col: 0, height: 6, width: 78}
+        pane_type: table_scroll
+        binding: "sys:im_session"
+        order: asc
+
+      - kind: static
+        at: {row: 9, col: 0}
+        text: "TIME      SENDER                    MESSAGE"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 10, col: 0, height: 9, width: 80}
+        pane_type: table_scroll
+        binding: "sys:im_timeline"
+        order: desc
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "NOT end-to-end encrypted. Unencrypted rooms only; no olm, no key escrow."
+        attrs: [label, warning]
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "A domain is proof of homeserver control, not of employer. Entity match is a name."
+        attrs: [label]

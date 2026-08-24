@@ -1,0 +1,136 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "INSTANT MESSAGE"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        9,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TIME      SENDER                    MESSAGE"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label",
+        "warning"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "NOT end-to-end encrypted. Unencrypted rooms only; no olm, no key escrow."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "A domain is proof of homeserver control, not of employer. Entity match is a name."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "IM",
+  "panes": [
+    {
+      "binding": "sys:im_session",
+      "data": [
+        [
+          "Homeserver",
+          "http://127.0.0.1:8008"
+        ],
+        [
+          "Encryption",
+          "none — unencrypted rooms only; no olm, no key escrow"
+        ],
+        [
+          "Identity",
+          "a domain proves homeserver control, not employer"
+        ],
+        [
+          "Deployment",
+          "deploy/synapse/compose.yaml — shipped, never run"
+        ],
+        [
+          "Client",
+          "verified against treble/im/simulator.py, not against Synapse"
+        ]
+      ],
+      "region": [
+        2,
+        0,
+        6,
+        78
+      ],
+      "type": "table_scroll"
+    },
+    {
+      "binding": "sys:im_timeline",
+      "data": [
+        [
+          "09:13:41",
+          "@jack:treble.invalid",
+          "morning — any axe in IBM 4.15 39s?"
+        ],
+        [
+          "09:14:02",
+          "@dealer:acme.com",
+          "5mm IBM 4.15 39s offered at 98.25"
+        ]
+      ],
+      "region": [
+        10,
+        0,
+        9,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}
