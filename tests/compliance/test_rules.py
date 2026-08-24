@@ -369,3 +369,111 @@ class TestAgainstTheStore:
         report = check_mandate(store, ruleset, as_of=datetime(2026, 8, 19, tzinfo=UTC))  # type: ignore[arg-type]
         assert report.clean is False
         assert len(report.not_evaluable) == 2
+
+
+TODAY = date(2026, 8, 24)
+
+
+def _h(ident: str, value: float, **kw: object) -> Holding:
+    return Holding(identifier=ident, market_value=value, **kw)  # type: ignore[arg-type]
+
+
+class TestAMaturityRuleAppliesOnlyToThingsThatMature:
+    """An equity does not mature, and that is not missing data.
+
+    Testing the rule over every holding made it permanently NOT EVALUABLE
+    on any portfolio containing a share — 436 of 685 positions on the live
+    fund — so a rule that could have fired on the 239 bonds never ran once.
+    A permanently unevaluable rule is worse than a missing one: it teaches
+    the reader that NOT EVALUABLE is background noise.
+    """
+
+    RULE = Rule(name="30y", predicate=Predicate.MAX_MATURITY_YEARS, limit=30.0)
+
+    def test_equities_do_not_make_the_rule_unevaluable(self) -> None:
+        holdings = (
+            _h("bond", 100.0, asset_category="DBT", maturity=date(2030, 1, 1)),
+            _h("share", 100.0, asset_category="EC"),
+        )
+        result = evaluate(self.RULE, holdings, today=TODAY)
+        assert result.outcome is Outcome.PASS
+        assert "1 do not mature" in result.detail
+
+    def test_a_long_bond_still_breaches_beside_equities(self) -> None:
+        """The point of the scoping: the rule must be able to fire."""
+        holdings = (
+            _h("long", 100.0, asset_category="DBT", maturity=date(2070, 1, 1)),
+            _h("share", 900.0, asset_category="EC"),
+        )
+        result = evaluate(self.RULE, holdings, today=TODAY)
+        assert result.outcome is Outcome.BREACH
+        assert "long" in result.offenders
+
+    def test_a_debt_holding_with_no_maturity_still_refuses(self) -> None:
+        """Scoping must not become suppressing. A bond that reports no
+        maturity is missing data and the rule cannot be settled."""
+        holdings = (
+            _h("bond", 100.0, asset_category="DBT"),
+            _h("share", 100.0, asset_category="EC"),
+        )
+        result = evaluate(self.RULE, holdings, today=TODAY)
+        assert result.outcome is Outcome.NOT_EVALUABLE
+        assert "1 of 1 debt holding" in result.detail
+
+    def test_a_portfolio_of_only_equities_refuses(self) -> None:
+        """Not a pass. A maturity mandate on a fund holding no debt has
+        not been satisfied, it has not been tested."""
+        holdings = (_h("a", 100.0, asset_category="EC"), _h("b", 100.0, asset_category="EP"))
+        assert evaluate(self.RULE, holdings, today=TODAY).outcome is Outcome.NOT_EVALUABLE
+
+    def test_an_unknown_category_carrying_a_maturity_is_in_scope(self) -> None:
+        """The conservative direction. A category this list has not seen
+        must not silently drop a bond out of a maturity test."""
+        holdings = (_h("odd", 100.0, asset_category=None, maturity=date(2070, 1, 1)),)
+        assert evaluate(self.RULE, holdings, today=TODAY).outcome is Outcome.BREACH
+
+
+class TestIssuerConcentrationIsBoundedNotRefused:
+    """Unattributed holdings only make the rule unevaluable if they could
+    change the answer.
+
+    Refusing whenever any holding lacks an issuer is correct and far too
+    strong: on the live fund one position out of 685, worth 0.03%, blocked
+    a rule 684 holdings could answer.
+    """
+
+    RULE = Rule(name="10%", predicate=Predicate.MAX_ISSUER_WEIGHT, limit=10.0)
+
+    def test_a_trivial_unattributed_weight_does_not_block_a_pass(self) -> None:
+        holdings = (
+            *(_h(f"a{i}", 100.0, issuer=f"LEI{i}") for i in range(20)),
+            _h("orphan", 1.0),
+        )
+        result = evaluate(self.RULE, holdings, today=TODAY)
+        assert result.outcome is Outcome.PASS
+
+    def test_an_existing_breach_is_reported_despite_a_gap(self) -> None:
+        """Unattributed weight cannot un-breach a limit already exceeded."""
+        holdings = (
+            _h("big", 500.0, issuer="LEI1"),
+            _h("small", 400.0, issuer="LEI2"),
+            _h("o", 1.0),
+        )
+        result = evaluate(self.RULE, holdings, today=TODAY)
+        assert result.outcome is Outcome.BREACH
+
+    def test_a_gap_that_could_cross_the_limit_refuses(self) -> None:
+        """The genuinely unknown middle: the largest attributed issuer is
+        under the limit, but not by more than the unattributed weight."""
+        holdings = (
+            *(_h(f"a{i}", 100.0, issuer=f"LEI{i}") for i in range(11)),
+            _h("orphan", 90.0),
+        )
+        result = evaluate(self.RULE, holdings, today=TODAY)
+        assert result.outcome is Outcome.NOT_EVALUABLE
+        assert "cannot be settled" in result.detail
+        assert "%" in result.detail, "the reader needs the weights, not just a count"
+
+    def test_no_gap_at_all_still_passes(self) -> None:
+        holdings = tuple(_h(f"a{i}", 100.0, issuer=f"LEI{i}") for i in range(20))
+        assert evaluate(self.RULE, holdings, today=TODAY).outcome is Outcome.PASS

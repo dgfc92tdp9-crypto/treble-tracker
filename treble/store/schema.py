@@ -118,8 +118,22 @@ FACT_PROJECTION = ", ".join(FACT_COLUMNS)
 #: they make it the same every time. `DuckStore.ambiguous_partitions`
 #: exists so the affected fields can be found and remodelled rather than
 #: silently collapsed.
+#: A stated value outranks a null at the same knowledge time. This term
+#: is second, immediately after knowledge time, and it is not cosmetic:
+#: `value_kind` ascending puts the literal string `'null'` before
+#: `'text'`, so without it the *absence* of information outranked the
+#: information.
+#:
+#: Found by fixing the N-PORT currency extractor. Re-parsing the stored
+#: payloads produced `AED` for a holding that had been stored as null,
+#: both facts carrying the same knowledge time — correctly, because
+#: re-parsing corrects our reading of a source rather than learning
+#: something new about the world — and the read kept returning null. Four
+#: rows in one partition: one `AED`, three nulls, and the nulls won.
+_VALUE_BEFORE_NULL = "value_kind = 'null'"
+
 TIE_BREAK = (
-    "knowledge_from DESC, provenance_id DESC, value_kind, "
+    f"knowledge_from DESC, {_VALUE_BEFORE_NULL}, provenance_id DESC, value_kind, "
     "value_num, value_int, value_text, value_bool, value_date"
 )
 

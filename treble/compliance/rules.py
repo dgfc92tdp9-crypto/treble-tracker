@@ -148,6 +148,29 @@ class RuleSet:
         return hashlib.sha256(payload.encode()).hexdigest()
 
 
+#: N-PORT asset categories whose instruments carry a maturity date. Taken
+#: from the filings rather than invented: every DBT and ABS-* holding in
+#: the live store reports one, and no EC, EP or DE holding does. `STIV`
+#: (short-term investment vehicle) is deliberately absent — 6 of 8 in the
+#: store report no maturity, because the category covers money-market
+#: *funds* as well as instruments, so including it would reintroduce the
+#: permanent NOT EVALUABLE this scoping exists to remove.
+MATURING_CATEGORIES = frozenset({"DBT", "ABS-O", "ABS-MBS", "ABS-CBDO", "ABS-CDO", "ABS-ABS"})
+
+
+def _matures(holding: Holding) -> bool:
+    """Whether a maturity rule applies to this holding at all.
+
+    An unknown category is treated as maturing *if it reports a maturity*
+    and non-maturing otherwise, so a category this list has not seen
+    cannot silently drop a bond out of scope — the conservative direction,
+    since a bond excluded from a maturity test is the failure that matters.
+    """
+    if holding.asset_category in MATURING_CATEGORIES:
+        return True
+    return holding.asset_category is None and holding.maturity is not None
+
+
 def _weight(value: float, total: float) -> float:
     return 0.0 if total <= 0 else value / total * 100.0
 
@@ -182,24 +205,45 @@ def evaluate(rule: Rule, holdings: tuple[Holding, ...], *, today: date) -> Resul
     if rule.predicate in (Predicate.MAX_ISSUER_WEIGHT, Predicate.MAX_POSITION_WEIGHT):
         limit = float(rule.limit)  # type: ignore[arg-type]
         if rule.predicate is Predicate.MAX_ISSUER_WEIGHT:
+            # Unattributed holdings do not automatically make the rule
+            # unevaluable — only if they could change the answer.
+            #
+            # Refusing whenever any holding lacks an issuer is correct but
+            # far too strong: on the live fund one position out of 685,
+            # worth 0.03%, blocked a rule that 684 holdings could answer.
+            # A rule that refuses over a rounding error trains the reader
+            # to skim past NOT EVALUABLE, which is the outcome this module
+            # most needs them to read.
+            #
+            # So bound it. If some issuer already exceeds the limit, the
+            # unattributed weight cannot un-breach it. If the largest
+            # attributed issuer plus *all* the unattributed weight still
+            # sits inside the limit, no assignment of those holdings can
+            # breach it. Only between those two is the answer genuinely
+            # unknown, and that is the only case that refuses.
             missing = tuple(h.identifier for h in holdings if h.issuer is None)
-            if missing:
-                return Result(
-                    rule,
-                    Outcome.NOT_EVALUABLE,
-                    f"{len(missing)} holding(s) carry no issuer, so issuer concentration "
-                    "cannot be measured across the portfolio",
-                    missing[:5],
-                )
+            unattributed = _weight(sum(h.market_value for h in holdings if h.issuer is None), total)
             grouped: dict[str, float] = {}
             for holding in holdings:
-                assert holding.issuer is not None  # noqa: S101 - narrowed above
+                if holding.issuer is None:
+                    continue
                 grouped[holding.issuer] = grouped.get(holding.issuer, 0.0) + holding.market_value
             breaches = tuple(
                 f"{issuer} {_weight(value, total):.2f}%"
                 for issuer, value in sorted(grouped.items())
                 if _weight(value, total) > limit
             )
+            if not breaches and missing:
+                largest = max((_weight(v, total) for v in grouped.values()), default=0.0)
+                if largest + unattributed > limit:
+                    return Result(
+                        rule,
+                        Outcome.NOT_EVALUABLE,
+                        f"{len(missing)} holding(s) carry no issuer, worth "
+                        f"{unattributed:.2f}%; the largest attributed issuer is "
+                        f"{largest:.2f}%, so the {limit:g}% limit cannot be settled",
+                        missing[:5],
+                    )
         else:
             breaches = tuple(
                 f"{h.identifier} {_weight(h.market_value, total):.2f}%"
@@ -217,24 +261,47 @@ def evaluate(rule: Rule, holdings: tuple[Holding, ...], *, today: date) -> Resul
 
     if rule.predicate is Predicate.MAX_MATURITY_YEARS:
         limit = float(rule.limit)  # type: ignore[arg-type]
-        missing = tuple(h.identifier for h in holdings if h.maturity is None)
+        # Scoped to instruments that *have* a maturity. An equity does not
+        # mature, and that is not missing data — no amount of ingest will
+        # ever supply it. Testing the rule over every holding made it
+        # permanently NOT EVALUABLE on any portfolio containing a share,
+        # which on the live fund was 436 of 685 positions, so a rule that
+        # could genuinely have fired on the 239 bonds never ran.
+        #
+        # A permanently unevaluable rule is worse than a missing one: it
+        # teaches the reader that NOT EVALUABLE is background noise, and
+        # the next one they skim past is a rule that really could not be
+        # tested.
+        applicable = tuple(h for h in holdings if _matures(h))
+        if not applicable:
+            return Result(
+                rule,
+                Outcome.NOT_EVALUABLE,
+                f"no holding carries a maturity: none of {len(holdings)} is a debt instrument",
+            )
+        missing = tuple(h.identifier for h in applicable if h.maturity is None)
         if missing:
             return Result(
                 rule,
                 Outcome.NOT_EVALUABLE,
-                f"{len(missing)} holding(s) report no maturity",
+                f"{len(missing)} of {len(applicable)} debt holding(s) report no maturity",
                 missing[:5],
             )
+        out_of_scope = len(holdings) - len(applicable)
+        scope = f" over {len(applicable)} debt holding(s); {out_of_scope} do not mature"
         breaches = tuple(
             h.identifier
-            for h in holdings
+            for h in applicable
             if h.maturity is not None and (h.maturity - today).days / 365.25 > limit
         )
         if breaches:
             return Result(
-                rule, Outcome.BREACH, f"{len(breaches)} maturing beyond {limit:g}y", breaches
+                rule,
+                Outcome.BREACH,
+                f"{len(breaches)} maturing beyond {limit:g}y,{scope}",
+                breaches,
             )
-        return Result(rule, Outcome.PASS, f"none maturing beyond {limit:g}y")
+        return Result(rule, Outcome.PASS, f"none maturing beyond {limit:g}y,{scope}")
 
     permitted = tuple(str(v).upper() for v in rule.limit)  # type: ignore[union-attr]
     currencies = rule.predicate is Predicate.PERMITTED_CURRENCIES
@@ -299,6 +366,7 @@ def run(ruleset: RuleSet, holdings: tuple[Holding, ...], *, today: date) -> Repo
 
 __all__ = [
     "BASIS",
+    "MATURING_CATEGORIES",
     "Holding",
     "Outcome",
     "Predicate",

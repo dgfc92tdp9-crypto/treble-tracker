@@ -58,7 +58,9 @@ _HOLDING_TEXT_FIELDS = (
     "lei",
     "title",
     "cusip",
-    "curCd",
+    # `curCd` is deliberately NOT here — see `_currency` below. It is one of
+    # two mutually exclusive forms and reading only this one silently nulls
+    # every foreign-denominated holding.
     "payoffProfile",
     "assetCat",
     "issuerCat",
@@ -125,6 +127,43 @@ def derivative_subject(*, counterparty: str, kind: str, termination: str) -> TUI
         raise ValueError("derivative holding names no counterparty and has no identifier")
     stamp = termination.strip()[:10] or "open"
     return TUID(f"otc:{party.replace(' ', '_')}:{kind}:{stamp}")
+
+
+def _currency(holding: Element) -> tuple[str | None, float | None]:
+    """The holding's denomination, from whichever of the two forms is used.
+
+    N-PORT states currency two mutually exclusive ways. A USD-denominated
+    holding carries ``<curCd>USD</curCd>``; a foreign one instead carries
+    ``<currencyConditional curCd="CAD" exchangeRt="1.3911"/>`` and has no
+    ``curCd`` element at all.
+
+    Reading only the first form nulls the currency of **every non-USD
+    holding**, which is precisely the population a permitted-currencies
+    mandate rule exists to catch — so the rule came back NOT EVALUABLE on
+    the holdings it was written for. Measured on one live filing: 80
+    ``<curCd>`` elements against 49 ``currencyConditional``, so a third of
+    that fund's positions had no currency in the store.
+
+    Found from the compliance report: 317 equity holdings reported no
+    currency, and the raw payload for one of them (a UAE issuer) turned
+    out to state it in the attribute form.
+    """
+    plain = _text(holding.find("n:curCd", NPORT_NS))
+    if plain not in ("", "N/A"):
+        return plain, None
+
+    conditional = holding.find("n:currencyConditional", NPORT_NS)
+    if conditional is None:
+        return None, None
+    code = (conditional.get("curCd") or "").strip()
+    raw_rate = (conditional.get("exchangeRt") or "").strip()
+    try:
+        rate = float(raw_rate) if raw_rate not in ("", "N/A") else None
+    except ValueError:
+        # A malformed rate must not cost the currency: the code is the
+        # thing a mandate rule reads, and it is right there beside it.
+        rate = None
+    return (code or None), rate
 
 
 def _text(node: Element | None) -> str:
@@ -231,6 +270,13 @@ class NportAdapter(SourceAdapter):
                 raw = _text(holding.find(f"n:{field}", NPORT_NS))
                 # "N/A" is the filer saying the value is absent, not a value.
                 emit(field, None if raw in ("", "N/A") else raw)
+
+            currency, fx_rate = _currency(holding)
+            emit("curCd", currency)
+            # The filer's own USD conversion rate, carried because valUSD is
+            # already converted and a reader reconciling it against `balance`
+            # in the local currency otherwise has no way to.
+            emit("exchangeRt", fx_rate)
             for field in _HOLDING_NUMERIC_FIELDS:
                 raw = _text(holding.find(f"n:{field}", NPORT_NS))
                 emit(field, None if raw in ("", "N/A") else float(raw))

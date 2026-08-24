@@ -35,6 +35,17 @@ from treble.compliance.rules import Holding, Report, RuleSet, run
 from treble.store.duck import DuckStore
 
 
+def _issuer_key(name: object) -> str:
+    """A name reduced to something two spellings of one issuer can share.
+
+    Deliberately shallow — case and surrounding whitespace only. Stripping
+    suffixes like PLC or Group would merge genuinely different entities
+    (`GPT Group` and `GPT`), and this exists to *avoid* understating
+    concentration, so it errs towards splitting rather than merging.
+    """
+    return name.strip().upper() if isinstance(name, str) and name.strip() else ""
+
+
 def holdings_from_store(store: DuckStore, *, as_of: datetime) -> tuple[Holding, ...]:
     """Every straight-debt holding, as a compliance rule sees it.
 
@@ -57,6 +68,33 @@ def holdings_from_store(store: DuckStore, *, as_of: datetime) -> tuple[Holding, 
         ):
             latest[identifier] = row
 
+    # Issuer identity, for the 242 of 1,861 holdings that carry no LEI.
+    #
+    # Falling straight back to the filer's issuer name would be wrong in
+    # the dangerous direction: an issuer holding one bond under its LEI
+    # and one share under its name alone would split into two groups, and
+    # a 12% combined exposure would read as two 6% positions — a
+    # concentration rule *understating* concentration is worse than one
+    # refusing to answer.
+    #
+    # So the name->LEI mapping is learned from the holdings that carry
+    # both, and applied to the ones that do not. What is left over is
+    # keyed by name, which is weaker than an LEI because names do not
+    # normalise, and `evaluate` says how many were resolved that way.
+    by_name: dict[str, str] = {}
+    for row in latest.values():
+        lei = row.get("gleif:lei") or row.get("nport:lei")
+        key = _issuer_key(row.get("nport:name"))
+        if isinstance(lei, str) and key:
+            by_name.setdefault(key, lei)
+    for row in latest.values():
+        key = _issuer_key(row.get("nport:name"))
+        if key and key not in by_name:
+            # No LEI anywhere for this name: the name itself is the best
+            # issuer identity available, and grouping by it is closer to
+            # the truth than not grouping at all.
+            by_name[key] = f"name:{key}"
+
     out: list[Holding] = []
     for identifier, row in sorted(latest.items()):
         value = row.get("nport:valUSD")
@@ -67,7 +105,11 @@ def holdings_from_store(store: DuckStore, *, as_of: datetime) -> tuple[Holding, 
         maturity = row.get("nport:maturityDt")
         currency = row.get("nport:curCd")
         category = row.get("nport:assetCat")
-        issuer = row.get("gleif:lei") or row.get("nport:lei")
+        issuer = (
+            row.get("gleif:lei")
+            or row.get("nport:lei")
+            or by_name.get(_issuer_key(row.get("nport:name")))
+        )
         out.append(
             Holding(
                 identifier=identifier,

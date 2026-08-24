@@ -8,12 +8,13 @@ so the test verifies the parse rather than hand-typed numbers.
 import re
 from datetime import UTC, date, datetime
 from pathlib import Path
+from xml.etree.ElementTree import Element
 
 import pytest
 
 from treble.core.identifiers import validate_lei
 from treble.ingest.base import RawPayload
-from treble.ingest.nport import NportAdapter, holding_subject
+from treble.ingest.nport import NportAdapter, _currency, holding_subject
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadStore, payload_hash
 
@@ -260,3 +261,52 @@ class TestDerivativesAreKeyedByWhatIdentifiesThem:
         assert derivative_subject(
             counterparty="CITIBANK N.A.", kind="swapDeriv", termination=""
         ).endswith(":open")
+
+
+class TestBothCurrencyForms:
+    """N-PORT states currency two mutually exclusive ways, and reading
+    only one nulls every foreign-denominated holding.
+
+    Measured on a live filing: 80 `<curCd>` elements against 49
+    `currencyConditional`, so a third of that fund's positions had no
+    currency in the store — and `permitted_currencies` came back NOT
+    EVALUABLE on exactly the population it exists to catch.
+    """
+
+    @staticmethod
+    def _holding(inner: str) -> Element:
+        from defusedxml.ElementTree import fromstring
+
+        return fromstring(
+            f'<invstOrSec xmlns="http://www.sec.gov/edgar/nport"><name>X</name>{inner}</invstOrSec>'
+        )
+
+    def test_the_plain_element_form(self) -> None:
+        currency, rate = _currency(self._holding("<curCd>USD</curCd>"))
+        assert (currency, rate) == ("USD", None)
+
+    def test_the_conditional_attribute_form(self) -> None:
+        currency, rate = _currency(
+            self._holding('<currencyConditional curCd="CAD" exchangeRt="1.391100"/>')
+        )
+        assert currency == "CAD"
+        assert rate == pytest.approx(1.3911)
+
+    def test_neither_form_is_a_null_not_an_error(self) -> None:
+        assert _currency(self._holding("")) == (None, None)
+
+    def test_a_malformed_rate_does_not_cost_the_currency(self) -> None:
+        """The code is what a mandate rule reads, and it is right there
+        beside the rate that failed to parse."""
+        currency, rate = _currency(
+            self._holding('<currencyConditional curCd="JPY" exchangeRt="n/a"/>')
+        )
+        assert (currency, rate) == ("JPY", None)
+
+    def test_na_in_the_plain_form_falls_through_to_the_conditional(self) -> None:
+        """A filer writing N/A in one form and the real value in the other
+        must not have the N/A win."""
+        currency, _ = _currency(
+            self._holding('<curCd>N/A</curCd><currencyConditional curCd="EUR"/>')
+        )
+        assert currency == "EUR"

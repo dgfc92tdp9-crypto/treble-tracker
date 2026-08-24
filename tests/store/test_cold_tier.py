@@ -500,6 +500,50 @@ class TestAmbiguousPartitionsResolveDeterministically:
             f.provenance_id for f in from_read
         ]
 
+    def test_a_stated_value_outranks_a_null_at_the_same_knowledge_time(
+        self, tmp_path: Path
+    ) -> None:
+        """Found by fixing the N-PORT currency extractor.
+
+        Re-parsing stored payloads produced `AED` for a holding stored as
+        null, both facts carrying the same knowledge time — correctly,
+        since re-parsing corrects our reading of a source rather than
+        learning something new about the world. The read kept returning
+        null, because `value_kind` ascending puts the literal `'null'`
+        before `'text'`: the *absence* of information outranked the
+        information.
+        """
+        directory = tmp_path / "n"
+        directory.mkdir(parents=True)
+        store = DuckStore(directory / "t.db")
+        record = _provenance("aold")
+        store.write_provenance([record])
+        # Null written first, so physical order favours it too.
+        store.write_facts(
+            [
+                _fact("isin:X", "nport:curCd", None, OLD, record.id),
+                _fact("isin:X", "nport:curCd", "AED", OLD, record.id),
+            ]
+        )
+        assert [f.value for f in store.read(TUID("isin:X"), "nport:curCd", as_of=NOW)] == ["AED"]
+
+    def test_a_later_null_still_wins_over_an_earlier_value(self, tmp_path: Path) -> None:
+        """The null preference is a *tie*-break only. A source that later
+        says it does not know is newer knowledge and must still win —
+        otherwise a withdrawn value could never be withdrawn."""
+        directory = tmp_path / "n"
+        directory.mkdir(parents=True)
+        store = DuckStore(directory / "t.db")
+        record = _provenance("aold")
+        store.write_provenance([record])
+        store.write_facts(
+            [
+                _fact("isin:X", "nport:curCd", "AED", OLD, record.id),
+                _fact("isin:X", "nport:curCd", None, NEWER, record.id),
+            ]
+        )
+        assert [f.value for f in store.read(TUID("isin:X"), "nport:curCd", as_of=NOW)] == [None]
+
     def test_the_conflict_is_reported_rather_than_hidden(self, tmp_path: Path) -> None:
         store = self._conflicting(tmp_path / "a", reverse=False)
         assert store.ambiguous_partitions() == [("cik:1", "Revenue", date(2025, 12, 31), 2)]
