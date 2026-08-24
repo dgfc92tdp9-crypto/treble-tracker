@@ -1532,6 +1532,34 @@ recorded as "unread rather than known-prohibitive" have now been read:
 | Egan-Jones | `egan-jones.io/17g-7` | host returns **403 to every non-browser client, including `robots.txt`** — the DTCC/Stooq line; not circumvented |
 | KBRA | two XBRL histories linked from `kbra.com/regulatory` (`/documents/report/2390`, `2392`) | Terms of Use prohibit "any robot, spider, scraper, crawler, data extraction tool, automated script, bot, or other automated means", and separately forbid storing content "in a database" |
 | Morningstar DBRS | `dbrs.morningstar.com/regulatory` | Terms prohibit "any automated device, program, tool, algorithm, process, or methodology … to access, acquire, copy, or monitor any portion of the Site" |
+| Moody's | `moodys.com/web/en/us/legal/terms-of-use.html` | Terms prohibit accessing the site "by means of any automated program, expert system, electronic agent 'bot,' 'spider' or similar tool"; separately forbid "'scrape' or data mine any information or Materials", and forbid using Materials "to develop, improve, train or retrain any software program **or database**" |
+| S&P Global | `spglobal.com/en/terms-of-use` | **403 to an identified non-browser client** — the terms cannot be read without circumventing the block, so they are not read. Egan-Jones line |
+| Fitch | `fitchratings.com/terms-of-use` | Redirects to `/redirect/?q=/terms-of-use`, a path **Fitch's own `robots.txt` disallows**. Not followed |
+
+**The three majors were the gap in this table and are now closed (measured 2026-08-24).** The
+earlier row set covered only the smaller NRSROs; Moody's, S&P and Fitch are the ones whose
+coverage would actually reach a global corporate portfolio, and all three are shut — one by
+explicit terms, two by a block that cannot be probed further without circumventing it.
+
+**One genuinely open alternative was tested and does not cover this portfolio.** The ECB
+publishes its eligible marketable assets list daily, free and machine-readable —
+`ecb.europa.eu/paym/coll/assets/html/dla/ea_MID/ea_csv_<yymmdd>.csv`, UTF-16, tab-separated,
+31,192 ISINs on 2026-08-21. Everything on it clears credit quality step 3, so *presence implies
+a BBB- floor* without any vendor rating. Two reasons it does not answer `MIN_RATING` here:
+
+1. **Coverage is zero.** 0 of our 239 debt holdings appear on it. The list is euro-area
+   collateral; this portfolio's debt is AUD, JPY and USD. Measured, not assumed.
+2. **Absence proves nothing.** A bond off the list may be ineligible for currency, issuer type
+   or market reasons that have nothing to do with credit, so the list can raise a floor for the
+   assets on it and can never rule anything out — which is what a rating floor rule needs.
+
+The file carries no rating column at all: the credit quality step is only *inferable* by
+inverting the published haircut schedule, into two bands (CQS 1-2 against CQS 3). Deriving a
+credit rating from a haircut is an explanation, not a measurement, and is not done.
+
+**So `MIN_RATING` is permanently NOT EVALUABLE by measurement, not by omission.** It stays in
+the shipped mandate deliberately: a mandate that cares about credit quality must show the reader
+that the rule was not tested, rather than have the rule quietly absent from the report.
 
 **KBRA is the one to remember: `robots.txt` said yes and the terms said no.** It serves
 `User-agent: * / Allow: /` — an explicit, machine-readable grant — while its Terms of Use forbid

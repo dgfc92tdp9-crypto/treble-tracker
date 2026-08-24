@@ -64,9 +64,32 @@ class Predicate(enum.Enum):
     #: Every holding must be in one of the permitted asset categories.
     PERMITTED_ASSET_CATEGORIES = "permitted_asset_categories"
     #: Nothing rated below a floor. Present deliberately and evaluable
-    #: nowhere: no rating source this repository may use has been found, and
-    #: a mandate that cares about ratings should see NOT EVALUABLE rather
-    #: than a rule quietly missing from its report.
+    #: nowhere, and that is now a **measured** negative rather than an open
+    #: task — see the ratings table in PROGRESS.md's data-access findings.
+    #:
+    #: Availability was never the obstacle: SEC Rule 17g-7(b) makes every
+    #: NRSRO's full rating history legally public, free and in XBRL. The
+    #: obstacle is per-vendor terms, and all six NRSROs whose coverage
+    #: would reach this portfolio are shut. Moody's prohibits automated
+    #: access, scraping, and use of its materials in "any software program
+    #: or database"; KBRA and Morningstar DBRS prohibit the same in their
+    #: own words; S&P and Egan-Jones return 403 to identified non-browser
+    #: clients, so their terms cannot even be read without circumventing
+    #: the block; Fitch's terms page redirects into a path its own
+    #: robots.txt disallows.
+    #:
+    #: The one genuinely open alternative — the ECB's daily eligible
+    #: marketable assets list, where mere presence implies a BBB- floor —
+    #: covers 0 of this store's 239 debt holdings, because that list is
+    #: euro-area collateral and this debt is AUD, JPY and USD. It also
+    #: carries no rating column; the credit quality step is only inferable
+    #: by inverting a haircut schedule, which is an explanation rather than
+    #: a measurement and is not done.
+    #:
+    #: So a mandate that cares about ratings sees NOT EVALUABLE, which is
+    #: the point: the alternative is the rule quietly missing from the
+    #: report, and a compliance officer signing a clean bill of health on a
+    #: constraint nobody tested.
     MIN_RATING = "min_rating"
 
 
