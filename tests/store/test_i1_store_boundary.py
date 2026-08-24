@@ -84,3 +84,55 @@ def test_provenance_write_is_idempotent(store: DuckStore) -> None:
     store.write_provenance([prov])
     store.write_provenance([prov])  # same content address — no-op, no error
     assert store.provenance(prov.id) == prov
+
+
+def test_the_not_null_column_is_the_second_line_of_defence(store: DuckStore) -> None:
+    """`write_facts` refuses a dangling id; the column refuses a null one.
+
+    I1 claims both, and only the first had a test — removing `NOT NULL`
+    from the DDL passed the entire suite. The column matters because it
+    is the only guard on a path that does not go through `write_facts`:
+    a migration script, a repair query, a future writer. Verified here by
+    a direct INSERT, which is exactly what such a path would do.
+    """
+    import duckdb
+
+    with pytest.raises(duckdb.Error, match="NOT NULL"):
+        store._conn.execute(
+            """
+            INSERT INTO facts VALUES
+            ('cik:1','Revenue','num',1.0,NULL,NULL,NULL,NULL,
+             DATE '2025-12-31',NULL,TIMESTAMPTZ '2026-01-01 00:00:00+00', NULL)
+            """
+        )
+
+
+def test_there_is_no_foreign_key_and_that_is_recorded(store: DuckStore) -> None:
+    """A *dangling* id — non-null, but naming no provenance record — is
+    refused by `write_facts` and accepted by a direct INSERT.
+
+    Stated as a test rather than left implicit because a reader may
+    reasonably assume the database enforces referential integrity here.
+    It does not: the original design called for
+    `provenance_id ... REFERENCES provenance(id)` and the column was
+    built without it. On the live store the application check has held —
+    0 dangling and 0 null across 13,300,231 facts — but that is the
+    *application* holding, not the schema.
+
+    If this test ever fails because an FK was added, that is good news:
+    delete it and say so in the I1 docstring.
+    """
+    store._conn.execute(
+        """
+        INSERT INTO facts VALUES
+        ('cik:2','Revenue','num',1.0,NULL,NULL,NULL,NULL,
+         DATE '2025-12-31',NULL,TIMESTAMPTZ '2026-01-01 00:00:00+00','nosuchprovenance')
+        """
+    )
+    dangling = store._conn.execute(
+        "SELECT count(*) FROM facts f WHERE NOT EXISTS "
+        "(SELECT 1 FROM provenance p WHERE p.id = f.provenance_id)"
+    ).fetchone()
+    assert dangling is not None and dangling[0] == 1, (
+        "an FK now exists — remove this test and update the I1 docstring"
+    )

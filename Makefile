@@ -1,5 +1,21 @@
 .PHONY: app audit check clean completion conformance deep desktop desktop-install drift gate golden imports lint mutate mutation proto setup test tools tui types web
 
+# Every `uv run` below refuses to touch the lockfile.
+#
+# Without this, `uv run` *silently regenerates* uv.lock whenever
+# pyproject.toml has drifted from it — measured: exit 0, lock rewritten,
+# nothing said. So a dependency edit committed without running `uv lock`
+# leaves the committed lock stale, CI relocks in its own ephemeral
+# checkout and goes green, and the file that is supposed to make the
+# build reproducible quietly stops describing it. Nobody finds out until
+# a fresh clone resolves a different dependency set.
+#
+# `--locked` turns that into exit 2 and "hint: To update the lockfile,
+# run `uv lock`", which is a one-command fix and keeps the lock honest.
+# Adding a dependency is still a two-step: edit pyproject, run `uv lock`,
+# commit both.
+export UV_LOCKED := 1
+
 setup: tools          ## create the venv and install everything
 	uv venv --python 3.12
 	uv pip install -e ".[dev]"

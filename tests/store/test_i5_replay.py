@@ -62,6 +62,33 @@ class TestPayloadStore:
         with pytest.raises(PayloadIntegrityError):
             store.get(key)
 
+    def test_a_corrupt_stored_payload_is_caught_on_re_put(self, tmp_path: Path) -> None:
+        """`put` verifies rather than overwrites, and that check had no test.
+
+        Content addressing makes overwrite meaningless, so a second `put`
+        of the same bytes could simply return the key. The reason it
+        reads the stored copy back is that the copy may have rotted on
+        disk since — and then the store holds bytes that do not match
+        their own address while every future `put` reports success.
+
+        Deleting the comparison passed the whole suite, which is how this
+        was found: the guard existed and nothing could tell whether it
+        worked.
+        """
+        store = PayloadStore(tmp_path)
+        key = store.put(b"the original payload")
+        # Rot the stored copy in place, keeping it valid gzip so the
+        # failure is a mismatch rather than a decompression error.
+        import gzip
+
+        # Two-level fan-out: key[:2]/key[2:4]/key.gz. Derived from the
+        # store rather than assumed — the first version of this test wrote
+        # to a path that does not exist, so nothing was corrupted and the
+        # test failed for the wrong reason.
+        store._gz_path(key).write_bytes(gzip.compress(b"something else"))
+        with pytest.raises(PayloadIntegrityError, match=key):
+            store.put(b"the original payload")
+
     def test_key_is_content_hash(self, tmp_path: Path) -> None:
         store = PayloadStore(tmp_path)
         assert store.put(b"abc") == payload_hash(b"abc")
