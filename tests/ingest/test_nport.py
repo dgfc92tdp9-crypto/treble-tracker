@@ -165,16 +165,22 @@ class TestPlaceholderIdentifiersAreNotIdentifiers:
 #: add one would make it no longer a recording.
 _SWAP_DOC = """<?xml version="1.0"?>
 <edgarSubmission xmlns="http://www.sec.gov/edgar/nport">
-  <formData><genInfo><repPdDate>2026-03-31</repPdDate></genInfo>
+  <formData><genInfo>
+    <regCik>0001593547</regCik><seriesId>S000052180</seriesId>
+    <repPdDate>2026-03-31</repPdDate>
+  </genInfo>
   <invstOrSecs>
     <invstOrSec>
       <name>N/A</name><cusip>N/A</cusip>
+      <title>USD SOFR 10Y RECEIVE FIXED</title>
+      <identifiers><other otherDesc="Internal Identifier" value="SWP-000431"/></identifiers>
       <valUSD>1000.00</valUSD><pctVal>0.01</pctVal><balance>0</balance>
       <derivativeInfo><swapDeriv>
         <counterparties>
           <counterpartyName>BANK OF AMERICA, N.A.</counterpartyName>
           <counterpartyLei>B4TYDEB6GKMZO031MB27</counterpartyLei>
         </counterparties>
+        <payOffProf>Long</payOffProf>
         <notionalAmt>250000000.00</notionalAmt>
         <unrealizedAppr>-1234567.00</unrealizedAppr>
         <terminationDt>2031-06-20</terminationDt>
@@ -184,11 +190,73 @@ _SWAP_DOC = """<?xml version="1.0"?>
 </edgarSubmission>
 """
 
+#: Two index futures against one clearing broker, as a filer states them: no
+#: `terminationDt` anywhere, because a future expires rather than terminating.
+#: Reading only `terminationDt` stamps both `open` and keys them identically.
+_FUTURES_DOC = """<?xml version="1.0"?>
+<edgarSubmission xmlns="http://www.sec.gov/edgar/nport">
+  <formData><genInfo>
+    <regCik>0001593547</regCik><seriesId>S000052180</seriesId>
+    <repPdDate>2026-04-30</repPdDate>
+  </genInfo>
+  <invstOrSecs>
+    <invstOrSec>
+      <name>N/A</name><cusip>N/A</cusip>
+      <title>S&amp;P500 EMINI FUT JUN26</title>
+      <identifiers><other otherDesc="Bloomberg Ticker" value="ESM6"/></identifiers>
+      <valUSD>1918571.90</valUSD><pctVal>1.45</pctVal><balance>15</balance>
+      <derivativeInfo><futrDeriv derivCat="FUT">
+        <counterparties>
+          <counterpartyName>MORGAN STANLEY &amp; CO, INC</counterpartyName>
+        </counterparties>
+        <payOffProf>Long</payOffProf>
+        <expDate>2026-06-19</expDate>
+        <notionalAmt>2160550.35</notionalAmt>
+      </futrDeriv></derivativeInfo>
+    </invstOrSec>
+    <invstOrSec>
+      <name>N/A</name><cusip>N/A</cusip>
+      <title>TOPIX INDX FUTR JUN26</title>
+      <identifiers><other otherDesc="Bloomberg Ticker" value="TPM6"/></identifiers>
+      <valUSD>-1979965.00</valUSD><pctVal>-3.58</pctVal><balance>-48</balance>
+      <derivativeInfo><futrDeriv derivCat="FUT">
+        <counterparties>
+          <counterpartyName>MORGAN STANLEY &amp; CO, INC</counterpartyName>
+        </counterparties>
+        <payOffProf>Short</payOffProf>
+        <expDate>2026-06-12</expDate>
+        <notionalAmt>-3603924.09</notionalAmt>
+      </futrDeriv></derivativeInfo>
+    </invstOrSec>
+  </invstOrSecs></formData>
+</edgarSubmission>
+"""
 
-def _swap_facts(adapter: NportAdapter):  # type: ignore[no-untyped-def]
-    data = _SWAP_DOC.encode()
+
+#: A representative contract, as the arguments the subject is built from.
+#: Written once because every key test varies one segment of it.
+_CONTRACT: dict[str, str] = {
+    "fund": "S000052180",
+    "counterparty": "BANK OF AMERICA, N.A.",
+    "kind": "swapDeriv",
+    "contract_date": "2031-06-20",
+    "direction": "Long",
+    "contract_id": "SWP-000431",
+}
+
+#: `otc:fund:counterparty:kind:date:direction:contract` — the separator count
+#: is asserted so a segment cannot be forged by punctuation inside a value.
+_CONTRACT_SEGMENTS = 6
+
+
+def _facts_from(adapter: NportAdapter, document: str):  # type: ignore[no-untyped-def]
+    data = document.encode()
     raw = RawPayload(data=data, source_uri="https://example.invalid/d", fetched_at=FETCHED)
     return adapter.parse(raw, payload_hash(data)).facts
+
+
+def _swap_facts(adapter: NportAdapter):  # type: ignore[no-untyped-def]
+    return _facts_from(adapter, _SWAP_DOC)
 
 
 class TestDerivativesAreKeyedByWhatIdentifiesThem:
@@ -224,12 +292,8 @@ class TestDerivativesAreKeyedByWhatIdentifiesThem:
     def test_two_counterparties_do_not_collapse(self) -> None:
         from treble.ingest.nport import derivative_subject
 
-        first = derivative_subject(
-            counterparty="BANK OF AMERICA, N.A.", kind="swapDeriv", termination="2031-06-20"
-        )
-        second = derivative_subject(
-            counterparty="GOLDMAN SACHS INTERNATIONAL", kind="swapDeriv", termination="2031-06-20"
-        )
+        first = derivative_subject(**{**_CONTRACT, "counterparty": "BANK OF AMERICA, N.A."})
+        second = derivative_subject(**{**_CONTRACT, "counterparty": "GOLDMAN SACHS INTERNATIONAL"})
         assert first != second
         assert first.startswith("otc:")
 
@@ -238,12 +302,7 @@ class TestDerivativesAreKeyedByWhatIdentifiesThem:
         contract every quarter."""
         from treble.ingest.nport import derivative_subject
 
-        args = {
-            "counterparty": "Barclays Bank PLC",
-            "kind": "fwdDeriv",
-            "termination": "2027-01-15",
-        }
-        assert derivative_subject(**args) == derivative_subject(**args)
+        assert derivative_subject(**_CONTRACT) == derivative_subject(**_CONTRACT)
 
     def test_an_unnamed_counterparty_is_refused(self) -> None:
         """This is the situation being replaced, not a variation on it: a
@@ -253,14 +312,93 @@ class TestDerivativesAreKeyedByWhatIdentifiesThem:
 
         for name in ("", "N/A", "   "):
             with pytest.raises(ValueError, match="names no counterparty"):
-                derivative_subject(counterparty=name, kind="swapDeriv", termination="")
+                derivative_subject(**{**_CONTRACT, "counterparty": name})
 
     def test_an_open_ended_contract_still_keys(self) -> None:
         from treble.ingest.nport import derivative_subject
 
-        assert derivative_subject(
-            counterparty="CITIBANK N.A.", kind="swapDeriv", termination=""
-        ).endswith(":open")
+        assert ":open:" in derivative_subject(**{**_CONTRACT, "contract_date": ""})
+
+    def test_one_broker_many_futures_do_not_collapse(self) -> None:
+        """The defect this key replaces. Fifteen index futures against one
+        clearing broker, none of them carrying a termination date, keyed
+        identically — `otc:MORGAN_STANLEY_&_CO,_INC:futrDeriv:open` held 15
+        distinct notionals on the live store and a screen could show one."""
+        from treble.ingest.nport import derivative_subject
+
+        book = [
+            {
+                **_CONTRACT,
+                "kind": "futrDeriv",
+                "contract_date": "2026-06-19",
+                "contract_id": ticker,
+                "direction": side,
+            }
+            for ticker in ("ESM6", "NQM6", "TPM6")
+            for side in ("Long", "Short")
+        ]
+        assert len({derivative_subject(**c) for c in book}) == len(book)
+
+    def test_two_funds_holding_one_contract_stay_apart(self) -> None:
+        """An ISIN names an instrument many funds may hold; a forward is an
+        agreement one fund entered into. Keying without the fund merges two
+        funds' positions into one, which is the same defect one level up."""
+        from treble.ingest.nport import derivative_subject
+
+        assert derivative_subject(**{**_CONTRACT, "fund": "S000002839"}) != derivative_subject(
+            **{**_CONTRACT, "fund": "S000052180"}
+        )
+
+    def test_a_colon_in_the_discriminator_cannot_forge_a_segment(self) -> None:
+        """`NEXTDC LTD ISSUE 5:27 / TERMS 1:1` is a real holding, and the
+        title is what keys a contract the filer gave no identifier for."""
+        from treble.ingest.nport import derivative_subject
+
+        subject = derivative_subject(**{**_CONTRACT, "contract_id": "ISSUE 5:27 / TERMS 1:1"})
+        assert subject.count(":") == _CONTRACT_SEGMENTS
+        assert "ISSUE_5-27_/_TERMS_1-1" in subject
+
+    def test_an_unidentifiable_contract_is_refused(self) -> None:
+        from treble.ingest.nport import derivative_subject
+
+        with pytest.raises(ValueError, match="no identifier and no title"):
+            derivative_subject(**{**_CONTRACT, "contract_id": ""})
+        with pytest.raises(ValueError, match="cannot be attributed to a fund"):
+            derivative_subject(**{**_CONTRACT, "fund": ""})
+
+
+class TestEachContractTypeDatesItselfDifferently:
+    """Only swaps carry a `terminationDt`. Reading that one element for every
+    contract type finds nothing on a future or a forward and stamps the key
+    `open`, which is not a parse failure — it is a key that silently merges
+    every unexpired contract a fund holds against one broker."""
+
+    def test_a_future_is_keyed_by_its_expiry_not_open(self, adapter: NportAdapter) -> None:
+        facts = _facts_from(adapter, _FUTURES_DOC)
+        subjects = {str(f.subject) for f in facts}
+        assert not any(":open:" in s for s in subjects), subjects
+        assert any("2026-06-19" in s for s in subjects)
+
+    def test_two_futures_on_one_broker_stay_apart(self, adapter: NportAdapter) -> None:
+        """The live defect: 15 index futures against Morgan Stanley on one
+        subject, 13 distinct titles invisible behind the tie-break."""
+        subjects = {str(f.subject) for f in _facts_from(adapter, _FUTURES_DOC)}
+        assert len(subjects) == 2, subjects
+
+    def test_the_expiry_reaches_the_store(self, adapter: NportAdapter) -> None:
+        """It was in the payload and in no fact: only `terminationDt` was
+        emitted, so a future's expiry was parsed for the key and dropped."""
+        values = {(str(f.subject), f.field): f.value for f in _facts_from(adapter, _FUTURES_DOC)}
+        expiries = {v for (_, field), v in values.items() if field == "nport:deriv:expDate"}
+        assert expiries == {date(2026, 6, 19), date(2026, 6, 12)}
+
+    def test_the_keying_identifier_is_stored(self, adapter: NportAdapter) -> None:
+        ids = {
+            f.value
+            for f in _facts_from(adapter, _FUTURES_DOC)
+            if f.field == "nport:deriv:contractId"
+        }
+        assert ids == {"ESM6", "TPM6"}
 
 
 class TestBothCurrencyForms:

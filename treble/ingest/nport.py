@@ -110,23 +110,82 @@ def holding_subject(*, cusip: str, isin: str) -> TUID:
     raise ValueError("holding has neither CUSIP nor ISIN")
 
 
-def derivative_subject(*, counterparty: str, kind: str, termination: str) -> TUID:
-    """Key an OTC derivative by what actually identifies one.
+#: Which element carries a contract's own date, by contract type. N-PORT does
+#: not use one name for this: only swaps and `othDeriv` have a `terminationDt`,
+#: a future expires (`expDate`) and a forward settles (`settlementDt`).
+#:
+#: Reading `terminationDt` alone — as this did — does not fail loudly. It finds
+#: nothing on a future or a forward and stamps the key `open`, so every
+#: unexpired future a fund holds against one counterparty keys identically. On
+#: the live store that was 51 of 68 derivative holdings, and 45 of them were
+#: hidden by the date alone.
+_CONTRACT_DATE: dict[str, str] = {
+    "futrDeriv": "expDate",
+    "fwdDeriv": "settlementDt",
+    "swapDeriv": "terminationDt",
+    "othDeriv": "terminationDt",
+}
 
-    A swap has no CUSIP, and the previous behaviour keyed it to `cusip:N/A`
-    along with every other unidentified holding. What identifies an OTC
-    contract is its counterparty and its terms, so that is the key: the
-    counterparty, the contract type, and the termination date.
 
-    Raises when the counterparty is unnamed, because a contract with no
-    counterparty and no identifier cannot be told apart from another one —
-    which is the situation this replaces, not a variation on it.
+def _segment(raw: str) -> str:
+    """One segment of a subject key, with the separator taken out.
+
+    A colon inside a segment would make the key ambiguous to anything that
+    splits on it, and titles genuinely contain them: `NEXTDC LTD ISSUE 5:27 /
+    TERMS 1:1` is a real holding used as a discriminator below.
+    """
+    return " ".join(raw.split()).upper().replace(":", "-").replace(" ", "_")
+
+
+def derivative_subject(
+    *,
+    fund: str,
+    counterparty: str,
+    kind: str,
+    contract_date: str,
+    direction: str,
+    contract_id: str,
+) -> TUID:
+    """Key an OTC derivative by what actually identifies one position.
+
+    A swap has no CUSIP, and the behaviour before that keyed it to `cusip:N/A`
+    along with every other unidentified holding. Counterparty and terms fixed
+    that, but not far enough: `otc:<counterparty>:<kind>:<date>` describes a
+    *kind of contract*, not a contract. A fund running fifteen index futures
+    with one clearing broker put all fifteen on one subject, and the
+    visibility window showed whichever the tie-break ranked first.
+
+    So the key carries the whole of what makes a position distinct:
+
+    * `fund` — an OTC contract is bilateral, not fungible. Two funds short the
+      same future against the same broker hold two positions, and keying only
+      on the contract would merge them. This is the one segment that has no
+      counterpart in `holding_subject`, and the reason is real: an ISIN
+      identifies an instrument that many funds may hold, whereas a forward is
+      an agreement *this* fund entered into.
+    * `counterparty`, `kind`, `contract_date` — the contract's own terms.
+    * `direction` — a fund may be long and short the same future at once.
+      Measured: dropping this re-merged two positions on the live store.
+    * `contract_id` — the filer's own identifier for the contract, from
+      `identifiers/other`, which 65 of 68 derivative holdings carry. Where
+      there is none the title stands in, which is weaker (a title is prose)
+      but is what the filer gave.
+
+    Raises rather than guessing when the counterparty, the fund or the
+    discriminator is missing, because a contract that cannot be told apart
+    from another one is the situation this replaces, not a variation on it.
     """
     party = counterparty.strip().upper()
     if not party or party in _NULL_IDENTIFIERS:
         raise ValueError("derivative holding names no counterparty and has no identifier")
-    stamp = termination.strip()[:10] or "open"
-    return TUID(f"otc:{party.replace(' ', '_')}:{kind}:{stamp}")
+    if not (scope := _segment(fund)):
+        raise ValueError("derivative holding cannot be attributed to a fund")
+    if not (contract := _segment(contract_id)):
+        raise ValueError("derivative holding carries no identifier and no title")
+    stamp = contract_date.strip()[:10] or "open"
+    return TUID(
+        ":".join(("otc", scope, _segment(party), kind, stamp, _segment(direction) or "-", contract))
+    )
 
 
 def _currency(holding: Element) -> tuple[str | None, float | None]:
@@ -220,6 +279,18 @@ class NportAdapter(SourceAdapter):
             raise ValueError("N-PORT document has no reporting period date")
         period_end = date.fromisoformat(period_raw)
 
+        # Which fund is filing. Only derivative subjects need it — a holding
+        # with an ISIN is keyed by the instrument, which is the same
+        # instrument whoever holds it — so a filing that somehow states
+        # neither still yields all of its cash positions, and loses only the
+        # contracts it cannot attribute. `seriesId` is the fund; `regCik` is
+        # the registrant above it, and is the coarser fallback.
+        fund = (
+            _text(root.find(".//n:seriesId", NPORT_NS))
+            or _text(root.find(".//n:regCik", NPORT_NS))
+            or _text(root.find(".//n:cik", NPORT_NS))
+        )
+
         provenance = Provenance(
             source_system=self.meta.source_id,
             source_uri=payload.source_uri,
@@ -242,7 +313,7 @@ class NportAdapter(SourceAdapter):
                 # counterparty and terms. Anything else is genuinely
                 # unidentifiable and is skipped, never guessed at.
                 try:
-                    subject = _derivative_subject_for(holding)
+                    subject = _derivative_subject_for(holding, fund=fund)
                 except ValueError:
                     continue
 
@@ -325,7 +396,21 @@ _DERIVATIVE_TEXT: tuple[str, ...] = (
 )
 
 
-def _derivative_subject_for(holding: Element) -> TUID:
+def _contract_identifier(holding: Element) -> str:
+    """The filer's own identifier for a contract, if it gave one.
+
+    Sits beside `isin` under `identifiers`, and was being read past: only
+    `isin` was ever looked for there, so a forward carrying
+    `<other otherDesc="Forward FX" value="CCTEUR__00343463"/>` looked
+    identifierless. It is the closest thing to a contract number N-PORT has.
+    """
+    other = holding.find("n:identifiers/n:other", NPORT_NS)
+    if other is None:
+        return ""
+    return "" if (raw := (other.get("value") or "").strip()) in _NULL_IDENTIFIERS else raw
+
+
+def _derivative_subject_for(holding: Element, *, fund: str) -> TUID:
     """The OTC key for a derivative holding, or raise if it is not one."""
     info = holding.find("n:derivativeInfo", NPORT_NS)
     if info is None:
@@ -334,10 +419,19 @@ def _derivative_subject_for(holding: Element) -> TUID:
     if not contracts:
         raise ValueError("derivative block names no contract type")
     contract = contracts[0]
+    kind = contract.tag.rsplit("}", 1)[-1]
+    date_element = _CONTRACT_DATE.get(kind, "terminationDt")
     return derivative_subject(
+        fund=fund,
         counterparty=_text(contract.find(".//n:counterpartyName", NPORT_NS)),
-        kind=contract.tag.rsplit("}", 1)[-1],
-        termination=_text(contract.find(".//n:terminationDt", NPORT_NS)),
+        kind=kind,
+        contract_date=_text(contract.find(f".//n:{date_element}", NPORT_NS)),
+        direction=_text(contract.find(".//n:payOffProf", NPORT_NS)),
+        # The filer's contract number where there is one, the title where
+        # there is not. Never the notional or the mark: those move every
+        # quarter, and a key built on them would make one position look like
+        # a new one each filing — the opposite failure to the one being fixed.
+        contract_id=_contract_identifier(holding) or _text(holding.find("n:title", NPORT_NS)),
     )
 
 
@@ -382,6 +476,17 @@ def _emit_derivative(holding: Element, emit: Any) -> None:
         raw = _text(contract.find(f".//n:{field}", NPORT_NS))
         if raw not in ("", "N/A"):
             emit(f"deriv:{field}", raw)
-    termination = _text(contract.find(".//n:terminationDt", NPORT_NS))
-    if termination not in ("", "N/A"):
-        emit("deriv:terminationDt", date.fromisoformat(termination[:10]))
+    # Each contract type dates itself differently and only `terminationDt`
+    # was being read, so a future's expiry and a forward's settlement date
+    # were in the payload and absent from the store. Emitted under their own
+    # names rather than flattened into one field: a settlement date is not a
+    # termination date, and `_CONTRACT_DATE` already says which to expect.
+    for field in ("terminationDt", "expDate", "settlementDt"):
+        raw = _text(contract.find(f".//n:{field}", NPORT_NS))
+        if raw not in ("", "N/A"):
+            emit(f"deriv:{field}", date.fromisoformat(raw[:10]))
+
+    # The identifier the subject is keyed on, stored so the key can be traced
+    # back to the filing rather than only reproduced by re-running the parser.
+    if identifier := _contract_identifier(holding):
+        emit("deriv:contractId", identifier)

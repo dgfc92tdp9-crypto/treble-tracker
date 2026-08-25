@@ -419,18 +419,27 @@ class DuckStore:
         the counterparty in the key and leaves 3, all duplicate filings
         naming the same counterparty.
 
-        The remaining 1,336 are the genuinely multi-valued kind, which
+        51 are `otc:` subjects in the superseded encoding, and those are a
+        third cause again: not a field holding several values, nor a record
+        split across two fields, but a *subject* that did not identify the
+        thing it named. `otc:<counterparty>:<derivType>:<date>` describes a
+        kind of contract, so a fund's fifteen index futures against one
+        clearing broker were one subject. Superseded (I2 keeps them, nothing
+        reads them) by a key carrying the fund, the contract's own date, the
+        direction and the filer's contract identifier — see
+        `ingest.nport.derivative_subject`. Those 67 subjects hold no
+        ambiguous partition at all.
+
+        The remaining 1,285 are the genuinely multi-valued kind, which
         wants a key that admits several values rather than one that holds
         a record together: 643 `nport:curCd`, 367 `edgar:filing:form`
         (a filer submitted more than one form on a day), 274 DTCC swap
-        metrics (two snapshots of one tenor-day, restated), 51 under
-        `otc:` subjects — `otc:<counterparty>:<derivType>:<status>` does
-        not identify a position, so 46 positions share 8 subjects — and
-        one `ffd:` offering price.
+        metrics (two snapshots of one tenor-day, restated), and one `ffd:`
+        offering price.
 
-        Reported rather than repaired, because the repair is per-field and
-        differs by cause, and a store that quietly collapsed them would be
-        hiding data it holds.
+        Reported rather than repaired where the remedy is still open,
+        because it is per-field and differs by cause, and a store that
+        quietly collapsed them would be hiding data it holds.
 
         Returns (subject, field, effective_from, distinct value count).
         """
