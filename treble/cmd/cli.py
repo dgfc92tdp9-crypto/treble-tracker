@@ -31,6 +31,7 @@ from treble.ems.transport import HOST, SimulatorServer
 from treble.ingest.base import SourceAdapter
 from treble.ingest.health import Freshness, overdue, source_health
 from treble.ingest.populate import Populator
+from treble.ingest.replay import rebuild
 from treble.render.server import DEFAULT_HOST, DEFAULT_PORT
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
@@ -667,6 +668,60 @@ def compact(
             f"[yellow]Left hot — namespace not a safe file name: "
             f"{', '.join(report.skipped)}[/yellow]"
         )
+
+
+@app.command()
+def replay(
+    data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where payloads and the log live."),
+    into: Path = typer.Option(..., help="New database file to build. Must not exist."),
+    source: list[str] = typer.Option([], help="Only these source ids. Default: all logged."),
+    up_to_seq: int | None = typer.Option(None, help="Stop at this ingest-log sequence number."),
+) -> None:
+    """Rebuild a store from stored payloads alone, with no network (I5).
+
+    Writes to a **new** file and refuses an existing one. The point of a
+    replay is to be compared against the store you already have; writing
+    over that store destroys the only thing worth comparing against, and
+    an operator who wants to replace it can move the file themselves.
+
+    Three of the nineteen adapters cannot replay: their `parse` reads
+    fetch-time configuration the ingest log does not record. They are
+    reported by name rather than skipped quietly — see ADR-0009.
+    """
+    if into.exists():
+        raise typer.BadParameter(f"{into} exists; replay writes a new file", param_hint="--into")
+
+    payloads = PayloadStore(data_dir / "payloads")
+    log = IngestLog(data_dir / "ingest.db")
+    target = DuckStore(into)
+
+    def progress(source_id: str, entries: int, facts: int) -> None:
+        console.print(f"  {source_id:<22} {entries:>5} payloads -> {facts:>10,} facts")
+
+    console.print(f"Replaying {data_dir} into {into}")
+    report = rebuild(
+        target,
+        payloads,
+        log,
+        sources=tuple(source) or None,
+        up_to_seq=up_to_seq,
+        on_source=progress,
+    )
+    console.print(
+        f"\n[green]{report.facts:,} facts from {report.entries:,} payloads, no network[/green]"
+    )
+
+    if report.unclaimed:
+        console.print(
+            f"[red]No adapter for: {', '.join(report.unclaimed)} — "
+            "these payloads can no longer be re-derived.[/red]"
+        )
+    for source_id, seq, message in report.failures:
+        console.print(f"[yellow]{source_id} seq {seq}: {message}[/yellow]")
+    if not report.ok:
+        # Non-zero, because a replay that could not re-derive everything
+        # has not demonstrated what a replay exists to demonstrate.
+        raise typer.Exit(1)
 
 
 @app.command()
