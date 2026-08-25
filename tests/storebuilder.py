@@ -23,9 +23,42 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 
 from treble.core.facts import Fact
+from treble.core.identifiers import position_subject
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
 from treble.tapi.swap_market import DISCOUNT_CURVE, FORECAST_CURVE, USD_DISCOUNT_CURVE
+
+#: Fields `ingest.nport` keys to a position rather than to the instrument,
+#: mirroring `ingest.nport._POSITION_FIELDS`. Duplicated here on purpose: a
+#: test double that imported the production set would follow it silently if
+#: the set ever changed, and these fixtures exist to notice that.
+POSITION_FIELDS = frozenset(
+    {
+        "nport:balance",
+        "nport:valUSD",
+        "nport:pctVal",
+        "nport:fairValLevel",
+        "nport:payoffProfile",
+        "nport:exchangeRt",
+    }
+)
+
+
+def split_holding(
+    instrument: str, fields: dict[str, object], *, fund: str = "S000000001"
+) -> list[tuple[str, str, object]]:
+    """Route each field to the subject the ingest would actually write it to.
+
+    Fixtures that put a fund's par and value on the instrument model a store
+    shape the ingest no longer produces, so a reader could pass its tests and
+    still find nothing in a real store. Returns `(subject, field, value)`.
+    """
+    held = str(position_subject(fund=fund, instrument=instrument))
+    return [
+        (held if field in POSITION_FIELDS else instrument, field, value)
+        for field, value in fields.items()
+    ]
+
 
 #: When every fact becomes known. Tests query after it.
 KNOWN = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
@@ -109,12 +142,20 @@ class StoreBuilder:
             ]
         return self._write("dtcc-sdr", rows)
 
-    def with_bonds(self, count: int = 60, *, issuers: int = 4) -> StoreBuilder:
+    def with_bonds(
+        self, count: int = 60, *, issuers: int = 4, fund: str = "S000000001"
+    ) -> StoreBuilder:
         """Corporate bonds an issuer curve can be fitted through.
 
         Priced off a smooth spread so the curve fits and the residuals are
         small but not zero — a set that fitted perfectly would make every
         rich/cheap call zero and hide whether the residual layer ran at all.
+
+        Par and value go on a **position** subject, as `ingest.nport` writes
+        them: they are one fund's numbers, not the bond's. A builder that
+        kept them on the instrument would be modelling a store shape the
+        ingest no longer produces, and every reader test would pass against
+        a layout that cannot occur.
         """
         rows: list[tuple[str, str, object, date]] = []
         for i in range(count):
@@ -124,6 +165,7 @@ class StoreBuilder:
             # A price near par, drifting with maturity and jittered per bond.
             price = 99.0 + 0.05 * years + ((i * 37) % 11 - 5) * 0.08
             par = 1_000_000.0
+            instrument = f"isin:{_isin(i)}"
             for field, value in (
                 ("nport:lei", f"LEI{issuer:017d}"),
                 ("nport:assetCat", "DBT"),
@@ -132,10 +174,30 @@ class StoreBuilder:
                 ("nport:curCd", "USD"),
                 ("nport:maturityDt", date(DAY.year + years, 6, 30)),
                 ("nport:annualizedRt", coupon),
-                ("nport:balance", par),
-                ("nport:valUSD", par * price / 100.0),
             ):
-                rows.append((f"isin:{_isin(i)}", field, value, DAY))
+                rows.append((instrument, field, value, DAY))
+            held = str(position_subject(fund=fund, instrument=instrument))
+            rows.append((held, "nport:balance", par, DAY))
+            rows.append((held, "nport:valUSD", par * price / 100.0, DAY))
+        return self._write("edgar-nport", rows)
+
+    def with_second_holder(
+        self, count: int = 60, *, fund: str = "S000000002", share: float = 0.25
+    ) -> StoreBuilder:
+        """A second fund reporting the same bonds, at its own size.
+
+        The situation that made this split necessary: one instrument, two
+        filers, two different marks. Under the old instrument keying the
+        later-fetched filing simply won and the other was never shown.
+        """
+        rows: list[tuple[str, str, object, date]] = []
+        for i in range(count):
+            years = 2 + (i % 12)
+            price = 99.0 + 0.05 * years + ((i * 37) % 11 - 5) * 0.08
+            par = 1_000_000.0 * share
+            held = str(position_subject(fund=fund, instrument=f"isin:{_isin(i)}"))
+            rows.append((held, "nport:balance", par, DAY))
+            rows.append((held, "nport:valUSD", par * price / 100.0, DAY))
         return self._write("edgar-nport", rows)
 
     def with_factors(self, days: int = 250, assets: int = 5) -> StoreBuilder:

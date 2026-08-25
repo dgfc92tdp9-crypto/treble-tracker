@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 
 from treble.core.facts import Fact
+from treble.core.identifiers import position_subject
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
 from treble.tapi.peers import MIN_PEERS, NoPeersError, peer_values
@@ -43,20 +44,24 @@ def _store(
     store.write_provenance([record])
     facts = []
     for isin, lei, price, years in bonds:
-        for field, value in {
-            "gleif:lei": lei,
-            "nport:assetCat": "DBT",
-            "nport:issuerCat": "CORP",
-            "nport:curCd": "USD",
-            "nport:name": f"ISSUER {lei[-2:]}",
-            "nport:maturityDt": date(DAY.year + years, DAY.month, DAY.day),
-            "nport:annualizedRt": 5.0,
-            "nport:valUSD": 1_000_000.0 * price / 100.0,
-            "nport:balance": 1_000_000.0,
-        }.items():
+        instrument = f"isin:{isin}"
+        # Par and value belong to the holder, so they go on a position
+        # subject exactly as `ingest.nport` writes them.
+        held = str(position_subject(fund="S000000001", instrument=instrument))
+        for subject, field, value in (
+            (instrument, "gleif:lei", lei),
+            (instrument, "nport:assetCat", "DBT"),
+            (instrument, "nport:issuerCat", "CORP"),
+            (instrument, "nport:curCd", "USD"),
+            (instrument, "nport:name", f"ISSUER {lei[-2:]}"),
+            (instrument, "nport:maturityDt", date(DAY.year + years, DAY.month, DAY.day)),
+            (instrument, "nport:annualizedRt", 5.0),
+            (held, "nport:valUSD", 1_000_000.0 * price / 100.0),
+            (held, "nport:balance", 1_000_000.0),
+        ):
             facts.append(
                 Fact(
-                    subject=f"isin:{isin}",
+                    subject=subject,
                     field=field,
                     value=value,
                     effective_from=DAY,

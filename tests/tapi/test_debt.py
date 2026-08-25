@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.storebuilder import split_holding
 from treble.core.facts import Fact
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
@@ -51,12 +52,11 @@ def _store(tmp_path: Path, bonds: list[dict[str, object]]) -> DuckStore:
     facts = []
     for bond in bonds:
         day = bond.get("day", DAY)
-        for field, value in bond.items():
-            if field in {"isin", "day"}:
-                continue
+        holding = {f: v for f, v in bond.items() if f not in {"isin", "day"}}
+        for subject, field, value in split_holding(f"isin:{bond['isin']}", holding):
             facts.append(
                 Fact(
-                    subject=f"isin:{bond['isin']}",
+                    subject=subject,
                     field=field,
                     value=value,
                     effective_from=day,  # type: ignore[arg-type]

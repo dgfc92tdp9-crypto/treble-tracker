@@ -12,7 +12,7 @@ from xml.etree.ElementTree import Element
 
 import pytest
 
-from treble.core.identifiers import validate_lei
+from treble.core.identifiers import parse_position_subject, validate_lei
 from treble.ingest.base import RawPayload
 from treble.ingest.nport import NportAdapter, _currency, holding_subject
 from treble.store.ingest_log import IngestLog
@@ -39,6 +39,20 @@ def payload() -> RawPayload:
         source_uri="https://www.sec.gov/Archives/edgar/data/1484018/.../primary_doc.xml",
         fetched_at=FETCHED,
     )
+
+
+def _instrument_with_position(facts) -> dict[object, dict[str, object]]:  # type: ignore[no-untyped-def]
+    """Each instrument's fields with its own fund's position folded in.
+
+    The join every reader now has to do: an instrument subject carries what
+    the bond is, a position subject carries what one fund holds of it.
+    """
+    merged: dict[object, dict[str, object]] = {}
+    for fact in facts:
+        parsed = parse_position_subject(fact.subject)
+        key = parsed[1] if parsed else fact.subject
+        merged.setdefault(key, {})[fact.field] = fact.value
+    return merged
 
 
 class TestParse:
@@ -69,7 +83,7 @@ class TestParse:
 
         isin_m = re.search(r'<isin value="([^"]+)"', text)
         subject = holding_subject(cusip=tag("cusip"), isin=isin_m.group(1) if isin_m else "")
-        by_field = {f.field: f.value for f in batch.facts if f.subject == subject}
+        by_field = _instrument_with_position(batch.facts)[subject]
         assert by_field["nport:valUSD"] == pytest.approx(float(tag("valUSD")))
         assert by_field["nport:balance"] == pytest.approx(float(tag("balance")))
         assert by_field["nport:issuerCat"] == "CORP"
@@ -80,17 +94,44 @@ class TestParse:
         assert isinstance(by_field["nport:maturityDt"], date)
         assert by_field["nport:annualizedRt"] == pytest.approx(float(tag("annualizedRt")))
 
+    def test_the_instrument_and_the_position_are_separate_subjects(
+        self, adapter: NportAdapter
+    ) -> None:
+        """What the bond is, and how much of it one fund owns, are different
+        questions. Keying both to `isin:` meant three funds' marks landed in
+        one partition and the window showed whichever was fetched last."""
+        raw = payload()
+        batch = adapter.parse(raw, payload_hash(raw.data))
+        on_instrument = {f.field for f in batch.facts if str(f.subject).startswith("isin:")}
+        on_position = {f.field for f in batch.facts if str(f.subject).startswith("pos:")}
+        # The fund's own numbers are never on the shared instrument subject.
+        assert not on_instrument & {"nport:valUSD", "nport:balance", "nport:pctVal"}
+        assert {"nport:valUSD", "nport:balance", "nport:pctVal"} <= on_position
+        # The instrument's own facts are never duplicated onto the position.
+        assert not on_position & {"nport:maturityDt", "nport:issuerCat", "nport:assetCat"}
+
+    def test_every_position_names_its_fund(self, adapter: NportAdapter) -> None:
+        raw = payload()
+        batch = adapter.parse(raw, payload_hash(raw.data))
+        positions = {str(f.subject) for f in batch.facts if str(f.subject).startswith("pos:")}
+        assert positions, "no positions emitted"
+        for subject in positions:
+            parsed = parse_position_subject(subject)
+            assert parsed is not None, subject
+            fund, instrument = parsed
+            assert fund and str(instrument).startswith(("isin:", "cusip:"))
+
     def test_implied_price_is_computable_and_sane(self, adapter: NportAdapter) -> None:
         """valUSD / balance * 100 must land in a plausible bond-price range —
         the whole point of this source. Ingest stores the inputs; this asserts
-        they are consistent enough for the analytics layer to divide."""
+        they are consistent enough for the analytics layer to divide.
+
+        Joins the position back to its instrument, because the price needs
+        `assetCat` from one and the two numbers from the other."""
         raw = payload()
         batch = adapter.parse(raw, payload_hash(raw.data))
-        by_subject: dict[object, dict[str, object]] = {}
-        for fact in batch.facts:
-            by_subject.setdefault(fact.subject, {})[fact.field] = fact.value
         priced = 0
-        for fields in by_subject.values():
+        for fields in _instrument_with_position(batch.facts).values():
             if fields.get("nport:assetCat") != "DBT":
                 continue
             val, bal = fields.get("nport:valUSD"), fields.get("nport:balance")

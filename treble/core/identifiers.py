@@ -259,3 +259,71 @@ def looks_like_isin(value: str) -> bool:
     if len(candidate) != 12 or not candidate[:2].isalpha() or not candidate.isalnum():
         return False
     return isin_check_digit(candidate[:11]) == candidate[11]
+
+
+#: Namespace for a *position* — one fund's holding of one instrument — as
+#: distinct from the instrument itself.
+POSITION_PREFIX = "pos:"
+
+
+def position_subject(*, fund: str, instrument: TUID | str) -> TUID:
+    """Key one fund's holding of one instrument.
+
+    An instrument subject answers "what is this bond": its maturity, coupon,
+    issuer and denomination are the same facts whoever holds it. A *position*
+    answers "how much of it does this fund own, and at what mark", and that
+    is a different question with a different answer per fund.
+
+    Keying both to `isin:` conflated them. Three funds reported
+    `isin:US7185461040` for 2026-03-31 at $1.87bn, $35.0m and $4.39m; the
+    visibility window partitions on subject and field and shows one row, so
+    the store held all three and every screen saw $4.39m — the smallest,
+    because its filing happened to be fetched last. Measured on the live
+    store: 75 (instrument, period) pairs reported by more than one filing,
+    376 values invisible.
+
+    That loss never appeared in `DuckStore.ambiguous_partitions`, and the
+    reason is worth keeping: that check groups by `knowledge_from` as well,
+    so it only sees values that collide at the *same* knowledge time. Two
+    funds' filings are fetched seconds apart, so their marks land at
+    different knowledge times and the window silently prefers the later one.
+    A partition can lose data without ever being ambiguous.
+
+    Raises when the fund is unnamed rather than falling back to the bare
+    instrument, which would put the position back on the key it is being
+    moved off.
+
+    **Instrument first, fund last.** Every reader asks "what is held in this
+    bond" and none asks "what does this fund hold", so the instrument leads
+    and `pos:isin:US7185461040:` prefix-matches every fund reporting it.
+    Fund-first would have forced a full sweep of the store for one bond, and
+    the callers that need this are inside per-bond loops.
+    """
+    scope = " ".join(str(fund).split()).upper().replace(":", "-").replace(" ", "_")
+    if not scope:
+        raise ValueError("a position must name the fund that holds it")
+    return TUID(f"{POSITION_PREFIX}{instrument}:{scope}")
+
+
+def position_prefix_for(instrument: TUID | str) -> str:
+    """The prefix matching every fund's position in one instrument."""
+    return f"{POSITION_PREFIX}{instrument}:"
+
+
+def parse_position_subject(subject: TUID | str) -> tuple[str, TUID] | None:
+    """The fund and instrument behind a position subject, or None.
+
+    `None` rather than a raise: readers sweep every subject in the store and
+    a non-position subject is an ordinary answer, not an error.
+
+    Split from the right. The instrument keeps its own namespace separator
+    (`isin:US7185461040`), so the *last* segment is the fund — which holds
+    because `position_subject` strips colons out of the fund before joining.
+    """
+    text = str(subject)
+    if not text.startswith(POSITION_PREFIX):
+        return None
+    instrument, separator, fund = text[len(POSITION_PREFIX) :].rpartition(":")
+    if not separator or not fund or not instrument:
+        return None
+    return fund, TUID(instrument)

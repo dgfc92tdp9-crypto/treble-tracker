@@ -57,6 +57,7 @@ from treble.analytics.vol.surface import EXPIRY_BUCKETS, TENOR_BUCKETS, VolSurfa
 from treble.core.identifiers import TUID
 from treble.ingest.ecb_hicp import SUBJECT as HICP_SUBJECT
 from treble.store.duck import DuckStore
+from treble.tapi.positions import totals_for
 from treble.tapi.swap_market import (
     DISCOUNT_CURVE,
     USD_DISCOUNT_CURVE,
@@ -478,8 +479,12 @@ def assetswap_from_store(store: DuckStore, *, as_of: datetime, subject: TUID) ->
     facts = {f.field: f.value for f in store.subject_facts(subject, as_of=as_of)}
     maturity = facts.get("nport:maturityDt")
     coupon = facts.get("nport:annualizedRt")
-    balance = facts.get("nport:balance")
-    val_usd = facts.get("nport:valUSD")
+    # Par and value are the holders' numbers, not the bond's, and live on
+    # position subjects — summed across every fund reporting this instrument
+    # rather than taken from whichever filing was fetched last.
+    held = totals_for(store, subject, as_of=as_of)
+    balance = held.get("nport:balance")
+    val_usd = held.get("nport:valUSD")
     if not isinstance(maturity, date) or not isinstance(coupon, int | float):
         raise ProductUnavailableError(
             f"{subject}: no maturity or coupon stored, so there is no bond to swap"

@@ -1726,6 +1726,7 @@ class LocalTapi:
             fit_residual_model,
         )
         from treble.tapi.issuer_curves import IssuerCurvesUnavailableError, build_issuer_curves
+        from treble.tapi.positions import totals_for
 
         try:
             fitted = build_issuer_curves(self._store, as_of=as_of)
@@ -1740,7 +1741,12 @@ class LocalTapi:
                     f.field: f.value
                     for f in self._store.subject_facts(TUID(call.identifier), as_of=as_of)
                 }
-                coupon, size = facts.get("nport:annualizedRt"), facts.get("nport:valUSD")
+                # Size is the whole holding across funds, not one filing's
+                # slice: `valUSD` is keyed per position now.
+                coupon = facts.get("nport:annualizedRt")
+                size = totals_for(self._store, TUID(call.identifier), as_of=as_of).get(
+                    "nport:valUSD"
+                )
                 if not isinstance(coupon, int | float) or not isinstance(size, int | float):
                     continue
                 observations.append(

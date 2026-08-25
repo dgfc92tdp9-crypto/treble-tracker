@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from treble.core.facts import Fact
+from treble.core.identifiers import position_subject
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.ingest.treasury_curve import CURVE, FIELD
 from treble.store.duck import DuckStore
@@ -144,19 +145,23 @@ class TestBondSpreads:
         )
         store.write_provenance([record])
         report = date(2026, 3, 31)
-        fields: dict[str, object] = {
-            "nport:maturityDt": date(2031, 3, 31),
-            "nport:annualizedRt": coupon,
-            "nport:curCd": currency,
-            "nport:assetCat": "DBT",
-            "nport:name": "TEST ISSUER",
-            "nport:valUSD": 1_000_000.0 * price / 100.0,
-            "nport:balance": 1_000_000.0,
-        }
+        instrument = "isin:US0000000000"
+        # Par and value are the holder's, and live on a position subject as
+        # `ingest.nport` writes them; the rest describe the bond itself.
+        held = str(position_subject(fund="S000000001", instrument=instrument))
+        fields: list[tuple[str, str, object]] = [
+            (instrument, "nport:maturityDt", date(2031, 3, 31)),
+            (instrument, "nport:annualizedRt", coupon),
+            (instrument, "nport:curCd", currency),
+            (instrument, "nport:assetCat", "DBT"),
+            (instrument, "nport:name", "TEST ISSUER"),
+            (held, "nport:valUSD", 1_000_000.0 * price / 100.0),
+            (held, "nport:balance", 1_000_000.0),
+        ]
         store.write_facts(
             [
                 Fact(
-                    subject="isin:US0000000000",
+                    subject=subject,
                     field=field,
                     value=value,
                     effective_from=report,
@@ -164,7 +169,7 @@ class TestBondSpreads:
                     knowledge_from=KNOWN,
                     provenance_id=record.id,
                 )
-                for field, value in fields.items()
+                for subject, field, value in fields
             ]
         )
         return store

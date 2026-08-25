@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.storebuilder import split_holding
 from treble.core.facts import Fact
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
@@ -73,7 +74,7 @@ def _store(
     }
     facts += [
         Fact(
-            subject="isin:US0000000000",
+            subject=subject,
             field=field,
             value=value,
             effective_from=REPORT,
@@ -81,7 +82,7 @@ def _store(
             knowledge_from=KNOWN,
             provenance_id=record.id,
         )
-        for field, value in bond.items()
+        for subject, field, value in split_holding("isin:US0000000000", bond)
     ]
     store.write_facts(facts)
     return store
@@ -186,7 +187,7 @@ class TestItRefusesRatherThanInvents:
         store.write_facts(
             [
                 Fact(
-                    subject="isin:US0000000000",
+                    subject=subject,
                     field=field,
                     value=value,
                     effective_from=REPORT,
@@ -194,14 +195,17 @@ class TestItRefusesRatherThanInvents:
                     knowledge_from=KNOWN,
                     provenance_id=record.id,
                 )
-                for field, value in {
-                    "nport:maturityDt": date(2036, 3, 31),
-                    "nport:annualizedRt": 5.0,
-                    "nport:curCd": "USD",
-                    "nport:assetCat": "DBT",
-                    "nport:valUSD": 1_000_000.0,
-                    "nport:balance": 1_000_000.0,
-                }.items()
+                for subject, field, value in split_holding(
+                    "isin:US0000000000",
+                    {
+                        "nport:maturityDt": date(2036, 3, 31),
+                        "nport:annualizedRt": 5.0,
+                        "nport:curCd": "USD",
+                        "nport:assetCat": "DBT",
+                        "nport:valUSD": 1_000_000.0,
+                        "nport:balance": 1_000_000.0,
+                    },
+                )
             ]
         )
         with pytest.raises(OptionCostUnavailableError, match="discount curve"):

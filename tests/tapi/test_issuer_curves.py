@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.storebuilder import split_holding
 from treble.core.facts import Fact
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.store.duck import DuckStore
@@ -35,20 +36,23 @@ def _write(store: DuckStore, holdings: list[tuple[str, str, date, float, float]]
     )
     facts: list[Fact] = []
     for isin, asset_cat, maturity, coupon, value in holdings:
-        for field, value_ in (
-            ("nport:lei", LEI),
-            ("nport:assetCat", asset_cat),
-            ("nport:issuerCat", "CORP"),
-            ("nport:name", "Example Issuer"),
-            ("nport:curCd", "USD"),
-            ("nport:maturityDt", maturity),
-            ("nport:annualizedRt", coupon),
-            ("nport:valUSD", value),
-            ("nport:balance", 1_000_000.0),
+        for subject, field, value_ in split_holding(
+            f"isin:{isin}",
+            {
+                "nport:lei": LEI,
+                "nport:assetCat": asset_cat,
+                "nport:issuerCat": "CORP",
+                "nport:name": "Example Issuer",
+                "nport:curCd": "USD",
+                "nport:maturityDt": maturity,
+                "nport:annualizedRt": coupon,
+                "nport:valUSD": value,
+                "nport:balance": 1_000_000.0,
+            },
         ):
             facts.append(
                 Fact(
-                    subject=f"isin:{isin}",
+                    subject=subject,
                     field=field,
                     value=value_,
                     effective_from=DAY,

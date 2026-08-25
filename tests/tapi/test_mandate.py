@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+from tests.storebuilder import split_holding
 from treble.core.facts import Fact
 from treble.core.identifiers import TUID
 from treble.core.provenance import ExtractionMethod, Provenance
@@ -45,8 +46,8 @@ def _store(tmp_path: Path, holdings: dict[str, dict[str, object]]) -> DuckStore:
                 knowledge_from=KNOWN,
                 provenance_id=record.id,
             )
-            for subject, fields in holdings.items()
-            for field, value in fields.items()
+            for subject_fields in holdings.items()
+            for subject, field, value in split_holding(subject_fields[0], subject_fields[1])
         ]
     )
     return store

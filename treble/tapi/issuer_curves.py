@@ -44,6 +44,7 @@ from treble.analytics.tval.relative import (
 )
 from treble.core.identifiers import TUID
 from treble.store.duck import DuckStore
+from treble.tapi.positions import totals_by_instrument
 
 #: Yields outside this band are treated as a bad mark rather than a bond.
 #: A fund reporting a stale balance produces an implied price of 3 or 3,000,
@@ -141,12 +142,22 @@ def bond_rows(store: DuckStore, *, as_of: datetime) -> list[dict[str, object]]:
         "nport:maturityDt",
         "nport:annualizedRt",
         "nport:curCd",
-        "nport:valUSD",
-        "nport:balance",
+        # `valUSD` and `balance` are deliberately absent: they are position
+        # fields now, and the store still holds the instrument-keyed ones
+        # written before the split (I2 deletes nothing). Reading them here
+        # would let a superseded fact through wherever a position is missing
+        # — the stale value would win by being the only one present, which
+        # is the quietest way for this fix to not have worked.
         "nport:issuerCat",
         "nport:assetCat",
         "nport:name",
     )
+    # `valUSD` and `balance` no longer live on the instrument: they are one
+    # fund's numbers and several funds report the same bond, so they are
+    # keyed per position and summed back here. Fetched once for the whole
+    # store rather than per instrument — this loop is every ISIN in it.
+    positions = totals_by_instrument(store, as_of=as_of)
+
     rows: list[dict[str, object]] = []
     for subject in store.subjects_with_prefix("isin:", as_of=as_of):
         facts = store.subject_facts(TUID(str(subject)), as_of=as_of)
@@ -154,8 +165,21 @@ def bond_rows(store: DuckStore, *, as_of: datetime) -> list[dict[str, object]]:
         for fact in facts:
             if fact.field in wanted:
                 by_date[fact.effective_from][fact.field] = fact.value
-        for day, values in by_date.items():
-            rows.append({"identifier": str(subject), "report_date": day, **values})
+        # A report date can exist on either side: a fund files a position for
+        # a period the instrument has no other fact on, or the instrument is
+        # described in a filing that holds none of it. Both are rows.
+        for day in by_date.keys() | {
+            day for (instrument, day) in positions if instrument == str(subject)
+        }:
+            values = by_date.get(day, {})
+            rows.append(
+                {
+                    "identifier": str(subject),
+                    "report_date": day,
+                    **values,
+                    **positions.get((str(subject), day), {}),
+                }
+            )
     return rows
 
 

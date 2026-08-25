@@ -17,7 +17,7 @@ import pytest
 
 from treble.analytics.derivatives.cancellable import cancellable_swap
 from treble.core.facts import Fact
-from treble.core.identifiers import TUID
+from treble.core.identifiers import TUID, position_subject
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.ingest.ecb_hicp import SUBJECT as HICP_SUBJECT
 from treble.store.duck import DuckStore
@@ -256,18 +256,21 @@ class TestAssetSwapUsesStoredHoldings:
         )
         store.write_provenance([prov])
         subject = TUID("isin:US0000000001")
-        rows: list[tuple[str, object]] = [
-            ("nport:maturityDt", date(2031, 6, 30)),
-            ("nport:annualizedRt", 4.50),
-            ("nport:balance", balance),
-            ("nport:valUSD", val),
+        # Par and value belong to the holder, not the bond, so they go on a
+        # position subject exactly as `ingest.nport` writes them.
+        held = position_subject(fund="S000000001", instrument=subject)
+        rows: list[tuple[str, str, object]] = [
+            (str(subject), "nport:maturityDt", date(2031, 6, 30)),
+            (str(subject), "nport:annualizedRt", 4.50),
+            (str(held), "nport:balance", balance),
+            (str(held), "nport:valUSD", val),
         ]
         if currency is not None:
-            rows.append(("nport:curCd", currency))
+            rows.append((str(subject), "nport:curCd", currency))
         store.write_facts(
             [
                 Fact(
-                    subject=str(subject),
+                    subject=where,
                     field=field,
                     value=value,
                     effective_from=DAY,
@@ -275,7 +278,7 @@ class TestAssetSwapUsesStoredHoldings:
                     knowledge_from=KNOWN,
                     provenance_id=prov.id,
                 )
-                for field, value in rows
+                for where, field, value in rows
             ]
         )
         return subject
@@ -319,10 +322,14 @@ class TestAssetSwapUsesStoredHoldings:
         )
         store.write_provenance([prov])
         subject = TUID("isin:US0000000002")
+        # Priceable on purpose: the refusal under test is the maturity, so
+        # par and value must be present — on the position, as ingest writes
+        # them — or the bond is refused a step earlier for the wrong reason.
+        held = position_subject(fund="S000000001", instrument=subject)
         store.write_facts(
             [
                 Fact(
-                    subject=str(subject),
+                    subject=where,
                     field=field,
                     value=value,
                     effective_from=DAY,
@@ -330,12 +337,12 @@ class TestAssetSwapUsesStoredHoldings:
                     knowledge_from=KNOWN,
                     provenance_id=prov.id,
                 )
-                for field, value in (
-                    ("nport:maturityDt", date(2020, 1, 1)),
-                    ("nport:annualizedRt", 4.5),
-                    ("nport:balance", 100_000.0),
-                    ("nport:valUSD", 99_000.0),
-                    ("nport:curCd", "USD"),
+                for where, field, value in (
+                    (str(subject), "nport:maturityDt", date(2020, 1, 1)),
+                    (str(subject), "nport:annualizedRt", 4.5),
+                    (str(held), "nport:balance", 100_000.0),
+                    (str(held), "nport:valUSD", 99_000.0),
+                    (str(subject), "nport:curCd", "USD"),
                 )
             ]
         )

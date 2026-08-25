@@ -36,7 +36,7 @@ import httpx
 from defusedxml.ElementTree import fromstring as safe_fromstring
 
 from treble.core.facts import Fact
-from treble.core.identifiers import PLACEHOLDER_IDENTIFIERS, TUID
+from treble.core.identifiers import PLACEHOLDER_IDENTIFIERS, TUID, position_subject
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.ingest.base import (
     ParsedBatch,
@@ -70,6 +70,24 @@ _HOLDING_TEXT_FIELDS = (
 )
 _HOLDING_NUMERIC_FIELDS = ("balance", "valUSD", "pctVal")
 _DEBT_TEXT_FIELDS = ("couponKind", "isDefault", "areIntrstPmntsInArrs", "isPaidKind")
+
+#: Fields that describe a *position* rather than an instrument, and so belong
+#: to the fund that holds it (`core.identifiers.position_subject`).
+#:
+#: The line is "would two funds holding this bond state the same value?".
+#: Maturity, coupon, issuer and denomination are the instrument's and would
+#: agree. Par balance, USD value and percent of portfolio are the fund's own
+#: and would not — three funds reported one ISIN at $1.87bn, $35.0m and
+#: $4.39m, and keying all three to `isin:` left one visible.
+#:
+#: `fairValLevel` and `payoffProfile` sit here for the same reason even
+#: though they rarely differ: the ASC 820 level is the filer's valuation
+#: judgement and the payoff profile is the direction *this* fund took, so
+#: neither is a property of the bond. `exchangeRt` follows `valUSD` because
+#: it is the rate that filer converted at.
+_POSITION_FIELDS: frozenset[str] = frozenset(
+    {"balance", "valUSD", "pctVal", "fairValLevel", "payoffProfile", "exchangeRt"}
+)
 
 
 #: Identifier values that are filers saying "there isn't one". Treated as
@@ -279,12 +297,11 @@ class NportAdapter(SourceAdapter):
             raise ValueError("N-PORT document has no reporting period date")
         period_end = date.fromisoformat(period_raw)
 
-        # Which fund is filing. Only derivative subjects need it — a holding
-        # with an ISIN is keyed by the instrument, which is the same
-        # instrument whoever holds it — so a filing that somehow states
-        # neither still yields all of its cash positions, and loses only the
-        # contracts it cannot attribute. `seriesId` is the fund; `regCik` is
-        # the registrant above it, and is the coarser fallback.
+        # Which fund is filing. Every holding needs it now, not only the
+        # derivatives: an instrument's facts are the same whoever holds it,
+        # but a position's are the filer's own, so `_POSITION_FIELDS` are
+        # keyed to the fund. `seriesId` is the fund; `regCik` is the
+        # registrant above it, and is the coarser fallback.
         fund = (
             _text(root.find(".//n:seriesId", NPORT_NS))
             or _text(root.find(".//n:regCik", NPORT_NS))
@@ -317,13 +334,43 @@ class NportAdapter(SourceAdapter):
                 except ValueError:
                     continue
 
-            # `holding_subject` is bound as a default argument, not captured:
-            # a late-binding closure would attribute every fact to the *last*
+            # Where each fact goes. An instrument subject is shared by every
+            # fund that holds it, so the fund's own numbers cannot live there
+            # — they get a position subject. A derivative is already keyed to
+            # its fund, so it keeps everything on the one subject rather than
+            # being split against itself.
+            #
+            # `position` is resolved once per holding rather than per fact: it
+            # can raise, and it must raise before anything is emitted, not
+            # half way through a holding.
+            try:
+                position = (
+                    subject
+                    if str(subject).startswith("otc:")
+                    else position_subject(fund=fund, instrument=subject)
+                )
+            except ValueError:
+                # The filing names no fund, so its marks cannot be attributed
+                # to one. The instrument's own facts are still true and still
+                # emitted; only the position is dropped.
+                position = None
+
+            # Both subjects are bound as default arguments, not captured: a
+            # late-binding closure would attribute every fact to the *last*
             # holding if these were ever collected and called after the loop.
-            def emit(field: str, value: Any, *, subject: TUID = subject) -> None:
+            def emit(
+                field: str,
+                value: Any,
+                *,
+                subject: TUID = subject,
+                position: TUID | None = position,
+            ) -> None:
+                target = position if field in _POSITION_FIELDS else subject
+                if target is None:
+                    return
                 facts.append(
                     Fact(
-                        subject=subject,
+                        subject=target,
                         field=f"nport:{field}",
                         value=value,
                         effective_from=period_end,

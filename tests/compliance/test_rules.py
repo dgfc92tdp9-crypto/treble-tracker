@@ -256,6 +256,7 @@ class TestAgainstTheStore:
     def _store(tmp_path: Path, rows: list[dict[str, object]]) -> object:
         from datetime import UTC, datetime
 
+        from tests.storebuilder import split_holding
         from treble.core.facts import Fact
         from treble.core.provenance import ExtractionMethod, Provenance
         from treble.store.duck import DuckStore
@@ -274,10 +275,10 @@ class TestAgainstTheStore:
         facts = []
         for row in rows:
             isin = row.pop("isin")
-            for field, value in row.items():
+            for subject, field, value in split_holding(f"isin:{isin}", row):
                 facts.append(
                     Fact(
-                        subject=f"isin:{isin}",
+                        subject=subject,
                         field=field,
                         value=value,
                         effective_from=TODAY,
