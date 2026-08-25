@@ -96,8 +96,8 @@ FACT_PROJECTION = ", ".join(FACT_COLUMNS)
 #:
 #: `knowledge_from DESC` alone is not a total order, and the live store
 #: proved it: **6,766 (subject, field, effective period, knowledge time)
-#: keys held more than one distinct value** when this was written — 13,997
-#: today, against 9.6 million visible facts — so `row_number() ... WHERE
+#: keys held more than one distinct value** when this was written — 7,417
+#: today, against 10.3 million visible facts — so `row_number() ... WHERE
 #: rn = 1` was picking whichever row the storage engine returned first.
 #:
 #: That was invisible until the cold tier reordered rows on disk and the
@@ -111,9 +111,10 @@ FACT_PROJECTION = ", ".join(FACT_COLUMNS)
 #: one thing either, and reading them as one thing cost a wrong fix.
 #:
 #: Some genuinely are multi-valued facts under a key that assumes one
-#: value: `edgar:filing:form` (7,131 today) because a filer can submit an
-#: 8-K and a Form 4 on the same day. Every value is stored; the window
-#: shows one; the remedy is a key that admits several.
+#: value: `edgar:filing:form` (367 today) because a filer can submit an
+#: 8-K and a Form 4 on the same day, and `nport:curCd` (643), the largest
+#: of them. Every value is stored; the window shows one; the remedy is a
+#: key that admits several.
 #:
 #: The GLEIF relationship rows were **not** that, though they were counted
 #: as if they were. One relationship record was written as two facts — the
@@ -128,7 +129,7 @@ FACT_PROJECTION = ", ".join(FACT_COLUMNS)
 #: (`core.entity_graph.relationship_state_field`), 3 partitions remain,
 #: all genuine duplicate filings naming the same counterparty.
 #:
-#: The ~6,065 `gleif:rr:*` partitions still counted here are the
+#: The 6,078 `gleif:rr:*` partitions still counted here are the
 #: superseded two-fact encoding, kept because nothing is deleted from this
 #: store (I2) and read by nothing.
 #:

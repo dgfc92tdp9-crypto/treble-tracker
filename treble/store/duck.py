@@ -403,17 +403,13 @@ class DuckStore:
         is assumed to identify a single value. These hold more than one,
         so `rn = 1` picks and the rest are invisible.
 
-        On the live store there are 13,997 of these against 9.6 million
+        On the live store there are 7,417 of these against 10.3 million
         visible facts. The cause is a modelling gap rather than bad data,
         but **it is not one gap, and the count alone does not say which** —
         reading this number as a single finding is how a key that had been
         split came to be treated as a key that needed splitting further.
 
-        7,131 are `edgar:filing:form`, where a filer submitted more than
-        one form on a day. That is one key holding several values
-        honestly, and it wants a key that admits several.
-
-        ~6,065 are `gleif:rr:*` in the superseded two-fact encoding, where
+        6,078 are `gleif:rr:*` in the superseded two-fact encoding, where
         one relationship record was written as a counterparty fact and a
         separate status fact. That was the opposite problem: not several
         values needing a key, but one record needing to stay together,
@@ -422,6 +418,15 @@ class DuckStore:
         deletes nothing) and nothing reads them; the current encoding puts
         the counterparty in the key and leaves 3, all duplicate filings
         naming the same counterparty.
+
+        The remaining 1,336 are the genuinely multi-valued kind, which
+        wants a key that admits several values rather than one that holds
+        a record together: 643 `nport:curCd`, 367 `edgar:filing:form`
+        (a filer submitted more than one form on a day), 274 DTCC swap
+        metrics (two snapshots of one tenor-day, restated), 51 under
+        `otc:` subjects — `otc:<counterparty>:<derivType>:<status>` does
+        not identify a position, so 46 positions share 8 subjects — and
+        one `ffd:` offering price.
 
         Reported rather than repaired, because the repair is per-field and
         differs by cause, and a store that quietly collapsed them would be
