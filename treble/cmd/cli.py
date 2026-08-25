@@ -35,6 +35,7 @@ from treble.render.server import DEFAULT_HOST, DEFAULT_PORT
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadStore
+from treble.store.storage import maintenance_due, measure, verdict
 from treble.vault.worm import Vault
 
 if TYPE_CHECKING:
@@ -54,6 +55,12 @@ console = Console()
 
 DEFAULT_DATA_DIR = default_data_dir()
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "config" / "universe.yaml"
+
+#: Days of knowledge time left in the hot tier by `compact` and `storage
+#: --fix`. Stated once because the two commands must agree: a `storage
+#: --fix` that compacted more aggressively than `compact` would move facts
+#: an in-flight ingest is still writing beside.
+DEFAULT_KEEP_DAYS = 7
 
 #: ECB daily reference rates for the majors `refresh` keeps current.
 ECB_FX_SERIES = ("D.USD.EUR.SP00.A", "D.GBP.EUR.SP00.A", "D.JPY.EUR.SP00.A")
@@ -465,6 +472,36 @@ def refresh(
         ran += 1
         console.print(f"[green]{source_id}[/]: {written} facts")
     console.print(f"refreshed {ran} of {len(targets)} source(s); run `treble status` to confirm")
+    _maintain(store)
+
+
+def _maintain(store: DuckStore) -> None:
+    """Compact after an ingest, if the hot tier has grown enough to warrant it.
+
+    The store reached 1.2 GB because `compact` was correct, tested, 21x
+    effective and *manual*. Nothing ran it, so every ingest added to a hot
+    tier that never shrank. This is the smallest change that makes that
+    impossible: the command that grows the store is the one that cleans up
+    after it.
+
+    Failures here are reported and swallowed. Compaction is crash-safe by
+    construction — it writes a temporary file, verifies it by hash, and
+    only then renames and deletes — so the worst case is that the store
+    stays large, which is the situation this improves rather than one it
+    creates. Aborting a successful `refresh` because the optional tidy-up
+    failed would lose the ingest that did work.
+    """
+    hot = store.hot_fact_count()
+    if not maintenance_due(hot):
+        return
+    console.print(f"[dim]hot tier at {hot:,} facts — compacting…[/dim]")
+    try:
+        report = store.compact(before=datetime.now(UTC) - timedelta(days=DEFAULT_KEEP_DAYS))
+    except Exception as exc:
+        console.print(f"[yellow]compaction skipped: {type(exc).__name__}: {exc}[/yellow]")
+        return
+    if report.moved_anything:
+        console.print(f"[dim]moved {report.rows_moved:,} settled facts to the cold tier[/dim]")
 
 
 @app.command()
@@ -553,7 +590,9 @@ def universes(
 @app.command()
 def compact(
     data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where the store lives."),
-    keep_days: int = typer.Option(7, help="Days of knowledge time to leave in the hot tier."),
+    keep_days: int = typer.Option(
+        DEFAULT_KEEP_DAYS, help="Days of knowledge time to leave in the hot tier."
+    ),
     namespace: list[str] = typer.Option(
         [], help="Only compact these namespaces. Default: all with settled facts."
     ),
@@ -628,6 +667,77 @@ def compact(
             f"[yellow]Left hot — namespace not a safe file name: "
             f"{', '.join(report.skipped)}[/yellow]"
         )
+
+
+@app.command()
+def storage(
+    data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where the store lives."),
+    fix: bool = typer.Option(False, help="Reclaim what can be reclaimed losslessly."),
+) -> None:
+    """Report what the data directory is using, and what of it is waste.
+
+    Read-only unless `--fix` is passed. `waste` means bytes a documented,
+    lossless command would return — never source data: `payloads/` holds
+    the content-addressed bytes every fact was derived from, and no
+    quantity of them is ever reported as reclaimable.
+
+    The same numbers back `make gate`, so a store that passes here passes
+    there.
+    """
+    report = measure(data_dir)
+    if not report.components:
+        console.print(f"[yellow]Nothing at {data_dir}.[/yellow]")
+        return
+
+    table = Table(title=f"{data_dir}")
+    table.add_column("component")
+    table.add_column("size", justify="right")
+    table.add_column("reclaimable", justify="right")
+    table.add_column("remedy")
+    for component in sorted(report.components, key=lambda c: -c.size):
+        table.add_row(
+            component.name,
+            f"{component.size / 1024 / 1024:,.1f} MB",
+            f"{component.waste / 1024 / 1024:,.1f} MB" if component.waste else "—",
+            component.remedy or "",
+        )
+    console.print(table)
+
+    result = verdict(report)
+    style = "green" if result.ok else "red"
+    console.print(
+        f"[{style}]{report.size / 1024 / 1024:,.1f} MB total, {result.summary}.[/{style}]"
+    )
+    if not fix:
+        if not result.ok:
+            console.print("[yellow]Run `treble storage --fix` to reclaim it.[/yellow]")
+        return
+
+    # Compaction first: it is the lossless one, verified by hash before
+    # anything is deleted. Backups are removed only afterwards, and only
+    # once the live store has answered a query — deleting a copy before
+    # confirming the original reads is the one ordering that can lose data.
+    store = DuckStore(data_dir / "treble.db")
+    before = datetime.now(UTC) - timedelta(days=DEFAULT_KEEP_DAYS)
+    compaction = store.compact(before=before)
+    if compaction.moved_anything:
+        console.print(f"compacted {compaction.rows_moved:,} facts into the cold tier")
+    store.reclaim()
+
+    facts = store.fact_count()
+    console.print(f"[green]store verified: {facts:,} facts readable after reclaim[/green]")
+
+    removed = 0
+    for component in measure(data_dir).wasteful:
+        if component.path.is_file() and component.path.name != "treble.db":
+            size = component.path.stat().st_size
+            component.path.unlink()
+            removed += size
+            console.print(f"removed {component.name} ({size / 1024 / 1024:,.1f} MB)")
+    console.print(
+        f"[green]reclaimed {(report.waste) / 1024 / 1024:,.1f} MB "
+        f"({removed / 1024 / 1024:,.1f} MB of it hand-made copies)[/green]"
+    )
 
 
 @app.command()

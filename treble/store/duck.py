@@ -477,6 +477,18 @@ class DuckStore:
         row = self._conn.execute("select count(*) from all_facts").fetchone()
         return int(row[0]) if row else 0
 
+    def hot_fact_count(self) -> int:
+        """Rows in the hot table alone — what compaction would move.
+
+        Distinct from :meth:`fact_count`, which spans both tiers. This is
+        the one that decides whether an ingest should compact, and reading
+        the combined figure there would compact a freshly compacted store
+        on every run: the cold tier is most of the count and none of the
+        work.
+        """
+        row = self._conn.execute("select count(*) from facts").fetchone()
+        return int(row[0]) if row else 0
+
     def subjects_with_prefix(self, prefix: str, *, as_of: datetime) -> list[TUID]:
         """Subjects in a namespace, sorted.
 
