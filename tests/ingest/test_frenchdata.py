@@ -19,9 +19,11 @@ from treble.core.facts import Fact
 from treble.ingest.base import RawPayload
 from treble.ingest.frenchdata import (
     BASE_URL,
+    CONTACT_ENV,
     DATASETS,
     MISSING,
     FrenchDataAdapter,
+    french_user_agent,
     parse_french_csv,
 )
 from treble.store.ingest_log import IngestLog
@@ -236,3 +238,38 @@ def test_every_declared_dataset_has_a_fixture() -> None:
     nobody has run. The three shipped here are the three declared."""
     missing = sorted(name for name in DATASETS if not (FIXTURES / name).exists())
     assert not missing, f"no offline fixture for: {', '.join(missing)}"
+
+
+class TestUserAgent:
+    """Who the request says it is.
+
+    This was a hardcoded personal address, so every install identified
+    itself as one developer and that address shipped in the repository.
+    """
+
+    def test_it_names_the_configured_contact(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv(CONTACT_ENV, "someone@example.com")
+        assert french_user_agent() == "TrebleTracker/0.1 (someone@example.com)"
+
+    def test_it_falls_back_to_the_edgar_contact(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """One contact for the install, rather than two variables to keep
+        in step. EDGAR's is mandatory, so it is the one likely to be set."""
+        monkeypatch.delenv(CONTACT_ENV, raising=False)
+        monkeypatch.setenv("TREBLE_EDGAR_CONTACT", "edgar@example.com")
+        assert french_user_agent() == "TrebleTracker/0.1 (edgar@example.com)"
+
+    def test_no_contact_still_produces_a_working_agent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Dartmouth does not require a contact, so an unset variable
+        degrades to an unidentified request rather than an error — unlike
+        EDGAR, which refuses one."""
+        monkeypatch.delenv(CONTACT_ENV, raising=False)
+        monkeypatch.delenv("TREBLE_EDGAR_CONTACT", raising=False)
+        assert french_user_agent() == "TrebleTracker/0.1"
+
+    def test_it_never_carries_a_personal_address(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The regression that matters for a public repository."""
+        monkeypatch.delenv(CONTACT_ENV, raising=False)
+        monkeypatch.delenv("TREBLE_EDGAR_CONTACT", raising=False)
+        assert "@" not in french_user_agent()

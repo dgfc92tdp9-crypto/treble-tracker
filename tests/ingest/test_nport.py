@@ -20,7 +20,7 @@ from treble.store.payloads import PayloadStore, payload_hash
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "nport" / "nport_sample.xml"
 FETCHED = datetime(2026, 7, 26, 18, 0, tzinfo=UTC)
-CONTACT = "jack_treble@icloud.com"
+CONTACT = "test@example.com"
 
 
 @pytest.fixture

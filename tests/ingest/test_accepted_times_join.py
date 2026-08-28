@@ -68,7 +68,7 @@ def _parse(tmp_path: Path, accepted: dict[str, datetime] | None) -> tuple:
         PayloadStore(tmp_path / "p"),
         IngestLog(tmp_path / "l.db"),
         ciks=(320193,),
-        contact_email="jack_treble@icloud.com",
+        contact_email="test@example.com",
         accepted=accepted,
     )
     raw = RawPayload(data=COMPANYFACTS, source_uri="https://sec.gov/cf", fetched_at=FETCHED)

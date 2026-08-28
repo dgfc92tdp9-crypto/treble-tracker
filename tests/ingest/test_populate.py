@@ -29,7 +29,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures"
 CONFIG = Path(__file__).parent.parent.parent / "config" / "universe.yaml"
 FETCHED = datetime(2026, 7, 27, 12, 0, tzinfo=UTC)
 START, END = date(2026, 6, 1), date(2026, 7, 24)
-CONTACT = "jack_treble@icloud.com"
+CONTACT = "test@example.com"
 
 
 @pytest.fixture

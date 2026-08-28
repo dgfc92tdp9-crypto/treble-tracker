@@ -44,7 +44,7 @@ def tapi(tmp_path: Path) -> LocalTapi:
         PayloadStore(tmp_path / "p"),
         IngestLog(tmp_path / "l.db"),
         ciks=(51143,),
-        contact_email="jack_treble@icloud.com",
+        contact_email="test@example.com",
     )
     raw = RawPayload(data=COMPANYFACTS.read_bytes(), source_uri="fixture://cf", fetched_at=FETCHED)
     batch = adapter.parse(raw, payload_hash(raw.data))

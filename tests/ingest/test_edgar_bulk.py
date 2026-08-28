@@ -37,7 +37,7 @@ def facts(tmp_path: Path) -> tuple:
         PayloadStore(tmp_path / "p"),
         IngestLog(tmp_path / "l.db"),
         quarters=("2026q1",),
-        contact_email="jack_treble@icloud.com",
+        contact_email="test@example.com",
         ciks=frozenset({IBM}),
     )
     data = ARCHIVE.read_bytes()
@@ -166,7 +166,7 @@ class TestParserIsPure:
             PayloadStore(tmp_path / "p"),
             IngestLog(tmp_path / "l.db"),
             quarters=("2026q1",),
-            contact_email="jack_treble@icloud.com",
+            contact_email="test@example.com",
             ciks=frozenset({IBM}),
         )
         first = adapter.parse(raw, payload_hash(data)).facts
@@ -182,7 +182,7 @@ class TestParserIsPure:
             PayloadStore(tmp_path / "p"),
             IngestLog(tmp_path / "l.db"),
             quarters=("2026q1",),
-            contact_email="jack_treble@icloud.com",
+            contact_email="test@example.com",
             ciks=frozenset({320193}),  # Apple, absent from this fixture
         )
         raw = RawPayload(data=data, source_uri="https://sec.gov/x", fetched_at=FETCHED)

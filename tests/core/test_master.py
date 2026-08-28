@@ -52,7 +52,7 @@ def nport_facts(tmp_path: Path) -> list:
         PayloadStore(tmp_path / "p2"),
         IngestLog(tmp_path / "l2.db"),
         filings=((1484018, "0002000324-26-002035"),),
-        contact_email="jack_treble@icloud.com",
+        contact_email="test@example.com",
     )
     return list(adapter.parse(raw, payload_hash(raw.data)).facts)
 

@@ -27,7 +27,7 @@ FIXTURES = Path(__file__).parent.parent / "fixtures" / "edgar"
 COMPANYFACTS = FIXTURES / "companyfacts_CIK0000051143.json"
 SUBMISSIONS = FIXTURES / "submissions_CIK0000051143.json"
 FETCHED = datetime(2026, 7, 25, 22, 15, tzinfo=UTC)
-CONTACT = "jack_treble@icloud.com"
+CONTACT = "test@example.com"
 
 
 def payload(path: Path) -> RawPayload:

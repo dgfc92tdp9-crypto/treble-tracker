@@ -44,6 +44,7 @@ server hosting a public good, not an API with a published quota.
 from __future__ import annotations
 
 import io
+import os
 import zipfile
 from collections.abc import Iterator
 from datetime import date, datetime
@@ -138,6 +139,27 @@ def parse_french_csv(text: str) -> tuple[list[str], list[tuple[date, list[float 
     return columns, rows
 
 
+#: Environment variable naming whoever is running this install.
+CONTACT_ENV: Final = "TREBLE_CONTACT_EMAIL"
+
+
+def french_user_agent() -> str:
+    """Identify the caller to Ken French's server, if we have been told who.
+
+    This was one developer's personal address, hardcoded — which sent
+    every user's requests under one person's name and put that address in
+    a public repository. Read from the environment instead, falling back
+    to the bare product string.
+
+    Unlike EDGAR, Dartmouth does not require a contact and does not block
+    requests without one, so a missing value degrades to an unidentified
+    but working request rather than an error. Being contactable is still
+    the polite default, which is why it is read at all.
+    """
+    contact = os.environ.get(CONTACT_ENV) or os.environ.get("TREBLE_EDGAR_CONTACT")
+    return f"TrebleTracker/0.1 ({contact})" if contact else "TrebleTracker/0.1"
+
+
 class FrenchDataAdapter(SourceAdapter):
     """Daily factor and industry-portfolio returns.
 
@@ -183,7 +205,7 @@ class FrenchDataAdapter(SourceAdapter):
         self._timeout = timeout
 
     def fetch(self) -> Iterator[RawPayload]:
-        headers = {"User-Agent": "TrebleTracker/0.1 (jack_treble@icloud.com)"}
+        headers = {"User-Agent": french_user_agent()}
         with httpx.Client(timeout=self._timeout, headers=headers) as client:
             for name in self._datasets:
                 self._throttle()

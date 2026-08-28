@@ -40,7 +40,7 @@ pytestmark = [
     ),
 ]
 
-EDGAR_CONTACT = os.environ.get("TREBLE_EDGAR_CONTACT", "jack_treble@icloud.com")
+EDGAR_CONTACT = os.environ.get("TREBLE_EDGAR_CONTACT", "test@example.com")
 SEC_HEADERS = {"User-Agent": f"TrebleTracker/0.1 ({EDGAR_CONTACT})"}
 
 
