@@ -35,6 +35,12 @@ ENTRY_POINTS: dict[str, str] = {
     "treble.plant.kafka": "Transport chosen at deployment, not at import.",
     "treble.ingest.frenchdata": "Adapter run out of band by scripts/backfill_port.py.",
     "treble.ingest.trace": "Adapter run out of band against a downloaded TRACE file.",
+    "treble.store.compare": (
+        "Store-to-store comparison, called by scripts/check_replay.py in the nightly "
+        "deep run. Deliberately not imported by the application: comparing two stores "
+        "is a verification concern, and a comparison the code under test could reach "
+        "is one that can be made to agree with itself."
+    ),
 }
 
 #: Built, tested, and not yet reachable from a screen or service. This is

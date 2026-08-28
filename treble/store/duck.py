@@ -477,6 +477,23 @@ class DuckStore:
         row = self._conn.execute("select count(*) from all_facts").fetchone()
         return int(row[0]) if row else 0
 
+    def close(self) -> None:
+        """Release the database file.
+
+        DuckDB holds an exclusive handle per file per process, so a second
+        connection to the same path — `ATTACH` for a comparison, a rebuild
+        writing where a reader is still open — fails with a file-handle
+        conflict rather than blocking. Every caller that opens two stores
+        and then compares them needs this, and its absence was found by
+        exactly that: the replay comparison could not attach a store the
+        same process had written.
+
+        Idempotent, and the object is not reusable afterwards. Reopening is
+        `DuckStore(path)`, which is cheap — the TEMP view is rebuilt at
+        every connect anyway.
+        """
+        self._conn.close()
+
     def hot_fact_count(self) -> int:
         """Rows in the hot table alone — what compaction would move.
 

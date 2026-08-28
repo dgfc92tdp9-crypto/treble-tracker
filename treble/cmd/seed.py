@@ -139,6 +139,13 @@ def _ingest(
         source_uri=source_uri,
         fetched_at=CAPTURED_AT,
         parser_version=adapter.parser_version,
+        # Same as `run()` records. Neither seeded adapter needs any today,
+        # so this is `{}` rather than `None` — and that distinction is the
+        # point: `{}` says the adapter was asked and needed nothing, which
+        # is what makes a seeded store replayable. Omitting it would write
+        # `None`, meaning "nobody asked", and a seeded install would report
+        # itself unconfigured for ever.
+        parse_config=adapter.parse_config(),
     )
     batch = adapter.parse(
         RawPayload(data=data, source_uri=source_uri, fetched_at=CAPTURED_AT),

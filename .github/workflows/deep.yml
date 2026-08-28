@@ -54,6 +54,18 @@ jobs:
           path: .hypothesis/examples
           key: hypothesis-examples-${{ github.run_id }}
 
+      # I5 end to end: seed from recorded fixtures through the real
+      # adapters, replay the log, require the two stores identical on all
+      # twelve fact columns. Offline by construction — a replay that
+      # reached the network would not be a replay.
+      #
+      # Exact, with no allowances. The live-store comparison in ADR-0010
+      # needed them (superseded parser output, renamed sources) and is
+      # therefore a diagnostic rather than a gate: a check whose expected
+      # answer gets edited to match the observed one has stopped checking.
+      - name: Replay round trip (I5)
+        run: uv run python scripts/check_replay.py
+
       # Network is allowed here (unlike the per-commit suite, which is
       # offline by contract). Failures mean a source changed shape.
       - name: Fixture drift
