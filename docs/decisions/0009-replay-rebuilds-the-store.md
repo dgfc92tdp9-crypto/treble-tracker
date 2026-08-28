@@ -107,10 +107,12 @@ arguments that changed what `parse` did with the bytes.
 
 ## What is still not proved
 
-Replay reconstructs **adapter-derived facts**. The live store also holds facts
-produced by derivation steps that run over those facts — the entity graph, the
-security master — and `rebuild` does not run them. A full reconstruction is
-replay followed by those steps, and the second half has not been measured. The
-live store's 14.5M facts against replay's 6.1M is mostly the three unreplayable
-sources plus superseded parser output, but "mostly" is doing real work in that
-sentence and it has not been decomposed.
+*(Superseded by the full replay in ADR-0010, which decomposed this.)*
+
+This ADR worried that the live store held facts produced by derivation steps —
+the entity graph, the security master — that `rebuild` does not run. **Measured:
+it does not.** All 14,525,794 facts join to one of eighteen adapter provenance
+records; zero have any other origin. Those modules compute at read time and
+store nothing, exactly as their docstrings say. The concern was real to raise
+and turned out to be unfounded, which is why it was written down rather than
+assumed either way.

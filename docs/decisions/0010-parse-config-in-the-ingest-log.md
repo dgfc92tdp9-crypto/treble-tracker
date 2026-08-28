@@ -82,8 +82,52 @@ not an error, and not a success either.
   because it looks reproducible. Both are stated in the base class docstring;
   neither is enforced by a type.
 
+## The full replay, measured
+
+All 488 payloads, all nineteen adapters, into an empty store: **13,845,567
+facts in 360s with no network**, against a live store of 14,525,794.
+
+| | facts | |
+|---|---|---|
+| bit-identical, all twelve columns | 3,639,527 | 9 sources |
+| identical content, hash-equal, provenance renamed | 8,066,887 | `edgar`, `ecb-fx`, `treasury-auctions` |
+| reproduced inside a diverged source | 812,381 | `gleif-rr`, `sec-nport`, `dtcc-sdr` |
+| **total live facts reproduced** | **12,518,795** | **86.2%** |
+
+The 2,006,999 not reproduced decompose completely:
+
+| cause | facts | should replay reproduce it? |
+|---|---|---|
+| `gleif-rr` superseded two-fact encoding (1,326,084 `:status` + 663,380 bare) | 1,989,464 | No — the parser was re-keyed to `:state` |
+| `sec-nport` pre-currency-fix output | 14,915 | No — the parser was corrected |
+| `dtcc-sdr` report-window change | 274 | No — same |
+| `gleif-isin`, replayed unconfigured | 2,346 | **Yes, and it cannot** |
+
+**2,004,653 of 2,006,999 are superseded parser output**, which I2 keeps and a
+fresh replay is right not to reproduce. The only irreproducible facts in the
+store are 2,346 `gleif-isin` facts — 0.016%.
+
+### `edgar` reproduced exactly despite being flagged unconfigured
+
+`edgar-bulk` has no recorded CIK filter, so replay ran it with the `None`
+default and produced 7,452,279 facts across 7,331 subjects. With companyfacts
+and submissions that is 7,995,758 — equal to live on both count and hash.
+The original ingest also ran unfiltered.
+
+The flag is still right. `unconfigured` claims *we never recorded this*, which
+is a statement about what is known, not a prediction that the output is wrong.
+The comparison is what establishes the outcome matched, and the two claims are
+worth keeping separate: if the universe config had named a CIK subset, the same
+flag would have preceded a real divergence.
+
 ## What is still not proved
 
-Unchanged from ADR-0009: `rebuild` re-derives adapter facts, not the entity
-graph or the security master that run over them. A full reconstruction is
-replay plus those steps, and the second half has not been measured.
+Nothing outstanding on reconstruction. ADR-0009 worried that derivation steps —
+the entity graph, the security master — wrote facts `rebuild` would miss.
+Measured: all 14,525,794 live facts carry adapter provenance and none has
+another origin; those modules compute at read time and store nothing.
+
+What remains is a *practice* rather than a proof: nothing runs this comparison
+on a schedule, so it is a measurement taken once rather than a gate. The store
+is large enough that a full replay is a six-minute job, which is too slow for
+`make gate` and well within reach of the nightly deep run.
