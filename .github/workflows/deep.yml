@@ -12,8 +12,15 @@
 #     against the recorded fixture, so a feed changing shape is reported
 #     the week it happens rather than discovered through wrong numbers.
 #
-# Runs nightly on the free ubuntu runner (~5 min/night of the 2000 free
-# monthly minutes) and on demand.
+# Runs nightly on the free ubuntu runner and on demand. Free and unmetered
+# since the repository went public.
+#
+# Verification steps carry `if: '!cancelled()'` so they all report. This is
+# a diagnostic job, not a gate: the first failure stopping the rest is what
+# turned one missing protobuf stub into "the nightly is red" with the
+# replay check, the drift check and the dependency audit never run and
+# nothing said which of them would have passed. Setup steps deliberately do
+# not carry it — running tests after a failed install is noise, not data.
 name: deep
 
 on:
@@ -33,9 +40,59 @@ jobs:
           uv venv --python 3.12
           uv pip install -e ".[dev]"
 
+      # The gRPC stubs are generated from proto/tapi.proto and deliberately
+      # not committed, so a clean checkout has none and
+      # `tests/tapi/test_grpc.py` fails at *collection* — which aborts the
+      # whole run before a single property test executes.
+      #
+      # This job ran `pytest` directly while `ci.yml` ran `make check`
+      # (= proto tools lint types imports web test), so only one of the two
+      # built what the suite needs. It went unnoticed because the deep run
+      # had been blocked at the billing gate for days, and because the
+      # stubs exist on any developer machine that has ever run `make proto`.
+      # `ci.yml` already carries the comment "an unstated environment
+      # assumption is how `make proto` stayed broken on every clean
+      # checkout"; this was the same assumption, one workflow over.
+      - name: Generate gRPC stubs
+        run: make proto
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache brokers
+        uses: actions/cache@v4
+        with:
+          path: .tools
+          key: brokers-${{ runner.os }}-nats2.14.4-kafka3.9.1
+
+      # `tests/plant/conftest.py` refuses to skip when a broker is absent,
+      # so the transport tests fail rather than quietly verifying nothing.
+      # The collection error above was hiding this second missing piece.
+      - name: Broker binaries
+        run: make tools
+
+      # I5 end to end: seed from recorded fixtures through the real
+      # adapters, replay the log, require the two stores identical on all
+      # twelve fact columns. Offline by construction — a replay that
+      # reached the network would not be a replay.
+      #
+      # Exact, with no allowances. The live-store comparison in ADR-0010
+      # needed them (superseded parser output, renamed sources) and is
+      # therefore a diagnostic rather than a gate: a check whose expected
+      # answer gets edited to match the observed one has stopped checking.
+      #
+      # Runs *before* the long property run because it takes three seconds
+      # and needs nothing the property run needs. Ordered by what a reader
+      # of a red run wants first, not by importance.
+      - name: Replay round trip (I5)
+        run: uv run python scripts/check_replay.py
+
       # Persist Hypothesis's example database between runs: found
       # counterexamples are replayed on every subsequent run, forever.
       - name: Restore Hypothesis example database
+        if: '!cancelled()'
         uses: actions/cache/restore@v4
         with:
           path: .hypothesis/examples
@@ -43,6 +100,7 @@ jobs:
           restore-keys: hypothesis-examples-
 
       - name: Deep property run
+        if: '!cancelled()'
         env:
           HYPOTHESIS_PROFILE: deep
         run: uv run pytest -q -p no:randomly
@@ -54,27 +112,17 @@ jobs:
           path: .hypothesis/examples
           key: hypothesis-examples-${{ github.run_id }}
 
-      # I5 end to end: seed from recorded fixtures through the real
-      # adapters, replay the log, require the two stores identical on all
-      # twelve fact columns. Offline by construction — a replay that
-      # reached the network would not be a replay.
-      #
-      # Exact, with no allowances. The live-store comparison in ADR-0010
-      # needed them (superseded parser output, renamed sources) and is
-      # therefore a diagnostic rather than a gate: a check whose expected
-      # answer gets edited to match the observed one has stopped checking.
-      - name: Replay round trip (I5)
-        run: uv run python scripts/check_replay.py
-
       # Network is allowed here (unlike the per-commit suite, which is
       # offline by contract). Failures mean a source changed shape.
       - name: Fixture drift
+        if: '!cancelled()'
         env:
           TREBLE_CHECK_DRIFT: "1"
           TREBLE_EDGAR_CONTACT: ${{ secrets.TREBLE_EDGAR_CONTACT }}
         run: uv run pytest -q -m drift
 
       - name: Dependency audit
+        if: '!cancelled()'
         run: uv run pip-audit --skip-editable
 
       # Mutation testing does not currently work here (five structural
