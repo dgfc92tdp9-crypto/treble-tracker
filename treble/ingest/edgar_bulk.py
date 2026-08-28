@@ -40,8 +40,9 @@ from __future__ import annotations
 import csv
 import io
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from datetime import UTC, date, datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -148,6 +149,18 @@ class EdgarBulkFinancialsAdapter(SourceAdapter):
         #: None means every filer in the archive. A subset keeps the dev
         #: universe cheap without changing what is parsed for the full run.
         self._ciks = ciks
+
+    def parse_config(self) -> dict[str, Any]:
+        """The CIK filter, which decides what comes out of identical bytes.
+
+        A replay without it produced a *superset* of the original ingest —
+        every filer in the archive rather than the universe's. Sorted so two
+        runs with the same set record the same JSON."""
+        return {"ciks": None if self._ciks is None else sorted(self._ciks)}
+
+    def apply_parse_config(self, config: Mapping[str, Any]) -> None:
+        ciks = config.get("ciks")
+        self._ciks = None if ciks is None else frozenset(int(c) for c in ciks)
 
     def fetch(self) -> Iterator[RawPayload]:
         from treble.ingest.edgar import edgar_user_agent

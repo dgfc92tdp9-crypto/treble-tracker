@@ -716,6 +716,16 @@ def replay(
             f"[red]No adapter for: {', '.join(report.unclaimed)} — "
             "these payloads can no longer be re-derived.[/red]"
         )
+    for degraded in report.unconfigured:
+        # Not an error and not a success. These entries predate the log's
+        # `parse_config` column, so the filter their parse needed was never
+        # recorded and the facts above are today's default rather than what
+        # the original run produced.
+        console.print(
+            f"[yellow]{degraded.source}: {degraded.unconfigured} of {degraded.entries} "
+            "payload(s) had no recorded parse config — replayed with the default, "
+            "so these facts are not what the original ingest produced.[/yellow]"
+        )
     for source_id, seq, message in report.failures:
         console.print(f"[yellow]{source_id} seq {seq}: {message}[/yellow]")
     if not report.ok:

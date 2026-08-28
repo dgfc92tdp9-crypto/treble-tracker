@@ -76,7 +76,7 @@ values at the earlier knowledge times they were genuinely observed at, which is
 what I2 asks for. No query answer changes: the visibility window returns the
 latest, which both stores hold.
 
-### Three adapters cannot replay at all
+### Three adapters could not replay at all (fixed — ADR-0010)
 
 Found by `parse_only` raising, and pinned in `tests/ingest/test_replay.py`:
 
@@ -91,13 +91,8 @@ configuration the ingest log does not record.** The log holds `source`,
 `payload_hash`, `source_uri`, `fetched_at`, `parser_version` — and none of the
 arguments that changed what `parse` did with the bytes.
 
-The fix is to record parse-affecting configuration in the log alongside the
-payload hash. It is not done here, and doing it later will not help the 488
-entries already written: their configuration was never captured. For those,
-`edgar-bulk` and `gleif-isin` are recoverable in principle (the filter only
-ever narrowed, so the payloads hold at least what was stored) and
-`edgar-companyfacts` is not, because the acceptance times live in another
-source's payloads and the join was done in memory.
+**Fixed in ADR-0010.** Two of the three record their configuration in a new
+`parse_config` column; the third derives it and needed no column at all.
 
 ## Consequences
 
@@ -106,9 +101,9 @@ source's payloads and the join was done in memory.
   to call `payloads/` reclaimable; this is the evidence for that refusal.
 - `treble replay` exits non-zero when it could not re-derive everything. A
   replay that quietly skipped a source would report success on a smaller store.
-- `CANNOT_REPLAY` in the tests is a backlog that should shrink. An adapter
-  added with a fetch-dependent `parse` lands there, and the test that pins the
-  set is where it gets noticed.
+- `NEEDS_RECORDED_CONFIG` in the tests is a backlog that should shrink. An
+  adapter added with a fetch-dependent `parse` lands there, and the test that
+  pins the set is where it gets noticed.
 
 ## What is still not proved
 

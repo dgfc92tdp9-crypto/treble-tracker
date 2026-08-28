@@ -121,6 +121,14 @@ class SourceReplay:
     #: report instead of just writing.
     failures: tuple[tuple[int, str], ...] = ()
 
+    #: Entries replayed without the configuration `parse` needed, because
+    #: they were written before the log recorded any. The facts came out,
+    #: but they are what *today's default* produces rather than what the
+    #: original run did — a `gleif-isin` entry with no recorded ISIN filter
+    #: yields nothing at all. Counted separately from `failures` because it
+    #: is not an error and must not be read as success either.
+    unconfigured: int = 0
+
     @property
     def ok(self) -> bool:
         return not self.failures
@@ -147,12 +155,28 @@ class ReplayReport:
         return sum(s.entries for s in self.sources)
 
     @property
+    def unconfigured(self) -> tuple[SourceReplay, ...]:
+        """Sources replayed without configuration their parse needed."""
+        return tuple(s for s in self.sources if s.unconfigured)
+
+    @property
     def ok(self) -> bool:
         return not self.unclaimed and all(s.ok for s in self.sources)
 
     @property
     def failures(self) -> tuple[tuple[str, int, str], ...]:
         return tuple((s.source, seq, message) for s in self.sources for seq, message in s.failures)
+
+
+def needs_config(cls: type[SourceAdapter]) -> bool:
+    """Whether this adapter's `parse` reads anything beyond its payload.
+
+    Detected by the class overriding `parse_config`, not by calling it: a
+    `parse_only` instance has no `__init__` state, so calling it would raise
+    exactly where the question is being asked. Three of nineteen override
+    it; the rest parse their bytes and nothing else.
+    """
+    return cls.parse_config is not SourceAdapter.parse_config
 
 
 def logged_sources(log: IngestLog) -> tuple[str, ...]:
@@ -185,6 +209,10 @@ def replay_source(
         if entry.source != source_id:
             continue
         try:
+            # Before parse, and per entry: two runs of one source can have
+            # been configured differently, so the config belongs to the log
+            # row rather than to the adapter.
+            adapter.apply_parse_config(entry.parse_config or {})
             data = payloads.get(entry.payload_hash)
             payload = RawPayload(
                 data=data,
@@ -233,8 +261,13 @@ def rebuild(
             continue
         entries = facts = provenance = 0
         failures: list[tuple[int, str]] = []
+        wants_config = needs_config(cls)
+        unrecorded = {e.seq for e in log.read(up_to_seq=up_to_seq) if e.parse_config is None}
+        unconfigured = 0
         for seq, result in replay_source(source_id, cls, payloads, log, up_to_seq=up_to_seq):
             entries += 1
+            if wants_config and seq in unrecorded:
+                unconfigured += 1
             if isinstance(result, Exception):
                 failures.append((seq, f"{type(result).__name__}: {result}"))
                 continue
@@ -249,6 +282,7 @@ def rebuild(
                 facts=facts,
                 provenance=provenance,
                 failures=tuple(failures),
+                unconfigured=unconfigured,
             )
         )
         if on_source is not None:
@@ -261,6 +295,7 @@ __all__ = [
     "SourceReplay",
     "adapter_classes",
     "logged_sources",
+    "needs_config",
     "parse_only",
     "rebuild",
     "replay_source",

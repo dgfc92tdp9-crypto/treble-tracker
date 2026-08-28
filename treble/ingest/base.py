@@ -16,8 +16,9 @@ from __future__ import annotations
 import threading
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -112,9 +113,29 @@ class SourceAdapter(ABC):
         (e.g. EDGAR ``accepted``) or, failing that, ``payload.fetched_at`` —
         never from the wall clock."""
 
+    def parse_config(self) -> dict[str, Any]:
+        """Configuration ``parse`` reads beyond the payload, recorded in the log.
+
+        Empty for most adapters, because `parse` is meant to be a pure
+        function of its payload. Three were not: a CIK filter, an ISIN
+        filter and a map of acceptance times decided what came out of
+        identical bytes, and none of it was written down — so the store
+        could not be rebuilt from the log (ADR-0009).
+
+        Anything returned here must be JSON-serialisable and must round-trip
+        through :meth:`apply_parse_config`. Overriding one without the other
+        gives a log that records configuration replay then ignores, which is
+        worse than not recording it: it looks reproducible and is not.
+        """
+        return {}
+
+    def apply_parse_config(self, config: Mapping[str, Any]) -> None:  # noqa: B027
+        """Restore what :meth:`parse_config` recorded, before ``parse`` runs."""
+
     def run(self) -> Iterator[ParsedBatch]:
         """Fetch, store raw (I5), log, then parse. The ordering is the
         invariant; subclasses cannot reorder it."""
+        config = self.parse_config()
         for payload in self.fetch():
             key = self._payloads.put(payload.data)
             self._log.append(
@@ -123,6 +144,7 @@ class SourceAdapter(ABC):
                 source_uri=payload.source_uri,
                 fetched_at=payload.fetched_at,
                 parser_version=self.parser_version,
+                parse_config=config,
             )
             yield self.parse(payload, key)
 

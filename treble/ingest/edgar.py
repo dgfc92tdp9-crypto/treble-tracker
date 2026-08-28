@@ -32,7 +32,7 @@ import json
 import re
 from collections.abc import Iterator, Mapping
 from datetime import UTC, date, datetime, time
-from typing import Any
+from typing import Any, ClassVar
 
 import httpx
 
@@ -112,6 +112,49 @@ class EdgarCompanyFactsAdapter(SourceAdapter):
         #: submissions are ingested, falling back to the coarser date.
         self._accepted: Mapping[str, datetime] = accepted or {}
 
+    #: Class-level fallback so an instance built by `replay.parse_only` —
+    #: which does not call `__init__` — resolves acceptance times from the
+    #: stored submissions payloads instead of raising. Not a silent default:
+    #: `_acceptance_times` derives the same mapping `Populator` injects, from
+    #: the same bytes, so replay reproduces the original knowledge dates
+    #: rather than degrading to filing-date resolution.
+    _accepted_cache: ClassVar[dict[str, Mapping[str, datetime]]] = {}
+
+    def _acceptance_times(self, payload: RawPayload) -> Mapping[str, datetime]:
+        """accession -> acceptance time for the filer this payload belongs to.
+
+        Prefers the mapping `Populator` injected, which is the same data and
+        saves re-reading the submissions payloads. Falls back to deriving it
+        from the ingest log, which is what makes this adapter replayable:
+        the acceptance times live in *another source's* payloads
+        (`edgar-submissions`), and those are stored, so nothing has to be
+        recorded in `parse_config` and even the 108 pre-existing entries
+        replay correctly.
+
+        Returns empty when submissions have not been ingested, which is the
+        documented degradation to filing-date resolution rather than a
+        failure.
+        """
+        injected: Mapping[str, datetime] = getattr(self, "_accepted", None) or {}
+        if injected:
+            return injected
+
+        match = re.search(r"CIK(\d{10})", payload.source_uri)
+        if match is None:
+            return {}
+        marker = f"CIK{match.group(1)}"
+        cached = type(self)._accepted_cache.get(marker)
+        if cached is not None:
+            return cached
+
+        merged: dict[str, datetime] = {}
+        for entry in self._log.read():
+            if entry.source != "edgar-submissions" or marker not in entry.source_uri:
+                continue
+            merged.update(accepted_times(self._payloads.get(entry.payload_hash)))
+        type(self)._accepted_cache[marker] = merged
+        return merged
+
     def fetch(self) -> Iterator[RawPayload]:
         headers = {"User-Agent": self._user_agent, "Accept-Encoding": "gzip"}
         with httpx.Client(timeout=60.0, headers=headers) as client:
@@ -123,6 +166,7 @@ class EdgarCompanyFactsAdapter(SourceAdapter):
                 yield RawPayload(data=response.content, source_uri=url, fetched_at=utcnow())
 
     def parse(self, payload: RawPayload, payload_hash: PayloadHash) -> ParsedBatch:
+        acceptance = self._acceptance_times(payload)
         doc: dict[str, Any] = json.loads(payload.data)
         cik = doc.get("cik")
         if cik is None:
@@ -153,7 +197,7 @@ class EdgarCompanyFactsAdapter(SourceAdapter):
                         # old behaviour when submissions have not been
                         # ingested, at the old resolution.
                         accession = row.get("accn")
-                        known = self._accepted.get(accession) if accession else None
+                        known = acceptance.get(accession) if accession else None
                         facts.append(
                             Fact(
                                 subject=subject,

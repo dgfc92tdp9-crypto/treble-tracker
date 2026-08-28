@@ -38,9 +38,9 @@ from __future__ import annotations
 import io
 import json
 import zipfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from datetime import UTC
-from typing import Final
+from typing import Any, Final
 
 import httpx
 
@@ -108,6 +108,15 @@ class GleifIsinLeiAdapter(SourceAdapter):
         super().__init__(payloads, log)
         self._isins = frozenset(i.strip().upper() for i in isins if i.strip())
         self._timeout = timeout
+
+    def parse_config(self) -> dict[str, Any]:
+        """The ISIN filter. Unlike `edgar-bulk`'s there is no "None means
+        all" escape, so a replay without it produced *zero* facts from a
+        payload holding millions of rows."""
+        return {"isins": sorted(self._isins)}
+
+    def apply_parse_config(self, config: Mapping[str, Any]) -> None:
+        self._isins = frozenset(str(i).strip().upper() for i in config.get("isins", ()))
 
     def fetch(self) -> Iterator[RawPayload]:
         with httpx.Client(timeout=self._timeout, follow_redirects=True) as client:
