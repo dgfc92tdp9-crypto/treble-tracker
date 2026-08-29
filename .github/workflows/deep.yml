@@ -15,12 +15,22 @@
 # Runs nightly on the free ubuntu runner and on demand. Free and unmetered
 # since the repository went public.
 #
-# Verification steps carry `if: '!cancelled()'` so they all report. This is
-# a diagnostic job, not a gate: the first failure stopping the rest is what
-# turned one missing protobuf stub into "the nightly is red" with the
-# replay check, the drift check and the dependency audit never run and
-# nothing said which of them would have passed. Setup steps deliberately do
-# not carry it — running tests after a failed install is noise, not data.
+# **Every verification step carries `if: '!cancelled()'`; no setup or build
+# step does.** This is a diagnostic job, not a gate: the first failure
+# stopping the rest is what turned one missing protobuf stub into "the
+# nightly is red" with the replay check, the drift check and the dependency
+# audit never run and nothing saying which of them would have passed.
+#
+# Setup and builds fail fast on purpose — a property run after a failed
+# install reports nothing you did not already know. Verification steps
+# always run, because "which of these would have passed" is the entire
+# question a nightly job exists to answer.
+#
+# `continue-on-error` is not a substitute and the mutation step proved it:
+# that flag stops a failure failing the *run*, and does nothing about
+# whether the step *executes* after an earlier failure. The one step whose
+# purpose is to notice that a known-failing thing started working was being
+# skipped on precisely the nights something ahead of it was red.
 name: deep
 
 on:
@@ -97,7 +107,14 @@ jobs:
       # Runs *before* the long property run because it takes three seconds
       # and needs nothing the property run needs. Ordered by what a reader
       # of a red run wants first, not by importance.
+      #
+      # Conditioned like the other verification steps even though it comes
+      # first, because it depends on none of the three builds above: a
+      # flaky broker download or a Node hiccup has nothing to do with
+      # whether a replay reproduces a store, and skipping this on that
+      # basis would discard a real signal for an unrelated reason.
       - name: Replay round trip (I5)
+        if: '!cancelled()'
         run: uv run python scripts/check_replay.py
 
       # Persist Hypothesis's example database between runs: found
@@ -142,7 +159,16 @@ jobs:
       # Hypothesis change, or a config insight shows up as a green step
       # instead of being rediscovered by hand months later. If this ever
       # passes, promote it to a required step and record the kill rate.
+      #
+      # `continue-on-error` and `if` do different jobs and this step needs
+      # both. The first stops a failure here failing the run; it does not
+      # make the step *execute* when something earlier failed. Without the
+      # condition, the one step whose entire purpose is to notice that a
+      # known-failing thing started working is skipped on exactly the
+      # nights when anything ahead of it is red — and a step that reports
+      # "skipped" for months reads the same as one that has nothing to say.
       - name: Mutation testing (known-failing; attempted to detect a fix)
+        if: '!cancelled()'
         continue-on-error: true
         run: |
           PYTEST_ADDOPTS="--no-cov -m 'not drift'" timeout 1800 uv run mutmut run
