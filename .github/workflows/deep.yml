@@ -56,6 +56,17 @@ jobs:
       - name: Generate gRPC stubs
         run: make proto
 
+      # The conformance suite refuses to skip when the web renderer is not
+      # built (tests/conformance/framework.py), so it fails rather than
+      # quietly verifying one renderer instead of two. Third piece `make
+      # check` builds and this job did not — the stub error was hiding it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build the web renderer
+        run: make web
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

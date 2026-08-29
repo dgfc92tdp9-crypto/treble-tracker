@@ -1,7 +1,22 @@
 """Every adapter the universe declares must have actually run.
 
-Marked `drift` because it inspects the live install rather than a fixture,
-so CI (fixture-only and offline) does not run it. `make drift` does.
+Marked `drift` because it inspects **the live install** rather than a
+fixture. That is a different requirement from the rest of the `drift` mark,
+which re-fetches sources over the network: those run anywhere with a network
+and a contact email, and these run only where someone has populated a store.
+
+The distinction used to be invisible because only `make drift` and the
+offline per-commit suite existed, and the docstring said "CI does not run
+it". Then the nightly job started running `pytest -m drift` and this module
+crashed with `IOException: Cannot open file .../data/ingest.db` — there is
+no live install on a fresh runner, and never will be.
+
+So it skips when there is no ingest log, loudly and with the reason. The
+skip is narrow on purpose: the file existing is what this checks *against*,
+so anywhere a store has been populated — every developer machine, `make
+drift` — the assertions below still run and can still fail. A blanket skip
+would turn the whole module into a check that cannot fail, which is the
+thing it was written to prevent.
 
 **Why it exists.** The Phase 1 investor audit found `gleif`, `openfigi` and
 `nport` built, unit-tested, and never once executed against a live payload.
@@ -24,11 +39,25 @@ from treble.cmd.cli import DEFAULT_CONFIG, DEFAULT_DATA_DIR
 from treble.core.universe import load_universe_config, plan_steps
 from treble.store.ingest_log import IngestLog
 
-pytestmark = pytest.mark.drift
+#: The live install's log. Absent on a CI runner, present on any machine
+#: that has run `treble populate` or `treble init`.
+_LOG_PATH = Path(DEFAULT_DATA_DIR) / "ingest.db"
+
+pytestmark = [
+    pytest.mark.drift,
+    pytest.mark.skipif(
+        not _LOG_PATH.is_file(),
+        reason=(
+            f"no ingest log at {_LOG_PATH}: these assertions inspect a populated "
+            "install, which a fresh checkout does not have. Run `treble populate` "
+            "or use `make drift` on a real install."
+        ),
+    ),
+]
 
 
 def _sources_run() -> set[str]:
-    log = IngestLog(Path(DEFAULT_DATA_DIR) / "ingest.db")
+    log = IngestLog(_LOG_PATH)
     return {entry.source for entry in log.read()}
 
 
