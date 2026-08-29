@@ -58,8 +58,13 @@ audit:                ## dependency vulnerability scan (network; CI + local, not
 deep:                 ## nightly-equivalent property run (2000 examples/property)
 	HYPOTHESIS_PROFILE=deep uv run pytest -q
 
+# `--no-cov` because `addopts` carries `--cov-fail-under=84`, which is a
+# statement about the whole suite. Applied to the handful of drift tests it
+# measures 16% and fails every time — so this target could never pass, and
+# nothing noticed because the one place it ran hit an EDGAR 403 first and
+# reported that instead.
 drift:                ## live source schema check — fails when a feed changes shape
-	TREBLE_CHECK_DRIFT=1 uv run pytest -q -m drift
+	TREBLE_CHECK_DRIFT=1 uv run pytest -q -m drift --no-cov
 
 mutate:               ## mutation testing: proves the suite detects damage. Slow.
 	uv run mutmut run   # scope configured in pyproject [tool.mutmut]

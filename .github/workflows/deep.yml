@@ -142,12 +142,18 @@ jobs:
 
       # Network is allowed here (unlike the per-commit suite, which is
       # offline by contract). Failures mean a source changed shape.
+      #
+      # `--no-cov` for the reason the `drift` make target now states: the
+      # 84% floor in `addopts` describes the whole suite, and a subset of
+      # four tests measures 16%. Without it this step fails whatever the
+      # sources say, which is what it did the moment the EDGAR 403 stopped
+      # failing first — one broken check standing in front of another.
       - name: Fixture drift
         if: '!cancelled()'
         env:
           TREBLE_CHECK_DRIFT: "1"
           TREBLE_EDGAR_CONTACT: ${{ secrets.TREBLE_EDGAR_CONTACT }}
-        run: uv run pytest -q -m drift
+        run: uv run pytest -q -m drift --no-cov
 
       - name: Dependency audit
         if: '!cancelled()'
