@@ -986,8 +986,13 @@ quantifying that, say what the count measures: "fields not written" and
 ## Continuous verification (standing requirement, Jack 2026-07-26)
 
 "Make sure holes are always found, even after their creation." Write-time checks are not
-enough — these six must exist and stay in place. **Never remove or weaken them; when adding
+enough — these eight must exist and stay in place. **Never remove or weaken them; when adding
 an external source, add its fixture-drift check at the same time.**
+
+> **A mechanism that exists is not a mechanism that runs.** Three of the eight below were
+> ticked and structurally incapable of reporting success — see "CI outage and six defects"
+> at the end of this section. When adding a mechanism here, tick it only once it has been
+> observed both to **pass** and to **fail**, and record where each was seen.
 
 - [x] **Scheduled deep CI run** — `.github/workflows/deep.yml`, nightly 03:17 UTC, Hypothesis
       `deep` profile at 2000 examples/property (`make deep` locally). This is how the
@@ -998,7 +1003,19 @@ an external source, add its fixture-drift check at the same time.**
       gated on `TREBLE_CHECK_DRIFT=1` so the offline contract holds for the normal suite.
       Compares live *schema* (not values) against every recorded fixture across all seven
       feeds. **When adding a source, add its drift check in the same commit.**
-- [x] **Coverage floor in CI** — `--cov-fail-under=84` in pytest addopts (measured 89.42%);
+      **Was broken from birth and ticked for 33 days (fixed 2026-08-29, a9ea2fb).** The
+      coverage floor and this drift target were added in the *same commit* — 3bbda6d,
+      2026-07-27 00:13, "Continuous verification: nightly deep run, fixture drift, coverage
+      floor, mutation testing" — so `make drift` has never once exited 0. `addopts` carries
+      `--cov-fail-under=84`, a statement about the whole suite; `pytest -m drift` runs four
+      tests and measures 16–39%, so *both* call sites — the `drift` make target and the
+      nightly step — failed on coverage whatever the live sources said. The one place it ran
+      automatically hit an EDGAR 403 first and reported that instead, so the second failure
+      was invisible until the first was fixed. `--no-cov` at both sites; `make drift` then
+      exited 0 against live sources for the first time. Observed passing (run 33265954132)
+      and failing (reproduced locally at 15.83%).
+- [x] **Coverage floor in CI** — `--cov-fail-under=84` in pytest addopts (measured 90.00% on
+      2026-08-29, 162 modules, none unmeasured);
       untested new code cannot land (would have caught the renamed-but-unexercised
       `TraceCredentialsMissing` call sites)
 - [ ] **Mutation testing — NOT ACHIEVED with mutmut 3.x. Do not sink more time into it
@@ -1024,17 +1041,108 @@ an external source, add its fixture-drift check at the same time.**
       `continue-on-error` step (Jack's instruction, 2026-07-27 — this is a genuine issue, not
       one to drop). A green step there means the blocker has lifted; promote it to required
       and record the kill rate at that point.
+      **That signal did not work until 2026-08-29 (e1bc1c0).** Two faults: the step had no
+      `if:` condition, so it was skipped on any night something ahead of it failed — and
+      `continue-on-error` reports `conclusion: success` regardless of the real result, so the
+      night mutmut finally worked would have looked identical to every night before it. It now
+      carries `if: '!cancelled()'` and a follow-up step that reads `steps.mutation.outcome` and
+      emits `::warning::` on the run summary when it passes. Verified: run 33266469796 printed
+      "mutation testing still failing as expected", with GitHub substituting the real value
+      into the condition (`if [ "failure" = "success" ]`).
 - [x] **`pip-audit` in CI** — dependency vulnerabilities disclosed after shipping
+- [x] **Replay round trip (I5)** — `scripts/check_replay.py`, nightly. Seeds a store from the
+      recorded fixtures through the **real adapters** (the same payload store → ingest log →
+      parse ordering `run()` uses), replays the log into a second store, requires the two
+      identical on all twelve fact columns. Exact, no allowances: both stores come from the
+      same bytes and parser version in the same process, so anything but equality is a
+      defect — a `parse` reading the wall clock, a provenance id that is not a pure function
+      of its fields, a `parse` reading configuration `parse_config` does not record,
+      iteration order leaking into output.
+      The **live-store** comparison (ADR-0010: 13.8M facts from 488 payloads, 86.2%
+      reproduced) is deliberately *not* the gate. Its allowances — superseded parser output,
+      renamed sources — would need editing every time a parser is corrected, and a check
+      whose expected answer is edited to match the observed one has stopped checking.
+      Observed passing (runs 33265954132, 33266469796) and failing (injected
+      `datetime.now(UTC)` into companyfacts' `parse`: exit 1, 37,540 facts diverged).
+      ADR-0009, ADR-0010.
+- [x] **Storage budget gate** — `scripts/check_storage_budget.py`, a `make gate` stage over
+      the working *data directory* rather than the code. Fails above 256 MB of reclaimable
+      waste, or on a partial compaction file at any size. Added after the store reached
+      1.7 GB with 1,007 MB of waste beside 668 MB of real data: `treble compact` was correct,
+      tested, hash-verified and 21.7× effective — and manual, so nothing ran it.
+      **Skips in CI and says so** (a fresh checkout has no `data/`), which makes the skip path
+      the one that runs almost everywhere; trust comes from `storage.verdict()` being pure
+      with a tested failure path, not from the gate's colour. Observed passing (every `make
+      gate` since) and failing (reconstructed the incident: 672 MB of backups, exit 1).
+      ADR-0008.
 
 **Full battery run 2026-07-27 from the new location, all green except mutation:** 211 tests,
 coverage 89.42%, mypy --strict over 52 files, both import contracts kept, ruff+bandit clean,
 no dependency vulnerabilities, deep stress at 2000 examples/property with no counterexamples,
 live schema drift checked against all seven feeds with no drift. Suite runtime 10s (51s with
-coverage). Three real defects found by this battery: eight late-binding closures in the ingest
+coverage).
+*(Correction, 2026-08-29: the drift line above cannot have been a clean `make drift`. The
+coverage floor landed in the same commit as the drift target that same day, so the target
+exited non-zero from its first run. The schema comparisons themselves may well have passed —
+the failure is on coverage, after the tests — but "checked with no drift" was read past a
+red exit, which is the habit the whole section exists to prevent.)* Three real defects found by this battery: eight late-binding closures in the ingest
 adapters (silent cross-instrument corruption on any future refactor), three property tests
 whose hardcoded `max_examples` silently overrode the deep profile (so the nightly run was
 never stressing price↔yield, the duration identity, or the I2 guarantee), and a `make mutate`
 target that had never worked.
+
+### CI outage and six defects (2026-08-29)
+
+The nightly was triggered by hand to confirm the new replay step. It failed in **three
+seconds**, and so had every run for five days:
+
+> The job was not started because recent account payments have failed or your spending limit
+> needs to be increased.
+
+**Last green run: 2026-08-23 20:38.** Every run since — `ci.yml` on every commit as well as
+the nightly — failed at the billing gate with zero steps executed. The repository was private,
+so Actions drew on a monthly free-minute allowance and then stopped. Made public
+(free and unmetered there), which also matches what the README already calls the project.
+
+Pre-publication audit across all 216 commits before flipping: `.env` never committed, no
+secret-shaped files ever added, no key values in any tracked file, `data/` never committed so
+no redistribution-restricted DTCC or Ken French payloads were published. One thing *was*
+found and fixed first (a32416d): a personal email hardcoded in thirteen files including
+`frenchdata.fetch`, which sent every install's requests to Dartmouth under one person's name.
+Now `french_user_agent()` reads `TREBLE_CONTACT_EMAIL`.
+
+Restarting CI then surfaced five more defects, **each invisible until the one before it was
+fixed**:
+
+| # | defect | why it hid |
+|---|---|---|
+| 1 | Actions blocked account-wide | nothing ran at all |
+| 2 | `deep.yml` never ran `make proto` | stubs are gitignored; they exist on any machine that has run it once |
+| 3 | `deep.yml` never ran `make web` | masked by the collection error from 2 |
+| 4 | a drift test inspects the *live install* | its docstring said "CI does not run it" — true of `ci.yml`, false once the nightly ran `-m drift` |
+| 5 | `make drift` could never pass | masked by an EDGAR 403 that failed first |
+| 6 | `continue-on-error` reports `success` | the mutation step's result was indistinguishable either way |
+
+2, 3 and 5 share one root cause: `ci.yml` runs `make check` (`proto tools lint types imports
+web test`); `deep.yml` ran `pytest` directly and built **none** of it. Each missing piece was
+masked by the one before, and none was visible locally because those artifacts persist.
+
+4 and 6 were defects in fixes made earlier the same day — which is the point worth keeping: a
+guard whose own preconditions were never exercised looks exactly like one that has never had
+reason to fire.
+
+Each was reproduced before being fixed: `rm -rf treble/tapi/_generated` and `rm -rf
+treble/render/web/dist` gave the identical CI failures locally, and `pytest tests/drift/ -m
+drift` failed at 15.83% coverage.
+
+**Run 33266469796, every figure read from executed output rather than a status field:** replay
+round trip 38,548 facts reproduced exactly; deep property run at 2000 examples/property,
+coverage 90.00%; fixture drift 7 passed 4 skipped against live feeds; `pip-audit` no known
+vulnerabilities; mutation still failing as expected and now saying so on the run summary.
+
+**Read `conclusion: success` carefully.** It means nothing failed that was *allowed* to fail
+the run — not that every check passed. `continue-on-error` reports success whatever happened,
+which is why the mutation step now emits its outcome explicitly.
 
 ## A units error in `bonds.g_spread` (2026-08-11)
 
