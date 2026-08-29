@@ -174,8 +174,27 @@ jobs:
       # nights when anything ahead of it is red — and a step that reports
       # "skipped" for months reads the same as one that has nothing to say.
       - name: Mutation testing (known-failing; attempted to detect a fix)
+        id: mutation
         if: '!cancelled()'
         continue-on-error: true
         run: |
           PYTEST_ADDOPTS="--no-cov -m 'not drift'" timeout 1800 uv run mutmut run
           uv run mutmut results
+
+      # `continue-on-error` reports `conclusion: success` whether the step
+      # passed or failed — it records the real result in `outcome` and then
+      # tells the run summary everything is fine. So the step that exists to
+      # notice mutmut starting to work would have looked identical on the
+      # night it finally did, and the instruction above ("if this ever
+      # passes, promote it") had nothing to trigger it.
+      #
+      # `::warning::` puts the transition on the run's summary page, where
+      # someone sees it without opening logs.
+      - name: Report the mutation outcome
+        if: '!cancelled()'
+        run: |
+          if [ "${{ steps.mutation.outcome }}" = "success" ]; then
+            echo "::warning::mutmut now PASSES. Promote it to a required step and record the kill rate (PROGRESS.md)."
+          else
+            echo "mutation testing still failing as expected — see PROGRESS.md 'Continuous verification'."
+          fi
