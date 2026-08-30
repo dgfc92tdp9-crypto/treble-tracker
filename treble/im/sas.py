@@ -172,6 +172,40 @@ def verify_commitment(*, public_key: str, start_content: dict[str, Any], claimed
     return hmac.compare_digest(commitment(public_key, start_content), claimed)
 
 
+def mac_info(
+    *,
+    sender_user: str,
+    sender_device: str,
+    receiver_user: str,
+    receiver_device: str,
+    transaction_id: str,
+) -> str:
+    """The base info for the MACs exchanged after the humans agree.
+
+    Directional, unlike `sas_info`: each side MACs *its own* keys, so the
+    sender comes first and the two sides build different strings. A
+    symmetric info here would let a MAC be reflected back at its author and
+    verify — the receiver would conclude the peer holds a key it had only
+    ever seen itself send.
+    """
+    return (
+        f"{MAC_INFO_PREFIX}{sender_user}{sender_device}"
+        f"{receiver_user}{receiver_device}{transaction_id}"
+    )
+
+
+def key_ids_mac_info(base: str) -> str:
+    """Info for the MAC over the *set* of key ids.
+
+    Matrix MACs the comma-joined sorted key ids as well as each key, and
+    that second MAC is what stops an attacker deleting an entry from the
+    `mac` object in flight. Without it a stripped key is indistinguishable
+    from a key the peer never claimed, and the receiver verifies a smaller
+    set than the sender sent while both sides believe they agreed.
+    """
+    return f"{base}KEY_IDS"
+
+
 def sas_info(
     *,
     initiator_user: str,
@@ -336,6 +370,8 @@ __all__ = [
     "ShortAuthString",
     "Verification",
     "commitment",
+    "key_ids_mac_info",
+    "mac_info",
     "sas_info",
     "verify_commitment",
 ]

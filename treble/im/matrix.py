@@ -41,7 +41,7 @@ from typing import Any
 from urllib.parse import quote
 
 from treble.im.crosssigning import DeviceTrust, key_material, verify_device
-from treble.im.sas import Verification, commitment
+from treble.im.sas import Verification, commitment, key_ids_mac_info, mac_info
 
 #: Client-server API version this speaks.
 API = "/_matrix/client/v3"
@@ -273,6 +273,112 @@ class MatrixClient:
         self.send_to_device(
             "m.key.verification.key",
             {their_user: {their_device: {"transaction_id": transaction_id, "key": public_key}}},
+        )
+
+    def send_verification_mac(
+        self,
+        verification: Verification,
+        *,
+        their_user: str,
+        their_device: str,
+        my_device: str,
+        transaction_id: str,
+        keys: dict[str, str],
+    ) -> dict[str, Any]:
+        """MAC this side's keys, once the humans have agreed.
+
+        ``keys`` maps key id to key value — normally
+        `{"ed25519:<device>": <public key>}`, plus the master key when the
+        exchange is verifying a user rather than a device.
+
+        Two MACs, and the second is the one that matters. Each key gets its
+        own, and then the comma-joined sorted *key ids* get one too. That
+        second MAC is what stops an attacker deleting an entry in flight:
+        without it a stripped key is indistinguishable from a key the peer
+        never claimed, and the receiver verifies a smaller set than the
+        sender sent while both sides believe they agreed.
+
+        `Verification.mac` refuses before confirmation, so this cannot run
+        ahead of the human.
+        """
+        base = mac_info(
+            sender_user=self.user_id or "",
+            sender_device=my_device,
+            receiver_user=their_user,
+            receiver_device=their_device,
+            transaction_id=transaction_id,
+        )
+        content = {
+            "transaction_id": transaction_id,
+            "mac": {
+                key_id: verification.mac(key=value, info=base + key_id)
+                for key_id, value in sorted(keys.items())
+            },
+            "keys": verification.mac(key=",".join(sorted(keys)), info=key_ids_mac_info(base)),
+        }
+        self.send_to_device("m.key.verification.mac", {their_user: {their_device: content}})
+        return content
+
+    def verify_verification_mac(
+        self,
+        verification: Verification,
+        *,
+        their_user: str,
+        their_device: str,
+        my_device: str,
+        transaction_id: str,
+        content: dict[str, Any],
+        claimed_keys: dict[str, str],
+    ) -> bool:
+        """Check the peer's MACs against the keys we believe they hold.
+
+        The key-ids MAC is checked **first and against our own view of the
+        set**, so a `mac` object with an entry removed fails before any
+        individual key is looked at. Checking the entries first and the set
+        afterwards would mean a stripped key had already been accepted by
+        the time the discrepancy surfaced.
+
+        ``claimed_keys`` is what the caller believes the peer's keys are —
+        from `/keys/query`. The MAC proves the peer holds the same values;
+        it cannot tell you the caller asked about the right peer.
+        """
+        base = mac_info(
+            sender_user=their_user,
+            sender_device=their_device,
+            receiver_user=self.user_id or "",
+            receiver_device=my_device,
+            transaction_id=transaction_id,
+        )
+        macs = content.get("mac")
+        keys_mac = content.get("keys")
+        if not isinstance(macs, dict) or not isinstance(keys_mac, str):
+            return False
+        if set(macs) != set(claimed_keys):
+            # A different set is a different claim, and the MAC below would
+            # be computed over our set rather than theirs — comparing it
+            # would be comparing our own arithmetic with itself.
+            return False
+        if not verification.verify_mac(
+            mac=keys_mac, key=",".join(sorted(macs)), info=key_ids_mac_info(base)
+        ):
+            return False
+        return all(
+            verification.verify_mac(mac=mac, key=claimed_keys[key_id], info=base + key_id)
+            for key_id, mac in macs.items()
+        )
+
+    def send_verification_done(
+        self, *, their_user: str, their_device: str, transaction_id: str
+    ) -> None:
+        """Close the exchange.
+
+        Carries no proof and is not treated as any: `done` says a side has
+        finished, and a side that never sends one has not thereby failed
+        verification. The MACs are what established anything.
+        """
+        self.send_to_device(
+            "m.key.verification.done",
+            {their_user: {their_device: {"transaction_id": transaction_id}}},
         )
 
     def verification_event(self, event_type: str, transaction_id: str) -> dict[str, Any] | None:

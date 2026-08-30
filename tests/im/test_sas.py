@@ -469,3 +469,275 @@ class TestTheCommitmentWireFormat:
             .rstrip("=")
         )
         assert commitment(key, start) == expected
+
+
+class TestTheMacExchange:
+    """The last step: each side commits to the keys it actually holds.
+
+    The emoji established that the two secrets match. The MACs establish
+    *which keys* that agreement was about — without them two humans have
+    confirmed a shared secret and learned nothing about anybody's device.
+    """
+
+    def _confirmed_pair(self):  # type: ignore[no-untyped-def]
+        from treble.im.matrix import MatrixClient
+        from treble.im.simulator import Homeserver
+
+        server = Homeserver()
+        server.accounts["alice"] = "pw-a"
+        server.accounts["bob"] = "pw-b"
+        alice = MatrixClient(transport=server.transport)
+        bob = MatrixClient(transport=server.transport)
+        alice.login(user="alice", password="pw-a")  # noqa: S106
+        bob.login(user="bob", password="pw-b")  # noqa: S106
+
+        hers, his = Verification(), Verification()
+        info = sas_info(
+            initiator_user=alice.user_id or "",
+            initiator_device="DESKTOP1",
+            initiator_key=hers.public_key,
+            responder_user=bob.user_id or "",
+            responder_device="LAPTOP2",
+            responder_key=his.public_key,
+            transaction_id="t",
+        )
+        their_h, their_hi = hers.public_key, his.public_key
+        hers.establish(their_hi, info=info)
+        his.establish(their_h, info=info)
+        hers.confirm(humans_agreed=True)
+        his.confirm(humans_agreed=True)
+        return alice, bob, hers, his
+
+    def test_a_mac_round_trips_over_to_device(self) -> None:
+        alice, bob, hers, his = self._confirmed_pair()
+        keys = {"ed25519:DESKTOP1": "alice-device-key"}
+
+        alice.send_verification_mac(
+            hers,
+            their_user=bob.user_id or "",
+            their_device="LAPTOP2",
+            my_device="DESKTOP1",
+            transaction_id="t",
+            keys=keys,
+        )
+        bob.sync()
+        content = bob.verification_event("m.key.verification.mac", "t")
+        assert content is not None
+        assert bob.verify_verification_mac(
+            his,
+            their_user=alice.user_id or "",
+            their_device="DESKTOP1",
+            my_device="LAPTOP2",
+            transaction_id="t",
+            content=content,
+            claimed_keys=keys,
+        )
+
+    def test_a_stripped_key_is_caught_by_the_keys_mac(self) -> None:
+        """**What the second MAC is for.** An attacker deleting an entry
+        from `mac` in flight would otherwise be undetectable: a stripped
+        key is indistinguishable from a key the peer never claimed, and the
+        receiver verifies a smaller set than the sender sent while both
+        sides believe they agreed."""
+        alice, bob, hers, his = self._confirmed_pair()
+        keys = {"ed25519:DESKTOP1": "device-key", "ed25519:MASTER": "master-key"}
+
+        content = alice.send_verification_mac(
+            hers,
+            their_user=bob.user_id or "",
+            their_device="LAPTOP2",
+            my_device="DESKTOP1",
+            transaction_id="t",
+            keys=keys,
+        )
+        tampered = dict(content)
+        tampered["mac"] = {"ed25519:DESKTOP1": content["mac"]["ed25519:DESKTOP1"]}
+
+        assert not bob.verify_verification_mac(
+            his,
+            their_user=alice.user_id or "",
+            their_device="DESKTOP1",
+            my_device="LAPTOP2",
+            transaction_id="t",
+            content=tampered,
+            claimed_keys={"ed25519:DESKTOP1": "device-key"},
+        )
+
+    def test_a_substituted_key_value_does_not_verify(self) -> None:
+        alice, bob, hers, his = self._confirmed_pair()
+        content = alice.send_verification_mac(
+            hers,
+            their_user=bob.user_id or "",
+            their_device="LAPTOP2",
+            my_device="DESKTOP1",
+            transaction_id="t",
+            keys={"ed25519:DESKTOP1": "the-real-key"},
+        )
+        assert not bob.verify_verification_mac(
+            his,
+            their_user=alice.user_id or "",
+            their_device="DESKTOP1",
+            my_device="LAPTOP2",
+            transaction_id="t",
+            content=content,
+            claimed_keys={"ed25519:DESKTOP1": "an-attackers-key"},
+        )
+
+    def test_a_reflected_mac_does_not_verify(self) -> None:
+        """`mac_info` is directional: each side MACs its own keys. A
+        symmetric info would let a MAC be bounced back at its author and
+        verify, and the receiver would conclude the peer holds a key it had
+        only ever seen itself send."""
+        alice, bob, hers, _ = self._confirmed_pair()
+        keys = {"ed25519:DESKTOP1": "alice-device-key"}
+        content = alice.send_verification_mac(
+            hers,
+            their_user=bob.user_id or "",
+            their_device="LAPTOP2",
+            my_device="DESKTOP1",
+            transaction_id="t",
+            keys=keys,
+        )
+        # Alice checks her own MAC as though Bob had sent it.
+        assert not alice.verify_verification_mac(
+            hers,
+            their_user=bob.user_id or "",
+            their_device="LAPTOP2",
+            my_device="DESKTOP1",
+            transaction_id="t",
+            content=content,
+            claimed_keys=keys,
+        )
+
+    def test_a_malformed_mac_event_is_false(self) -> None:
+        _, bob, _, his = self._confirmed_pair()
+        for content in ({}, {"mac": "not a dict"}, {"mac": {}, "keys": 42}):
+            assert not bob.verify_verification_mac(
+                his,
+                their_user="@alice:treble.invalid",
+                their_device="DESKTOP1",
+                my_device="LAPTOP2",
+                transaction_id="t",
+                content=content,
+                claimed_keys={},
+            )
+
+    def test_done_carries_no_proof_and_is_not_treated_as_any(self) -> None:
+        """A side that never sends `done` has not thereby failed
+        verification. The MACs are what established anything."""
+        alice, bob, _, _ = self._confirmed_pair()
+        alice.send_verification_done(
+            their_user=bob.user_id or "", their_device="LAPTOP2", transaction_id="t"
+        )
+        bob.sync()
+        content = bob.verification_event("m.key.verification.done", "t")
+        assert content == {"transaction_id": "t"}
+
+
+class TestTheMacWireFormat:
+    """Three mutants survived the first pass here, and two were the same
+    blind spot as the emoji sort and the padded base64 before them.
+
+    Every test in this file drives both sides with this implementation, so
+    a wire-format choice — the info string, the ordering inside it — stays
+    invisible: both sides make the same choice and agree with each other
+    while agreeing with no other Matrix client. Self-consistency cannot
+    catch an interoperability property, so the format is pinned against an
+    independent construction rather than against itself.
+
+    The third survivor was a genuine logic gap and is covered here too.
+    """
+
+    def _pair(self):  # type: ignore[no-untyped-def]
+        from treble.im.matrix import MatrixClient
+        from treble.im.simulator import Homeserver
+
+        server = Homeserver()
+        server.accounts["alice"] = "pw-a"
+        server.accounts["bob"] = "pw-b"
+        alice = MatrixClient(transport=server.transport)
+        bob = MatrixClient(transport=server.transport)
+        alice.login(user="alice", password="pw-a")  # noqa: S106
+        bob.login(user="bob", password="pw-b")  # noqa: S106
+
+        hers, his = Verification(), Verification()
+        their_h, their_hi = hers.public_key, his.public_key
+        hers.establish(their_hi, info="i")
+        his.establish(their_h, info="i")
+        hers.confirm(humans_agreed=True)
+        his.confirm(humans_agreed=True)
+        return alice, bob, hers, his
+
+    def test_the_key_ids_info_is_the_base_plus_a_literal_marker(self) -> None:
+        """`base` alone is still unique among the per-key infos, so both
+        sides would agree on it — and disagree with every other client."""
+        from treble.im.sas import key_ids_mac_info
+
+        assert key_ids_mac_info("BASE") == "BASEKEY_IDS"
+
+    def test_the_mac_info_is_the_specifications_concatenation(self) -> None:
+        """Built here independently of the module."""
+        from treble.im.sas import MAC_INFO_PREFIX, mac_info
+
+        produced = mac_info(
+            sender_user="@a:x",
+            sender_device="D1",
+            receiver_user="@b:x",
+            receiver_device="D2",
+            transaction_id="t",
+        )
+        assert produced == f"{MAC_INFO_PREFIX}@a:xD1@b:xD2t"
+
+    def test_the_keys_mac_is_over_sorted_ids(self) -> None:
+        """Two dicts holding the same keys in different insertion order
+        must produce the same `keys` MAC. Unsorted, they would not — and a
+        peer that happened to insert differently would fail every
+        verification for a reason nobody could see."""
+        alice, bob, hers, _ = self._pair()
+        forward = {"ed25519:AAA": "one", "ed25519:BBB": "two"}
+        backward = {"ed25519:BBB": "two", "ed25519:AAA": "one"}
+
+        first = alice.send_verification_mac(
+            hers,
+            their_user=bob.user_id or "",
+            their_device="LAPTOP2",
+            my_device="DESKTOP1",
+            transaction_id="t",
+            keys=forward,
+        )
+        second = alice.send_verification_mac(
+            hers,
+            their_user=bob.user_id or "",
+            their_device="LAPTOP2",
+            my_device="DESKTOP1",
+            transaction_id="t",
+            keys=backward,
+        )
+        assert first["keys"] == second["keys"], "the keys MAC depends on insertion order"
+
+    def test_a_mac_naming_a_key_we_do_not_know_is_false_not_an_error(self) -> None:
+        """The logic gap. Without the set check, an extra entry in `mac`
+        reaches a `claimed_keys[key_id]` lookup and raises KeyError — an
+        exception where the caller asked a yes/no question, and one the
+        happy path would have to catch."""
+        alice, bob, hers, his = self._pair()
+        content = alice.send_verification_mac(
+            hers,
+            their_user=bob.user_id or "",
+            their_device="LAPTOP2",
+            my_device="DESKTOP1",
+            transaction_id="t",
+            keys={"ed25519:DESKTOP1": "k", "ed25519:SURPRISE": "extra"},
+        )
+        assert (
+            bob.verify_verification_mac(
+                his,
+                their_user=alice.user_id or "",
+                their_device="DESKTOP1",
+                my_device="LAPTOP2",
+                transaction_id="t",
+                content=content,
+                claimed_keys={"ed25519:DESKTOP1": "k"},
+            )
+            is False
+        )
