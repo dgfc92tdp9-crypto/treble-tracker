@@ -41,7 +41,7 @@ from typing import Any
 from urllib.parse import quote
 
 from treble.im.crosssigning import DeviceTrust, key_material, verify_device
-from treble.im.sas import Verification
+from treble.im.sas import Verification, commitment
 
 #: Client-server API version this speaks.
 API = "/_matrix/client/v3"
@@ -200,41 +200,106 @@ class MatrixClient:
 
     def start_verification(
         self, *, their_user: str, their_device: str, transaction_id: str
-    ) -> Verification:
-        """Begin a SAS exchange and send this side's ephemeral key.
+    ) -> dict[str, Any]:
+        """Propose a SAS verification. Returns the `start` content sent.
 
-        Returns the half-finished `Verification`: the caller must feed it
-        the other side's key, show the emoji to a human, and pass back what
-        the human said. That sequence is not something this method can do
-        on anyone's behalf, and a convenience wrapper that appeared to
-        would be claiming the out-of-band step happened.
+        **The key is deliberately not in here.** An earlier cut of this put
+        it in `start`, which skips the commitment step and gives away the
+        whole property that step exists for: a responder that sees the
+        initiator's key before choosing its own can grind keys until the
+        emoji come out however it likes. The initiator proposes, the
+        responder commits, and only then do keys move.
+
+        The content is returned rather than kept, because the commitment is
+        computed over it and both sides must hash the same bytes — a
+        caller that reconstructed it would be hashing its own idea of what
+        it sent.
+        """
+        content = {
+            "method": "m.sas.v1",
+            "transaction_id": transaction_id,
+            "key_agreement_protocols": ["curve25519-hkdf-sha256"],
+            "hashes": ["sha256"],
+            "message_authentication_codes": ["hkdf-hmac-sha256.v2"],
+            "short_authentication_string": ["emoji", "decimal"],
+        }
+        self.send_to_device("m.key.verification.start", {their_user: {their_device: content}})
+        return content
+
+    def accept_verification(
+        self,
+        *,
+        their_user: str,
+        their_device: str,
+        transaction_id: str,
+        start_content: dict[str, Any],
+    ) -> Verification:
+        """Answer a `start` with a commitment, then this side's key.
+
+        The commitment goes first and covers both this side's public key
+        and the `start` content it is answering, so the initiator can tell
+        that the responder chose its key without having seen theirs — and
+        that it is answering *this* request rather than replaying an accept
+        from another.
         """
         verification = Verification()
         self.send_to_device(
-            "m.key.verification.start",
+            "m.key.verification.accept",
             {
                 their_user: {
                     their_device: {
-                        "method": "m.sas.v1",
                         "transaction_id": transaction_id,
-                        "key": verification.public_key,
+                        "commitment": commitment(verification.public_key, start_content),
+                        "key_agreement_protocol": "curve25519-hkdf-sha256",
+                        "hash": "sha256",
+                        "message_authentication_code": "hkdf-hmac-sha256.v2",
+                        "short_authentication_string": ["emoji", "decimal"],
                     }
                 }
             },
         )
+        self.send_verification_key(
+            their_user=their_user,
+            their_device=their_device,
+            transaction_id=transaction_id,
+            public_key=verification.public_key,
+        )
         return verification
 
-    def verification_keys(self, transaction_id: str) -> dict[str, str]:
-        """Ephemeral keys offered to us, by sender, for one transaction.
+    def send_verification_key(
+        self, *, their_user: str, their_device: str, transaction_id: str, public_key: str
+    ) -> None:
+        """Put one side's ephemeral public key on the wire."""
+        self.send_to_device(
+            "m.key.verification.key",
+            {their_user: {their_device: {"transaction_id": transaction_id, "key": public_key}}},
+        )
 
-        Read from the last sync's to-device events. Filtered by
-        transaction id because two verifications can be in flight at once,
+    def verification_event(self, event_type: str, transaction_id: str) -> dict[str, Any] | None:
+        """The most recent to-device event of a type for one transaction.
+
+        Filtered by transaction because two verifications can be in flight,
         and taking whichever arrived last would let a third party's
         exchange be mistaken for the one the human is looking at.
         """
+        for event in reversed(self.to_device):
+            if event.get("type") != event_type:
+                continue
+            content = event.get("content", {})
+            if content.get("transaction_id") == transaction_id:
+                return dict(content)
+        return None
+
+    def verification_keys(self, transaction_id: str) -> dict[str, str]:
+        """Ephemeral keys sent to us, by sender, for one transaction.
+
+        Reads `m.key.verification.key`, which is where a key actually
+        travels — `start` carries only the proposal, and reading a key out
+        of it would accept one sent before any commitment was made.
+        """
         out: dict[str, str] = {}
         for event in self.to_device:
-            if event.get("type") != "m.key.verification.start":
+            if event.get("type") != "m.key.verification.key":
                 continue
             content = event.get("content", {})
             if content.get("transaction_id") != transaction_id:

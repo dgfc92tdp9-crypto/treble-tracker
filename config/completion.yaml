@@ -1061,7 +1061,7 @@ phase_2:
 #   cost       — cannot be done for nothing, which the project forbids
 #   unverified — the assessment itself has not been checked; do not trust it
 phase_3:
-  P3_1:  {done: 0.92, blocker: code,
+  P3_1:  {done: 0.96, blocker: code,
           name: "IM on Matrix with verified identity; local Synapse in Docker",
           notes: "Synapse is open source and runs locally, so this needs no paid
                   service. The invariant work is identity: `verified` in Matrix means

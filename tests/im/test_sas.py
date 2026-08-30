@@ -274,13 +274,11 @@ class TestOrderIsPreserved:
 
 
 class TestOverTheHomeserver:
-    """Two clients verifying each other through to-device messaging.
+    """Two clients verifying through to-device messaging, with commitments.
 
-    The verifier is only worth having if two real parties can reach the
-    comparison step through the actual channel. To-device is that channel,
-    and it exists precisely because two devices needing to verify each
-    other may share no room — a verification that required one would be
-    unavailable exactly when a new device is being set up.
+    To-device is the channel this must run over: two devices needing to
+    verify each other may share no room, and a verification that required
+    one would be unavailable exactly when a new device is being set up.
     """
 
     def _two_clients(self):  # type: ignore[no-untyped-def]
@@ -296,47 +294,51 @@ class TestOverTheHomeserver:
         b.login(user="bob", password="pw-b")  # noqa: S106
         return server, a, b
 
-    def test_two_clients_reach_the_same_string(self) -> None:
-        """End to end: Alice starts, Bob syncs and sees her key, both
-        establish, and the emoji agree."""
+    def test_a_full_exchange_reaches_the_same_string(self) -> None:
+        """start -> accept(commitment) -> key -> key, then both derive."""
+        from treble.im.sas import verify_commitment
+
         _, alice, bob = self._two_clients()
         txn = "verify-1"
+        alice_id, bob_id = alice.user_id or "", bob.user_id or ""
 
-        hers = alice.start_verification(
-            their_user=bob.user_id or "", their_device="LAPTOP2", transaction_id=txn
+        start = alice.start_verification(
+            their_user=bob_id, their_device="LAPTOP2", transaction_id=txn
         )
         bob.sync()
-        offered = bob.verification_keys(txn)
-        assert alice.user_id in offered, "Bob did not receive Alice's key"
+        assert bob.verification_event("m.key.verification.start", txn) == start
 
-        his = Verification()
-        bob.send_to_device(
-            "m.key.verification.start",
-            {
-                alice.user_id or "": {
-                    "DESKTOP1": {
-                        "method": "m.sas.v1",
-                        "transaction_id": txn,
-                        "key": his.public_key,
-                    }
-                }
-            },
+        his = bob.accept_verification(
+            their_user=alice_id,
+            their_device="DESKTOP1",
+            transaction_id=txn,
+            start_content=start,
         )
         alice.sync()
-        back = alice.verification_keys(txn)
+        accept = alice.verification_event("m.key.verification.accept", txn)
+        assert accept is not None
+        bob_key = alice.verification_keys(txn)[bob_id]
 
-        alice_key = offered[alice.user_id or ""]
-        bob_key = back[bob.user_id or ""]
+        # The initiator checks the commitment before going further.
+        assert verify_commitment(
+            public_key=bob_key, start_content=start, claimed=accept["commitment"]
+        )
 
-        # Built once and used by both sides, which is the point of
-        # `sas_info` being a function: two sides assembling it separately
-        # is how the emoji come out different and the humans report an
-        # attack that is not happening.
+        hers = Verification()
+        alice.send_verification_key(
+            their_user=bob_id,
+            their_device="LAPTOP2",
+            transaction_id=txn,
+            public_key=hers.public_key,
+        )
+        bob.sync()
+        alice_key = bob.verification_keys(txn)[alice_id]
+
         info = sas_info(
-            initiator_user=alice.user_id or "",
+            initiator_user=alice_id,
             initiator_device="DESKTOP1",
             initiator_key=alice_key,
-            responder_user=bob.user_id or "",
+            responder_user=bob_id,
             responder_device="LAPTOP2",
             responder_key=bob_key,
             transaction_id=txn,
@@ -346,28 +348,74 @@ class TestOverTheHomeserver:
             == his.establish(alice_key, info=info).emoji_indices
         )
 
-    def test_to_device_events_are_drained_not_replayed(self) -> None:
-        """A client that received the same `start` twice would begin two
-        exchanges for one request, and the second would never complete."""
-        _, alice, bob = self._two_clients()
-        alice.start_verification(
-            their_user=bob.user_id or "", their_device="LAPTOP2", transaction_id="t1"
-        )
-        bob.sync()
-        assert bob.verification_keys("t1")
-        bob.sync()
-        assert not bob.verification_keys("t1"), "the event was delivered twice"
+    def test_a_responder_that_swaps_its_key_is_caught(self) -> None:
+        """**The attack the commitment exists to stop.** A responder free
+        to choose after seeing the initiator's key can grind keys until the
+        emoji come out however it likes, and steer two humans onto a
+        sequence it prepared. The commitment binds it first."""
+        from treble.im.sas import verify_commitment
 
-    def test_another_transactions_key_is_not_returned(self) -> None:
-        """Two verifications can be in flight. Taking whichever arrived
-        last would let a third party's exchange be mistaken for the one the
-        human is looking at."""
+        _, alice, bob = self._two_clients()
+        txn = "verify-2"
+        start = alice.start_verification(
+            their_user=bob.user_id or "", their_device="LAPTOP2", transaction_id=txn
+        )
+        bob.sync()
+        bob.accept_verification(
+            their_user=alice.user_id or "",
+            their_device="DESKTOP1",
+            transaction_id=txn,
+            start_content=start,
+        )
+        alice.sync()
+        accept = alice.verification_event("m.key.verification.accept", txn)
+        assert accept is not None
+
+        substituted = Verification().public_key
+        assert not verify_commitment(
+            public_key=substituted, start_content=start, claimed=accept["commitment"]
+        ), "a swapped key must not match the commitment"
+
+    def test_an_accept_for_another_request_does_not_match(self) -> None:
+        """The commitment covers the `start` content too, so an accept
+        cannot be replayed from a different request."""
+        from treble.im.sas import commitment, verify_commitment
+
+        key = Verification().public_key
+        one = {"method": "m.sas.v1", "transaction_id": "a"}
+        two = {"method": "m.sas.v1", "transaction_id": "b"}
+        assert not verify_commitment(
+            public_key=key, start_content=two, claimed=commitment(key, one)
+        )
+
+    def test_the_start_event_carries_no_key(self) -> None:
+        """An earlier cut put it there, which skips the commitment step and
+        gives away the property that step exists for."""
+        _, alice, bob = self._two_clients()
+        start = alice.start_verification(
+            their_user=bob.user_id or "", their_device="LAPTOP2", transaction_id="t"
+        )
+        assert "key" not in start
+
+    def test_to_device_events_are_drained_not_replayed(self) -> None:
+        """A client receiving the same `start` twice would begin two
+        exchanges for one request."""
         _, alice, bob = self._two_clients()
         alice.start_verification(
             their_user=bob.user_id or "", their_device="LAPTOP2", transaction_id="t1"
         )
         bob.sync()
-        assert bob.verification_keys("t2") == {}
+        assert bob.verification_event("m.key.verification.start", "t1")
+        bob.sync()
+        assert bob.verification_event("m.key.verification.start", "t1") is None
+
+    def test_another_transactions_event_is_not_returned(self) -> None:
+        _, alice, bob = self._two_clients()
+        alice.start_verification(
+            their_user=bob.user_id or "", their_device="LAPTOP2", transaction_id="t1"
+        )
+        bob.sync()
+        assert bob.verification_event("m.key.verification.start", "t2") is None
 
     def test_a_verification_needs_no_shared_room(self) -> None:
         """The reason to-device exists. Neither client joins anything."""
@@ -377,4 +425,47 @@ class TestOverTheHomeserver:
             their_user=bob.user_id or "", their_device="LAPTOP2", transaction_id="t1"
         )
         bob.sync()
-        assert bob.verification_keys("t1")
+        assert bob.verification_event("m.key.verification.start", "t1")
+
+
+class TestTheCommitmentWireFormat:
+    """Found by mutation testing: padded base64 passed everything above.
+
+    Both sides ran this implementation, so the padding stayed consistent
+    and every comparison agreed. Against any other Matrix client it would
+    not — the specification says unpadded, and a padded string is simply a
+    different value. Self-consistency cannot catch an interoperability
+    property, so the shape is pinned directly.
+    """
+
+    def test_it_is_unpadded(self) -> None:
+        from treble.im.sas import commitment
+
+        value = commitment(Verification().public_key, {"method": "m.sas.v1"})
+        assert "=" not in value, "padded base64 disagrees with every other client"
+
+    def test_it_is_a_sha256_digest(self) -> None:
+        """32 bytes is 43 unpadded base64 characters. A different length
+        means a different hash function, which would agree with nobody."""
+        from treble.im.sas import commitment
+
+        value = commitment(Verification().public_key, {"method": "m.sas.v1"})
+        assert len(value) == 43
+
+    def test_it_matches_the_specifications_construction(self) -> None:
+        """SHA-256 over the key bytes followed by the canonical JSON of the
+        start content, computed here independently of the module."""
+        import base64
+        import hashlib
+
+        from treble.im.canonical import canonical_json
+        from treble.im.sas import commitment
+
+        key = Verification().public_key
+        start = {"method": "m.sas.v1", "transaction_id": "t"}
+        expected = (
+            base64.b64encode(hashlib.sha256(key.encode() + canonical_json(start)).digest())
+            .decode()
+            .rstrip("=")
+        )
+        assert commitment(key, start) == expected

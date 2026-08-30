@@ -41,9 +41,15 @@ have agreed. Everything here is the protocol around them.
 
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 from dataclasses import dataclass
+from typing import Any
 
 import vodozemac
+
+from treble.im.canonical import canonical_json
 
 #: The Matrix SAS emoji table, transcribed from the specification. Index
 #: order is normative: a table in a different order produces names that
@@ -131,6 +137,39 @@ MAC_INFO_PREFIX = "MATRIX_KEY_VERIFICATION_MAC"
 
 class SasError(ValueError):
     """The verification cannot proceed, and why."""
+
+
+def commitment(public_key: str, start_content: dict[str, Any]) -> str:
+    """The responder's binding commitment to its key and the request.
+
+    **Why the protocol has this step at all.** Without it the responder
+    could wait to see the initiator's public key and only then choose its
+    own — and since the emoji are derived from both, a responder free to
+    pick afterwards can grind keys until the string comes out however it
+    likes. It could steer two humans onto a sequence it had prepared.
+
+    So the responder commits first: `SHA-256(public_key || canonical_json(
+    start_content))`, sent in `m.key.verification.accept` before either key
+    is on the wire. The initiator checks it once the key arrives, and a
+    responder that changed its mind is caught.
+
+    Unpadded base64, as the specification requires. Padding would be a
+    different string and the two sides' comparison would fail on every
+    exchange.
+    """
+    digest = hashlib.sha256(public_key.encode() + canonical_json(start_content)).digest()
+    return base64.b64encode(digest).decode().rstrip("=")
+
+
+def verify_commitment(*, public_key: str, start_content: dict[str, Any], claimed: str) -> bool:
+    """Whether ``claimed`` is the commitment for this key and request.
+
+    Compared with `hmac.compare_digest` rather than `==`. The values are
+    public, so this is not about timing — it is that a constant-time
+    comparison is the correct habit for anything a peer supplies, and the
+    exception here would have to be argued rather than assumed.
+    """
+    return hmac.compare_digest(commitment(public_key, start_content), claimed)
 
 
 def sas_info(
@@ -296,5 +335,7 @@ __all__ = [
     "SasError",
     "ShortAuthString",
     "Verification",
+    "commitment",
     "sas_info",
+    "verify_commitment",
 ]

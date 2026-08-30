@@ -48,16 +48,12 @@ whose failure path is an exception invites a caller to forget the try.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from typing import Any
 
 import vodozemac
 
-#: Members excluded from the signed content, per the Matrix specification.
-#: `signatures` because an object cannot contain its own signature, and
-#: `unsigned` because it is server-supplied metadata a signer never saw.
-UNSIGNED_MEMBERS = ("signatures", "unsigned")
+from treble.im.canonical import UNSIGNED_MEMBERS, signing_bytes
 
 #: The algorithm prefix on a cross-signing or device key id.
 ED25519 = "ed25519"
@@ -75,13 +71,13 @@ class CrossSigningError(ValueError):
 def canonical_json(payload: dict[str, Any]) -> bytes:
     """Matrix canonical JSON of ``payload``, minus the unsigned members.
 
-    Sorted keys, no whitespace, UTF-8, and `ensure_ascii=False` so a
-    non-ASCII display name is signed as the bytes the specification says
-    rather than as `\\uXXXX` escapes — the two produce different signatures
-    and only one of them verifies against a real homeserver.
+    Delegates to `im.canonical.signing_bytes`: the serialisation is shared
+    with `im.sas`, which needs the same canonical form for a commitment
+    hash but must *not* strip anything. Two copies of these separator and
+    `ensure_ascii` choices would not look wrong anywhere, and would make
+    every signature disagree with every other client.
     """
-    content = {k: v for k, v in payload.items() if k not in UNSIGNED_MEMBERS}
-    return json.dumps(content, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    return signing_bytes(payload)
 
 
 def _signature(payload: dict[str, Any], *, user_id: str, key_id: str) -> str | None:
