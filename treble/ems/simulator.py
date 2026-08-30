@@ -486,6 +486,14 @@ def new_order_single(
             (ORDER_QTY, _decimal(quantity)),
             (ORD_TYPE, "2"),
             (PRICE, _decimal(price)),
+            # Required by FIX 4.4 and omitted here until the order store
+            # needed it. On an execution report tag 60 is when the trade
+            # happened; on an order it is **when the trader decided**, which
+            # is the instant an arrival-price benchmark is measured from.
+            # Without it an order's arrival is whenever the acceptor read
+            # the socket — a property of network scheduling, not of the
+            # decision.
+            (TRANSACT_TIME, now.astimezone(UTC).strftime("%Y%m%d-%H:%M:%S.%f")[:-3]),
         ),
         now=now,
     )
@@ -529,6 +537,14 @@ def cancel_replace_request(
             (ORDER_QTY, _decimal(quantity)),
             (ORD_TYPE, "2"),
             (PRICE, _decimal(price)),
+            # Required by FIX 4.4 and omitted here until the order store
+            # needed it. On an execution report tag 60 is when the trade
+            # happened; on an order it is **when the trader decided**, which
+            # is the instant an arrival-price benchmark is measured from.
+            # Without it an order's arrival is whenever the acceptor read
+            # the socket — a property of network scheduling, not of the
+            # decision.
+            (TRANSACT_TIME, now.astimezone(UTC).strftime("%Y%m%d-%H:%M:%S.%f")[:-3]),
         ),
         now=now,
     )

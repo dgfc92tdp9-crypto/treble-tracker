@@ -310,3 +310,80 @@ async def test_a_store_without_a_vault_records_nothing(tmp_path) -> None:  # typ
         writer.close()
 
     assert store.subjects_with_prefix(EXECUTION_PREFIX, as_of=datetime.now(UTC)) == []
+
+
+async def test_an_order_is_recorded_with_its_arrival_time(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """The record TCA's arrival benchmark was missing.
+
+    An execution carries its ClOrdID and, before this, nothing stored the
+    order it named — so there was no instant to measure an arrival price
+    from even in principle. Orders come from what the client *sent*;
+    executions from what the venue replied.
+    """
+    from treble.ems.orders import ORDER_PREFIX
+    from treble.ems.simulator import new_order_single
+    from treble.store.duck import DuckStore
+    from treble.vault.worm import Vault
+
+    vault = Vault(tmp_path / "vault")
+    store = DuckStore(tmp_path / "book.db")
+
+    async with running_simulator(vault=vault, store=store) as server:
+        reader, writer = await asyncio.open_connection(HOST, server.port)
+        client = Session(sender="TREBLE", target="SIM")
+        writer.write(client.logon(now=NOW))
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.write(
+            new_order_single(
+                client,
+                now=NOW,
+                order_id="ORD1",
+                symbol="IBM",
+                side="1",
+                quantity=100.0,
+                price=250.0,
+            )
+        )
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.close()
+
+    seen = datetime.now(UTC)
+    subjects = store.subjects_with_prefix(ORDER_PREFIX, as_of=seen)
+    assert len(subjects) == 1, "one order sent, one order subject"
+
+    facts = {
+        f.field: f.value
+        for field in ("ems:order:symbol", "ems:order:limitPrice", "ems:order:arrival")
+        for f in store.read(subjects[0], field, as_of=seen)
+    }
+    assert facts["ems:order:symbol"] == "IBM"
+    assert facts["ems:order:limitPrice"] == 250.0
+    # The arrival keeps its time of day: a date would round the decision to
+    # midnight, and the point of the field is the instant.
+    assert "T" in str(facts["ems:order:arrival"])
+
+    record = store.provenance(
+        store.read(subjects[0], "ems:order:symbol", as_of=seen)[0].provenance_id
+    )
+    assert vault.read(record.payload_hash), "the order's provenance must name retrievable bytes"
+
+
+async def test_a_logon_is_not_recorded_as_an_order(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Most inbound messages are not orders. Recording a Logon as one would
+    put a book entry with no symbol into every session."""
+    from treble.ems.orders import ORDER_PREFIX
+    from treble.store.duck import DuckStore
+    from treble.vault.worm import Vault
+
+    store = DuckStore(tmp_path / "book.db")
+    async with running_simulator(vault=Vault(tmp_path / "vault"), store=store) as server:
+        reader, writer = await asyncio.open_connection(HOST, server.port)
+        client = Session(sender="TREBLE", target="SIM")
+        writer.write(client.logon(now=NOW))
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.close()
+
+    assert store.subjects_with_prefix(ORDER_PREFIX, as_of=datetime.now(UTC)) == []

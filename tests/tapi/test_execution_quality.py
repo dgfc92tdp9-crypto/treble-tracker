@@ -221,3 +221,112 @@ class TestTheUnavailableLookup:
         """`NOT_COMPUTED` is listed rather than derived from the mapping, so
         a name in one and not the other is a visible difference."""
         assert set(NOT_COMPUTED) == set(UNAVAILABLE)
+
+
+def _order(
+    store: DuckStore,
+    *,
+    order_id: str = "ORD1",
+    symbol: str = "IBM",
+    side: str = "buy",
+    qty: float = 100.0,
+    limit: float = 105.0,
+) -> None:
+    from treble.ems.orders import Order, order_facts
+
+    order = Order(
+        order_id=order_id,
+        symbol=symbol,
+        side=side,
+        quantity=qty,
+        order_type="limit",
+        limit_price=limit,
+        arrival_time=TRADE,
+    )
+    store.write_facts(list(order_facts(order, _provenance(store))))
+
+
+class TestTheOrderJoin:
+    """What the order store buys TCA.
+
+    Slippage against the close says how a fill compared to *the market*.
+    These say how it compared to **the decision** — the limit the trader
+    set, and how much of the order that limit filled.
+    """
+
+    def test_an_order_is_joined_to_its_fills_by_clordid(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
+        store = DuckStore(tmp_path / "s.db")
+        _order(store, qty=100.0, limit=105.0)
+        _fill(store, exec_id="E1", price=101.0, qty=60.0)
+        _fill(store, exec_id="E2", price=103.0, qty=40.0)
+        _closes(store, "IBM", {date(2026, 8, 28): 100.0})
+
+        (outcome,) = execution_quality(store, as_of=NOW).orders
+        assert outcome.filled == 100.0
+        assert outcome.completion == 1.0
+
+    def test_the_average_is_quantity_weighted(self, tmp_path) -> None:
+        """A mean of the prices would let a one-share print weigh as much
+        as the rest of the order."""
+        store = DuckStore(tmp_path / "s.db")
+        _order(store, qty=100.0)
+        _fill(store, exec_id="E1", price=100.0, qty=99.0)
+        _fill(store, exec_id="E2", price=200.0, qty=1.0)
+        _closes(store, "IBM", {date(2026, 8, 28): 100.0})
+
+        (outcome,) = execution_quality(store, as_of=NOW).orders
+        assert outcome.average_price == pytest.approx(101.0)
+
+    def test_a_partially_filled_order_reports_its_completion(self, tmp_path) -> None:
+        store = DuckStore(tmp_path / "s.db")
+        _order(store, qty=100.0)
+        _fill(store, exec_id="E1", price=101.0, qty=25.0)
+        _closes(store, "IBM", {date(2026, 8, 28): 100.0})
+        assert execution_quality(store, as_of=NOW).orders[0].completion == 0.25
+
+    def test_an_unfilled_order_is_reported_not_dropped(self, tmp_path) -> None:
+        """Dropping it would hide exactly the orders that did not work."""
+        store = DuckStore(tmp_path / "s.db")
+        _order(store, qty=100.0)
+        (outcome,) = execution_quality(store, as_of=NOW).orders
+        assert (outcome.completion, outcome.filled) == (0.0, 0.0)
+        assert outcome.average_price is None
+        assert outcome.price_improvement_bp is None
+
+    def test_a_buy_inside_its_limit_is_an_improvement(self, tmp_path) -> None:
+        """The limit is a *worst acceptable* price, so being inside it is
+        the good direction — the opposite sign convention from slippage,
+        and they are printed side by side."""
+        store = DuckStore(tmp_path / "s.db")
+        _order(store, side="buy", limit=105.0)
+        _fill(store, side="buy", price=100.0, qty=100.0)
+        assert execution_quality(store, as_of=NOW).orders[0].price_improvement_bp > 0
+
+    def test_a_sell_above_its_limit_is_an_improvement(self, tmp_path) -> None:
+        store = DuckStore(tmp_path / "s.db")
+        _order(store, side="sell", limit=95.0)
+        _fill(store, side="sell", price=100.0, qty=100.0)
+        assert execution_quality(store, as_of=NOW).orders[0].price_improvement_bp > 0
+
+    def test_the_two_sides_disagree_on_the_same_fill(self, tmp_path) -> None:
+        """`abs()` would pass both single-sided tests above."""
+        buys = DuckStore(tmp_path / "b.db")
+        _order(buys, side="buy", limit=105.0)
+        _fill(buys, side="buy", price=100.0, qty=100.0)
+        sells = DuckStore(tmp_path / "s.db")
+        _order(sells, side="sell", limit=105.0)
+        _fill(sells, side="sell", price=100.0, qty=100.0)
+        assert execution_quality(buys, as_of=NOW).orders[0].price_improvement_bp == pytest.approx(
+            -execution_quality(sells, as_of=NOW).orders[0].price_improvement_bp
+        )
+
+    def test_fills_whose_order_predates_the_store_are_still_measured(self, tmp_path) -> None:
+        """A book recorded before the order store exists has fills and no
+        orders. Those fills are still scored against the close; they simply
+        have no order to compare against."""
+        store = DuckStore(tmp_path / "s.db")
+        _fill(store, price=101.0)
+        _closes(store, "IBM", {date(2026, 8, 28): 100.0})
+        quality = execution_quality(store, as_of=NOW)
+        assert quality.orders == ()
+        assert len(quality.measured) == 1

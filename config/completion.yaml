@@ -1428,7 +1428,7 @@ phase_3:
                   would not take: MANDATE_DIR was a *default argument*, bound at import,
                   so the mandate directory could never be redirected by any caller. It
                   resolves at call time now."}
-  P3_5:  {done: 0.5, blocker: data,
+  P3_5:  {done: 0.65, blocker: data,
           name: "TCA",
           notes: "Transaction cost analysis needs executions to analyse, and this
                   install has no trade or position store — the same gap that leaves
@@ -1496,7 +1496,39 @@ phase_3:
                   before it is blocked on market data it cannot get; implementation
                   shortfall is measured from arrival and inherits its blocker. No
                   screen YAML yet — the panels are served by LocalTapi and bound by
-                  nothing, so TCA is reachable through TAPI and not yet visible."}
+                  nothing, so TCA is reachable through TAPI and not yet visible.
+                  **The order store ships (2026-08-30).** ems/orders.py records
+                  NewOrderSingle as facts under `order:<ClOrdID>`, keyed on the
+                  identifier the venue echoes back so the join is on the venue's own
+                  link rather than an inferred one, and transport.py records it from
+                  the *inbound* message — orders are what was asked for, executions
+                  what the venue replied, and deriving both from one message would
+                  conflate a request with its outcome. Arrival is no longer blocked
+                  on a missing record; it is blocked only on data, which was the
+                  point. It still cannot be computed: the store holds one close per
+                  day, and scoring a 14:30 order against a 21:00 close and calling it
+                  arrival price gives a number with the right name and the wrong
+                  meaning. What the record does buy now is the order-to-fill join —
+                  completion, and each fill against the limit the trader actually set.
+                  That is a statement about the decision rather than about the market,
+                  and it is signed the *opposite* way from slippage on purpose: a
+                  limit is a worst-acceptable price, so being inside it is the good
+                  direction, and the two print side by side. Second instance of the
+                  same FIX gap: new_order_single omitted TransactTime (60) exactly as
+                  the execution report did, and here it matters more — on a report tag
+                  60 is when the trade happened, on an order it is when the trader
+                  decided, which is the instant an arrival benchmark measures from.
+                  Without it an order's arrival is whenever the acceptor read the
+                  socket, a property of network scheduling. Fallback order is
+                  TransactTime, then SendingTime, then received_at: decision,
+                  transmission, receipt. A market order is refused rather than
+                  recorded, because it carries no price and a limit of 0.0 would score
+                  every fill against it as infinitely bad. SIDES is imported from
+                  ems.executions rather than re-listed — a side mapped one way on the
+                  order and another on the fill would make the join silently wrong.
+                  Mutation-checked: 6 mutants, all killed, including preferring
+                  transmission over decision time and rounding the arrival to
+                  midnight."}
 
 phase_4:
   P4_1:  {done: 0.0, blocker: code,

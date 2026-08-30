@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from treble.analytics.tca import (
+    BUY_SIDES,
     UNAVAILABLE,
     BenchmarkUnavailableError,
     CloseBenchmark,
@@ -30,6 +31,7 @@ from treble.analytics.tca import (
 )
 from treble.core.identifiers import TUID
 from treble.ems.executions import EXECUTION_PREFIX
+from treble.ems.orders import ORDER_PREFIX
 from treble.store.duck import DuckStore
 from treble.tapi.prices import NoPriceSeriesError, listing_subject, price_series
 
@@ -41,6 +43,9 @@ _SYMBOL = "ems:exec:symbol"
 _SIDE = "ems:exec:side"
 _LAST_PX = "ems:exec:lastPx"
 _LAST_QTY = "ems:exec:lastQty"
+_ORDER_ID = "ems:exec:orderId"
+_ORDER_QTY = "ems:order:quantity"
+_ORDER_LIMIT = "ems:order:limitPrice"
 
 
 def unavailable_reason(benchmark: str) -> str:
@@ -86,11 +91,61 @@ class Unmeasured:
 
 
 @dataclass(frozen=True)
+class OrderOutcome:
+    """What an order asked for, and what it got.
+
+    The order store's payoff. Slippage against the close says how the fill
+    compared to *the market*; this says how it compared to **the decision**
+    — the limit the trader actually set, and how much of the order that
+    limit managed to fill.
+
+    Not an arrival-price benchmark, and deliberately not named like one.
+    Arrival needs a price at the order's instant and this install holds one
+    close per day; the limit is a number the trader chose, which is a
+    different and weaker claim honestly stated.
+    """
+
+    order_id: str
+    symbol: str
+    side: str
+    ordered: float
+    filled: float
+    limit_price: float
+    average_price: float | None
+
+    @property
+    def completion(self) -> float:
+        """Fraction of the order that filled, in [0, 1]."""
+        return self.filled / self.ordered if self.ordered else 0.0
+
+    @property
+    def price_improvement_bp(self) -> float | None:
+        """Basis points better than the limit. Positive is better.
+
+        A buy filled below its limit did better than the trader required;
+        a sell filled above it did. Signed the opposite way from slippage
+        because the limit is a *worst acceptable* price rather than a
+        benchmark to beat, so being inside it is the good direction — and
+        the two are reported side by side, so one convention for both
+        would make one of them read backwards.
+        """
+        if self.average_price is None or self.limit_price <= 0:
+            return None
+        difference = (self.limit_price - self.average_price) / self.limit_price * 10_000.0
+        return difference if self.side in BUY_SIDES else -difference
+
+
+@dataclass(frozen=True)
 class ExecutionQuality:
     """Every fill in the book, measured where it could be."""
 
     measured: tuple[CloseBenchmark, ...]
     unmeasured: tuple[Unmeasured, ...]
+    #: One row per order that has a record, joined to its fills by ClOrdID.
+    #: Empty on a book whose orders predate the order store — the fills are
+    #: still measured against the close, and their orders simply are not
+    #: there to compare against.
+    orders: tuple[OrderOutcome, ...]
     #: §18.5 benchmarks this install cannot compute, and why. Carried in
     #: the result so a screen cannot render the measured number alone.
     unavailable: dict[str, str]
@@ -184,13 +239,69 @@ def execution_quality(store: DuckStore, *, as_of: datetime) -> ExecutionQuality:
     return ExecutionQuality(
         measured=tuple(measured),
         unmeasured=tuple(unmeasured),
+        orders=_order_outcomes(store, as_of=as_of),
         unavailable={name: unavailable_reason(name) for name in NOT_COMPUTED},
     )
+
+
+def _order_outcomes(store: DuckStore, *, as_of: datetime) -> tuple[OrderOutcome, ...]:
+    """Join each recorded order to the fills that name it.
+
+    Fills are grouped by their own `orderId` rather than by walking the
+    order's subject, because the execution is the record that states the
+    link: an order does not know what filled it, and inferring the join
+    from anything but the venue's own `ClOrdID` echo would be guessing.
+
+    An order with no fills is still reported, at zero completion. Dropping
+    it would hide exactly the orders that did not work.
+    """
+    fills: dict[str, list[tuple[float, float]]] = {}
+    for subject in store.subjects_with_prefix(EXECUTION_PREFIX, as_of=as_of):
+        order_id = _value(store, subject, _ORDER_ID, as_of=as_of)
+        qty = _value(store, subject, _LAST_QTY, as_of=as_of)
+        price = _value(store, subject, _LAST_PX, as_of=as_of)
+        if not isinstance(order_id, str) or not isinstance(qty, (int, float)):
+            continue
+        if not isinstance(price, (int, float)):
+            continue
+        fills.setdefault(order_id, []).append((float(qty), float(price)))
+
+    outcomes: list[OrderOutcome] = []
+    for subject in store.subjects_with_prefix(ORDER_PREFIX, as_of=as_of):
+        order_id = str(subject).removeprefix(ORDER_PREFIX)
+        symbol = _value(store, subject, _SYMBOL.replace("exec", "order"), as_of=as_of)
+        side = _value(store, subject, _SIDE.replace("exec", "order"), as_of=as_of)
+        ordered = _value(store, subject, _ORDER_QTY, as_of=as_of)
+        limit = _value(store, subject, _ORDER_LIMIT, as_of=as_of)
+        if not isinstance(symbol, str) or not isinstance(side, str):
+            continue
+        if not isinstance(ordered, (int, float)) or not isinstance(limit, (int, float)):
+            continue
+
+        matched = fills.get(order_id, [])
+        filled = sum(qty for qty, _ in matched)
+        # Quantity-weighted, which is what an average fill price means. A
+        # mean of the prices would let a one-share print weigh as much as
+        # the rest of the order.
+        average = sum(qty * price for qty, price in matched) / filled if filled else None
+        outcomes.append(
+            OrderOutcome(
+                order_id=order_id,
+                symbol=symbol,
+                side=side,
+                ordered=float(ordered),
+                filled=filled,
+                limit_price=float(limit),
+                average_price=average,
+            )
+        )
+    return tuple(outcomes)
 
 
 __all__ = [
     "NOT_COMPUTED",
     "ExecutionQuality",
+    "OrderOutcome",
     "Unmeasured",
     "execution_quality",
     "unavailable_reason",

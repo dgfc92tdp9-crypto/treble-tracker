@@ -1616,6 +1616,20 @@ class LocalTapi:
                 rows.append(("caveat", "", quality.measured[0].caveat))
             for fill in quality.unmeasured:
                 rows.append((f"{fill.symbol} {fill.trade_date}", "UNMEASURED", fill.reason))
+            for order in quality.orders:
+                # Against the limit the trader set, not against the market:
+                # a different and weaker claim than an arrival benchmark,
+                # and labelled so rather than left to be read as one.
+                improvement = order.price_improvement_bp
+                rows.append(
+                    (
+                        f"{order.order_id} {order.symbol}",
+                        f"{order.completion:.0%} filled",
+                        "no fills"
+                        if improvement is None
+                        else f"{improvement:+.1f}bp vs its limit of {order.limit_price:g}",
+                    )
+                )
             return tuple(rows)
 
         if not quality.fills:

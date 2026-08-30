@@ -36,6 +36,12 @@ from treble.ems.executions import (
     parse_execution,
 )
 from treble.ems.heartbeat import HeartbeatMonitor, Liveness
+from treble.ems.orders import (
+    NotAnOrderError,
+    order_facts,
+    order_provenance,
+    parse_order,
+)
 from treble.ems.session import TEST_REQ_ID, MsgType
 from treble.ems.simulator import Simulator
 from treble.ems.store import resume, save
@@ -141,7 +147,11 @@ class SimulatorServer:
             async for raw in read_messages(reader):
                 now = datetime.now(UTC)
                 monitor.received(now)
-                self._archive(raw, now=now)
+                # Inbound: what the client asked for. Orders come from what
+                # was *sent*, executions from what the venue replied — the
+                # two halves TCA joins, and recording them from the same
+                # message would conflate a request with its outcome.
+                self._record_order(raw, self._archive(raw, now=now), now=now)
                 for reply in self.simulator.respond(raw, now=now):
                     # Executions come from the acceptor's *replies*, not
                     # from what the client sent: an order is a request and
@@ -214,6 +224,31 @@ class SimulatorServer:
         if self.vault is None:
             return None
         return self.vault.archive(raw, kind="fix", event_date=now.date(), now=now)
+
+    def _record_order(self, raw: bytes, archived: ArchivedRecord | None, *, now: datetime) -> None:
+        """Write an order to the fact store, if this message is one.
+
+        Same archive-then-derive ordering as `_record_execution`, and the
+        same refusal when there is no archived record: an order's
+        provenance names the message that placed it.
+
+        Most inbound messages are not orders — a Logon, a heartbeat, a
+        cancel — so `NotAnOrderError` is the common case and is not an
+        error condition.
+        """
+        if self.store is None or archived is None:
+            return
+        try:
+            order = parse_order(raw, received_at=now)
+        except NotAnOrderError:
+            return
+        provenance = order_provenance(
+            archived.key,
+            received_at=now,
+            source_uri=f"fix://{self.simulator.session.sender}/{self.simulator.session.target}",
+        )
+        self.store.write_provenance([provenance])
+        self.store.write_facts(list(order_facts(order, provenance.id)))
 
     def _record_execution(
         self, raw: bytes, archived: ArchivedRecord | None, *, now: datetime
