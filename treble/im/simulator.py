@@ -49,6 +49,11 @@ class Homeserver:
     master_keys: dict[str, dict[str, Any]] = field(default_factory=dict)
     self_signing_keys: dict[str, dict[str, Any]] = field(default_factory=dict)
     device_keys: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
+    #: To-device events waiting for each user, as `/sync` delivers them.
+    #: Keyed by recipient rather than by room because a to-device event has
+    #: no room — that is the whole point of the channel SAS runs over: key
+    #: verification must work between two devices with no shared room.
+    to_device: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
 
     def user_id(self, localpart: str) -> str:
         return f"@{localpart}:{self.domain}"
@@ -84,8 +89,10 @@ class Homeserver:
             return self._send(route, body or {}, self.tokens[token])
         if route == f"{API}/keys/query":
             return self._keys_query(body or {})
+        if route.startswith(f"{API}/sendToDevice/"):
+            return self._send_to_device(route, body or {}, self.tokens[token])
         if route == f"{API}/sync":
-            return self._sync(path)
+            return self._sync(path, self.tokens[token])
         return 404, {"errcode": "M_UNRECOGNIZED", "error": route}
 
     # -- handlers ---------------------------------------------------------
@@ -126,6 +133,36 @@ class Homeserver:
             },
         }
 
+    def _send_to_device(
+        self, route: str, body: dict[str, Any], sender: str
+    ) -> tuple[int, dict[str, Any]]:
+        """Queue a to-device event for each named recipient.
+
+        `messages` is `{user_id: {device_id: content}}`. The device is kept
+        on the queued event rather than used to partition the queue,
+        because `/sync` delivers a user's to-device events as one list and
+        a client filters by its own device — mirroring the real API rather
+        than inventing a tidier one this client would then be written
+        against.
+        """
+        event_type = route.split("/")[-2]
+        messages = body.get("messages")
+        if not isinstance(messages, dict):
+            return 400, {"errcode": "M_BAD_JSON", "error": "messages must be an object"}
+        for user, by_device in messages.items():
+            if not isinstance(by_device, dict):
+                continue
+            for device, content in by_device.items():
+                self.to_device.setdefault(str(user), []).append(
+                    {
+                        "type": event_type,
+                        "sender": sender,
+                        "to_device_id": str(device),
+                        "content": content,
+                    }
+                )
+        return 200, {}
+
     def _send(self, route: str, body: dict[str, Any], sender: str) -> tuple[int, dict[str, Any]]:
         parts = route.split("/")
         room = parts[parts.index("rooms") + 1].replace("%3A", ":").replace("%21", "!")
@@ -148,7 +185,7 @@ class Homeserver:
         self.batches.append([(room, event)])
         return 200, {"event_id": event_id}
 
-    def _sync(self, path: str) -> tuple[int, dict[str, Any]]:
+    def _sync(self, path: str, user: str) -> tuple[int, dict[str, Any]]:
         since = 0
         if "since=" in path:
             raw = path.split("since=", 1)[1].split("&", 1)[0]
@@ -164,7 +201,16 @@ class Homeserver:
             for room, event in batch:
                 joined.setdefault(room, {"timeline": {"events": []}})
                 joined[room]["timeline"]["events"].append(event)
-        return 200, {"next_batch": str(len(self.batches)), "rooms": {"join": joined}}
+        # To-device events are drained, not paged. A real homeserver
+        # deletes them once delivered, and a client that received the same
+        # verification `start` twice would begin two exchanges for one
+        # request — so this drains rather than replaying from `since`.
+        waiting = self.to_device.pop(user, [])
+        return 200, {
+            "next_batch": str(len(self.batches)),
+            "rooms": {"join": joined},
+            "to_device": {"events": waiting},
+        }
 
     def inject(self, room: str, sender: str, body: str) -> str:
         """Post a message as somebody else, so the client has traffic to

@@ -41,6 +41,7 @@ from typing import Any
 from urllib.parse import quote
 
 from treble.im.crosssigning import DeviceTrust, key_material, verify_device
+from treble.im.sas import Verification
 
 #: Client-server API version this speaks.
 API = "/_matrix/client/v3"
@@ -88,6 +89,11 @@ class MatrixClient:
     #: Where the next sync resumes. `None` means "from the beginning of
     #: what the server will give us", which is what a first sync wants.
     since: str | None = None
+    #: To-device events from the most recent sync. The channel key
+    #: verification runs over, and separate from the timeline because a
+    #: to-device event belongs to no room — which is the point: two devices
+    #: that need to verify each other may share none.
+    to_device: tuple[dict[str, Any], ...] = ()
     #: Transaction ids already used, by the message they were used for,
     #: so a retry of the *same* send reuses its id rather than minting a
     #: new one and duplicating the message.
@@ -169,6 +175,76 @@ class MatrixClient:
         )
         return str(payload["event_id"])
 
+    # -- to-device -------------------------------------------------------
+
+    def send_to_device(
+        self, event_type: str, messages: dict[str, dict[str, dict[str, Any]]]
+    ) -> None:
+        """Send an event straight to a device, outside any room.
+
+        The channel key verification runs over. It exists precisely because
+        two devices that need to verify each other may share no room, and a
+        verification that required one would be unavailable exactly when a
+        new device is being set up.
+
+        A fresh transaction id each call, unlike `send`: to-device events
+        are not user-authored messages, so there is no "the same message
+        twice" to deduplicate — a caller resending is a caller that means
+        to.
+        """
+        self._call(
+            "PUT",
+            f"{API}/sendToDevice/{event_type}/{uuid.uuid4().hex}",
+            {"messages": messages},
+        )
+
+    def start_verification(
+        self, *, their_user: str, their_device: str, transaction_id: str
+    ) -> Verification:
+        """Begin a SAS exchange and send this side's ephemeral key.
+
+        Returns the half-finished `Verification`: the caller must feed it
+        the other side's key, show the emoji to a human, and pass back what
+        the human said. That sequence is not something this method can do
+        on anyone's behalf, and a convenience wrapper that appeared to
+        would be claiming the out-of-band step happened.
+        """
+        verification = Verification()
+        self.send_to_device(
+            "m.key.verification.start",
+            {
+                their_user: {
+                    their_device: {
+                        "method": "m.sas.v1",
+                        "transaction_id": transaction_id,
+                        "key": verification.public_key,
+                    }
+                }
+            },
+        )
+        return verification
+
+    def verification_keys(self, transaction_id: str) -> dict[str, str]:
+        """Ephemeral keys offered to us, by sender, for one transaction.
+
+        Read from the last sync's to-device events. Filtered by
+        transaction id because two verifications can be in flight at once,
+        and taking whichever arrived last would let a third party's
+        exchange be mistaken for the one the human is looking at.
+        """
+        out: dict[str, str] = {}
+        for event in self.to_device:
+            if event.get("type") != "m.key.verification.start":
+                continue
+            content = event.get("content", {})
+            if content.get("transaction_id") != transaction_id:
+                continue
+            key = content.get("key")
+            sender = event.get("sender")
+            if isinstance(key, str) and isinstance(sender, str):
+                out[sender] = key
+        return out
+
     # -- device trust -----------------------------------------------------
 
     def device_trust(self, user_id: str, device_id: str) -> DeviceTrust:
@@ -232,6 +308,10 @@ class MatrixClient:
             path += f"&since={quote(self.since, safe='')}"
         payload = self._call("GET", path)
         events = _timeline(payload)
+        # Stashed before the token advances, for the same reason the token
+        # advances last: a caller that raised while handling a verification
+        # event must be able to see it again rather than resume past it.
+        self.to_device = tuple(payload.get("to_device", {}).get("events", ()))
         self.since = str(payload["next_batch"])
         return events
 
