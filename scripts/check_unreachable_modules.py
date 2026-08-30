@@ -58,6 +58,18 @@ AWAITING_WIRING: dict[str, str] = {
         "data question."
     ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
+    "treble.im.e2ee": (
+        "Olm and Megolm for room encryption (ADR-0012). Unreachable for a measured "
+        "reason rather than an unfinished one: vodozemac 0.10.0 exposes no "
+        "SessionKey.from_base64, so a Megolm room key cannot be rebuilt from the wire "
+        "and this device could send a room key it could never receive. Olm itself is "
+        "complete and round trips through the Matrix wire form, but its only real "
+        "consumer is m.room_key distribution — verification events are deliberately "
+        "sent unencrypted, since a session cannot be established with a device that has "
+        "not been verified. So there is nothing honest to wire it to until the binding "
+        "gains the constructor, at which point a test pinning its absence fails and this "
+        "entry goes with it."
+    ),
 }
 
 ALLOWED_UNREACHABLE = {**ENTRY_POINTS, **AWAITING_WIRING}
