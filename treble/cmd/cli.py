@@ -63,6 +63,10 @@ DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "config" / "universe.yaml
 #: an in-flight ingest is still writing beside.
 DEFAULT_KEEP_DAYS = 7
 
+#: Where `treble homeserver` binds. Matrix's own client-server default on
+#: an unencrypted local listener; 8448 is federation, which this is not.
+DEFAULT_IM_PORT = 8008
+
 #: ECB daily reference rates for the majors `refresh` keeps current.
 ECB_FX_SERIES = ("D.USD.EUR.SP00.A", "D.GBP.EUR.SP00.A", "D.JPY.EUR.SP00.A")
 
@@ -803,6 +807,61 @@ def storage(
         f"[green]reclaimed {(report.waste) / 1024 / 1024:,.1f} MB "
         f"({removed / 1024 / 1024:,.1f} MB of it hand-made copies)[/green]"
     )
+
+
+@app.command()
+def homeserver(
+    port: int = typer.Option(DEFAULT_IM_PORT, help="Port to bind. Matrix's client-server default."),
+    account: list[str] = typer.Option(
+        [], help="user:password to create. Repeatable. Without one, nobody can log in."
+    ),
+) -> None:
+    """Run the in-repo Matrix homeserver so IM has something to talk to.
+
+    **Not Synapse, and not a substitute for it.** `deploy/synapse/` is how
+    you run the real thing; it needs Docker, which is not installed here,
+    so that compose file has never been executed. This serves the same
+    simulator the tests drive — enough of the client-server API to hold a
+    session — over a real socket.
+
+    What it cannot do is make an identity claim mean more. `im/identity.py`
+    proves domain control through a whoami round trip, and against a
+    homeserver you started yourself that proves the transport and nothing
+    about who anybody is. IM says so on screen.
+
+    Bound to 127.0.0.1 and not configurable, like the FIX acceptor: the
+    only authentication here is the account table below, and §22.1's
+    entitlement model is the prerequisite for a wider surface.
+    """
+    from treble.im.server import DEFAULT_HOST, serve
+    from treble.im.simulator import Homeserver
+
+    server = Homeserver()
+    # **Start empty.** `Homeserver` carries a default account so tests can
+    # log in without ceremony, which is harmless in a fixture and is not
+    # harmless on a listening socket: served as-is, this command would
+    # authenticate a user the operator never asked for, with a password
+    # published in the repository. The default belongs to the test
+    # fixture; a served instance authenticates exactly what it was told to.
+    server.accounts.clear()
+    for entry in account:
+        user, _, password = entry.partition(":")
+        if not user or not password:
+            raise typer.BadParameter(f"{entry!r} is not user:password", param_hint="--account")
+        server.accounts[user] = password
+
+    if not server.accounts:
+        # Loud rather than a server nobody can use. An empty account table
+        # answers every login with M_FORBIDDEN, which reads exactly like a
+        # wrong password.
+        console.print(
+            "[yellow]No accounts: every login will be refused. "
+            "Pass --account user:password.[/yellow]"
+        )
+    for user in sorted(server.accounts):
+        console.print(f"  {server.user_id(user)}")
+    console.print(f"Matrix simulator on http://{DEFAULT_HOST}:{port}  (Ctrl-C to stop)")
+    serve(server, port=port)
 
 
 @app.command()
