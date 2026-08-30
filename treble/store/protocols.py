@@ -42,6 +42,21 @@ class IngestLogP(Protocol):
     def read(self, *, up_to_seq: int | None = None) -> list[IngestLogEntry]: ...
 
 
+class FactWriter(Protocol):
+    """The write half of a store, and nothing else.
+
+    Narrower than :class:`Store` on purpose, for callers that must not read
+    from what they are writing to. A replay rebuilding a store typed as
+    `Store` could start reading the thing it is reconstructing; the EMS
+    recording a fill has no business querying the book it is appending to.
+    Both take this instead, so the restriction is in the type rather than in
+    a comment asking future edits to be careful.
+    """
+
+    def write_provenance(self, records: list[Provenance]) -> None: ...
+    def write_facts(self, facts: list[Fact]) -> None: ...
+
+
 class Store(Protocol):
     """Current-state and point-in-time reads over bitemporal facts."""
 

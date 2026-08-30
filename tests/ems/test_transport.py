@@ -169,3 +169,144 @@ async def test_nothing_is_archived_without_a_vault(tmp_path) -> None:  # type: i
         client.receive(await anext(read_messages(reader)))
         writer.close()
     assert len(vault) == 0
+
+
+async def test_a_fill_is_recorded_as_facts_with_the_archived_message_as_provenance(
+    tmp_path,  # type: ignore[no-untyped-def]
+) -> None:
+    """The half of P3_5 the ledger called buildable.
+
+    TCA needs executions to analyse and this install had none: `ems/store.py`
+    persists sequence numbers and `tapi/positions.py` reads *fund* holdings
+    out of N-PORT. Neither is a record of what this workstation traded.
+
+    The provenance assertion is the point. An execution fact whose
+    provenance says only "the EMS said so" is a number with a story
+    attached; this one names the archived FIX message it was parsed from, so
+    the bytes behind a fill can be fetched back and re-read.
+    """
+    from treble.ems.executions import EXECUTION_FIELDS, EXECUTION_PREFIX
+    from treble.ems.simulator import new_order_single
+    from treble.store.duck import DuckStore
+    from treble.vault.worm import Vault
+
+    vault = Vault(tmp_path / "vault")
+    store = DuckStore(tmp_path / "book.db")
+
+    async with running_simulator(vault=vault, store=store) as server:
+        reader, writer = await asyncio.open_connection(HOST, server.port)
+        client = Session(sender="TREBLE", target="SIM")
+        writer.write(client.logon(now=NOW))
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.write(
+            new_order_single(
+                client,
+                now=NOW,
+                order_id="ORD1",
+                symbol="IBM",
+                side="1",
+                quantity=100.0,
+                price=250.0,
+            )
+        )
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.close()
+
+    # `as_of` is *now*, not the test's NOW: the transport stamps a fill
+    # with the wall clock it actually happened at, so a read positioned at
+    # a 2026-08-11 constant would look before the fact existed and find
+    # nothing — which would pass a test asserting absence and fail this one
+    # for the wrong reason.
+    seen = datetime.now(UTC)
+    subjects = store.subjects_with_prefix(EXECUTION_PREFIX, as_of=seen)
+    assert len(subjects) == 1, "one fill, one execution subject"
+
+    facts = [
+        fact for field in EXECUTION_FIELDS for fact in store.read(subjects[0], field, as_of=seen)
+    ]
+    assert {f.field for f in facts} == set(EXECUTION_FIELDS)
+
+    by_field = {f.field: f.value for f in facts}
+    assert by_field["ems:exec:symbol"] == "IBM"
+    assert by_field["ems:exec:side"] == "buy"
+    assert by_field["ems:exec:lastQty"] == 100.0
+    assert by_field["ems:exec:lastPx"] == 250.0
+
+    # I1: the provenance names bytes that are actually in the vault.
+    record = store.provenance(facts[0].provenance_id)
+    assert record.source_system == "ems"
+    assert record.payload_hash, "an execution's provenance must name its message"
+    assert vault.read(record.payload_hash), "and those bytes must be retrievable"
+
+
+async def test_nothing_is_recorded_without_a_store(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Opt-in like archiving: a transport writing to the book by default
+    would put every test run's fills into it."""
+    from treble.ems.executions import EXECUTION_PREFIX
+    from treble.ems.simulator import new_order_single
+    from treble.store.duck import DuckStore
+    from treble.vault.worm import Vault
+
+    store = DuckStore(tmp_path / "book.db")
+    async with running_simulator(vault=Vault(tmp_path / "vault")) as server:
+        reader, writer = await asyncio.open_connection(HOST, server.port)
+        client = Session(sender="TREBLE", target="SIM")
+        writer.write(client.logon(now=NOW))
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.write(
+            new_order_single(
+                client,
+                now=NOW,
+                order_id="ORD1",
+                symbol="IBM",
+                side="1",
+                quantity=100.0,
+                price=250.0,
+            )
+        )
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.close()
+
+    assert store.subjects_with_prefix(EXECUTION_PREFIX, as_of=datetime.now(UTC)) == []
+
+
+async def test_a_store_without_a_vault_records_nothing(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Recording requires archiving, and the ordering is the invariant.
+
+    An execution's provenance names the archived message it was parsed
+    from, so recording without archiving would write a fact pointing at
+    bytes nobody kept — the same failure as an ingest adapter parsing
+    before storing its payload, which `SourceAdapter.run` makes impossible
+    by construction.
+    """
+    from treble.ems.executions import EXECUTION_PREFIX
+    from treble.ems.simulator import new_order_single
+    from treble.store.duck import DuckStore
+
+    store = DuckStore(tmp_path / "book.db")
+    async with running_simulator(store=store) as server:
+        reader, writer = await asyncio.open_connection(HOST, server.port)
+        client = Session(sender="TREBLE", target="SIM")
+        writer.write(client.logon(now=NOW))
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.write(
+            new_order_single(
+                client,
+                now=NOW,
+                order_id="ORD1",
+                symbol="IBM",
+                side="1",
+                quantity=100.0,
+                price=250.0,
+            )
+        )
+        await writer.drain()
+        client.receive(await anext(read_messages(reader)))
+        writer.close()
+
+    assert store.subjects_with_prefix(EXECUTION_PREFIX, as_of=datetime.now(UTC)) == []

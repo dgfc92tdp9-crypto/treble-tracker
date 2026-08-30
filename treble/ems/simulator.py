@@ -30,7 +30,7 @@ session and the order path work.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 
 import simplefix
 
@@ -64,6 +64,13 @@ EXECUTION_REPORT = "8"
 CANCEL_REJECT = "9"
 
 ORIG_CL_ORD_ID = 41
+#: When the trade happened, as opposed to when the message was sent (52).
+#: FIX 4.4 requires it on an ExecutionReport and this simulator omitted it.
+#: Found while building the execution store: TCA picks its benchmark price
+#: from the moment of the fill, so without tag 60 an execution's time is
+#: whenever the reader happened to receive it — which on a replay is a
+#: different answer every run.
+TRANSACT_TIME = 60
 CXL_REJ_REASON = 102
 CXL_REJ_RESPONSE_TO = 434
 TEXT = 58
@@ -355,6 +362,7 @@ class Simulator:
             (CUM_QTY, _decimal(order.filled)),
             (LEAVES_QTY, _decimal(order.leaves)),
             (AVG_PX, _decimal(order.average_price)),
+            (TRANSACT_TIME, now.astimezone(UTC).strftime("%Y%m%d-%H:%M:%S.%f")[:-3]),
         ]
         if original is not None:
             fields.insert(1, (ORIG_CL_ORD_ID, original))

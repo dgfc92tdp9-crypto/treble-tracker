@@ -29,11 +29,18 @@ from pathlib import Path
 
 import simplefix
 
+from treble.ems.executions import (
+    NotAnExecutionError,
+    execution_facts,
+    execution_provenance,
+    parse_execution,
+)
 from treble.ems.heartbeat import HeartbeatMonitor, Liveness
 from treble.ems.session import TEST_REQ_ID, MsgType
 from treble.ems.simulator import Simulator
 from treble.ems.store import resume, save
-from treble.vault.worm import Vault
+from treble.store.protocols import FactWriter
+from treble.vault.worm import ArchivedRecord, Vault
 
 #: Loopback only. See the module docstring.
 HOST = "127.0.0.1"
@@ -83,6 +90,7 @@ class SimulatorServer:
         *,
         state_dir: Path | None = None,
         vault: Vault | None = None,
+        store: FactWriter | None = None,
         heartbeat_seconds: float = 0.0,
     ) -> None:
         self.simulator = simulator or Simulator()
@@ -104,6 +112,13 @@ class SimulatorServer:
         #: asks for is what crossed the wire, not this parser's reading of
         #: it, and the two can differ precisely when it matters.
         self.vault = vault
+        #: Where fills are recorded as facts, if anywhere. Requires the
+        #: vault: an execution's provenance names the archived message it
+        #: was parsed from, so recording without archiving would produce a
+        #: fact pointing at bytes nobody kept. Opt-in like archiving, for
+        #: the same reason — a transport that wrote to the store by default
+        #: would put every test run's fills into it.
+        self.store = store
         self._server: asyncio.AbstractServer | None = None
         self.port = 0
         #: Connections dropped for going silent. Counted, because a session
@@ -128,7 +143,10 @@ class SimulatorServer:
                 monitor.received(now)
                 self._archive(raw, now=now)
                 for reply in self.simulator.respond(raw, now=now):
-                    self._archive(reply, now=now)
+                    # Executions come from the acceptor's *replies*, not
+                    # from what the client sent: an order is a request and
+                    # only the venue can report a fill.
+                    self._record_execution(reply, self._archive(reply, now=now), now=now)
                     writer.write(reply)
                     monitor.sent(now)
                 await writer.drain()
@@ -179,7 +197,7 @@ class SimulatorServer:
                 monitor.sent(now)
             await writer.drain()
 
-    def _archive(self, raw: bytes, *, now: datetime) -> None:
+    def _archive(self, raw: bytes, *, now: datetime) -> ArchivedRecord | None:
         """Retain one message under the books-and-records schedule.
 
         The event date is *today* here because a FIX message's event is its
@@ -187,10 +205,47 @@ class SimulatorServer:
         earlier date. Callers archiving reconstructed history must pass the
         date the record concerns instead, which is why `Vault.archive` takes
         it rather than assuming.
+
+        Returns the record so `_record_execution` can name the archived
+        bytes as an execution's provenance. Without that key the fact would
+        have to claim "the EMS said so", which is a number with a story
+        attached rather than one that can be checked.
         """
         if self.vault is None:
+            return None
+        return self.vault.archive(raw, kind="fix", event_date=now.date(), now=now)
+
+    def _record_execution(
+        self, raw: bytes, archived: ArchivedRecord | None, *, now: datetime
+    ) -> None:
+        """Write a fill to the fact store, if this message is one.
+
+        **Archive first, then derive** — the same ordering `SourceAdapter.run`
+        enforces, and for the same reason: the bytes a record is derived from
+        must exist before anything derived from them does. So this refuses to
+        write when there is no archived record, rather than falling back to a
+        provenance with no payload.
+
+        Most execution reports are not fills — an ack, a cancel and a reject
+        all arrive as 35=8 — so `NotAnExecutionError` is the common case and
+        is not logged. A malformed message that *is* a fill would be, but
+        there is nowhere to log to here and swallowing it would lose a trade
+        silently; the recorder is deliberately narrow and anything it cannot
+        read stays in the vault to be replayed later.
+        """
+        if self.store is None or archived is None:
             return
-        self.vault.archive(raw, kind="fix", event_date=now.date(), now=now)
+        try:
+            execution = parse_execution(raw, received_at=now)
+        except NotAnExecutionError:
+            return
+        provenance = execution_provenance(
+            archived.key,
+            received_at=now,
+            source_uri=f"fix://{self.simulator.session.sender}/{self.simulator.session.target}",
+        )
+        self.store.write_provenance([provenance])
+        self.store.write_facts(list(execution_facts(execution, provenance.id)))
 
     def _resume(self) -> None:
         """Adopt persisted counters, if any were left by a previous run."""
@@ -232,11 +287,16 @@ async def running_simulator(
     *,
     state_dir: Path | None = None,
     vault: Vault | None = None,
+    store: FactWriter | None = None,
     heartbeat_seconds: float = 0.0,
 ) -> AsyncIterator[SimulatorServer]:
     """A simulator listening on loopback, stopped on exit."""
     server = SimulatorServer(
-        simulator, state_dir=state_dir, vault=vault, heartbeat_seconds=heartbeat_seconds
+        simulator,
+        state_dir=state_dir,
+        vault=vault,
+        store=store,
+        heartbeat_seconds=heartbeat_seconds,
     )
     await server.start()
     try:

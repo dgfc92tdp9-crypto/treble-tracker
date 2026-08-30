@@ -1428,14 +1428,54 @@ phase_3:
                   would not take: MANDATE_DIR was a *default argument*, bound at import,
                   so the mandate directory could never be redirected by any caller. It
                   resolves at call time now."}
-  P3_5:  {done: 0.0, blocker: data,
+  P3_5:  {done: 0.3, blocker: data,
           name: "TCA",
           notes: "Transaction cost analysis needs executions to analyse, and this
                   install has no trade or position store — the same gap that leaves
                   §12.1's total-return swap unfed. It also needs a benchmark price at
                   execution time, which for corporate bonds means the intraday quotes
                   measured absent on 2026-08-09. Blocked twice; the trade store is
-                  the half that is buildable."}
+                  the half that is buildable.",
+          basis: "the trade store ships; TCA itself does not, and 0.3 is the
+                  prerequisite rather than the deliverable. treble/ems/executions.py
+                  parses execution reports into facts and treble/ems/transport.py
+                  records them, so this install now has a book of what it traded
+                  where before it had none — ems/store.py persists FIX sequence
+                  numbers and tapi/positions.py reads *fund* holdings out of N-PORT,
+                  and neither is a record of our own fills. Executions go in `facts`
+                  rather than a table of their own, the opposite call from
+                  people/directory.py: personal data cannot be append-only and still
+                  honour an erasure request, while an execution is a record of
+                  something that happened and must never change, which is what I2 is
+                  for. Provenance is the archived FIX message, not 'the EMS said so':
+                  transport.py already writes every message to the content-addressed
+                  vault before deriving anything from it, so payload_hash is a vault
+                  key and the bytes behind a fill can be fetched back and re-parsed —
+                  the same archive-then-derive ordering SourceAdapter.run enforces,
+                  and the reason recording refuses to run without a vault. The
+                  dangerous direction is counting a non-fill as a fill: an ack, a
+                  cancel and a reject all arrive as 35=8, and a TCA average that
+                  included a cancel at price 0 would read as a good execution, so
+                  ExecType is checked against the FIX 4.2 and 4.4 trade codes and
+                  everything else is refused by name. An unmapped Side is refused
+                  rather than guessed, because a short sale booked as a buy is a
+                  position error with a plausible explanation. Found while building
+                  it: the simulator's execution reports carried no TransactTime (60),
+                  which FIX 4.4 requires — and TCA picks its benchmark from the
+                  moment of the fill, so without it an execution's time is whenever
+                  the reader happened to receive it, which on a replay is a different
+                  answer every run. Fixed in the simulator. Mutation-checked: 6
+                  mutants, all killed, including accepting an ack as a trade, signing
+                  a sell positive, and writing a fill as an open-ended period rather
+                  than an instant. Outstanding, and why this is 0.3 and still
+                  blocked on `data`: no TCA computation at all — no arrival price, no
+                  implementation shortfall, no VWAP. VWAP and arrival need intraday
+                  quotes this install does not have and cannot get for corporate
+                  bonds (measured absent 2026-08-09); a close-based benchmark is
+                  computable from the 885k twelvedata daily closes and is not yet
+                  built. No screen, and no order record — an execution knows its
+                  ClOrdID but nothing here stores the order it belongs to, so
+                  arrival-price shortfall has no arrival to measure from."}
 
 phase_4:
   P4_1:  {done: 0.0, blocker: code,

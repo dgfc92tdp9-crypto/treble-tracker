@@ -40,27 +40,12 @@ import inspect
 import pkgutil
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
-from typing import Protocol
 
 import treble.ingest
-from treble.core.facts import Fact
-from treble.core.provenance import Provenance
 from treble.ingest.base import ParsedBatch, RawPayload, SourceAdapter
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadStore
-
-
-class FactWriter(Protocol):
-    """The part of a store a rebuild needs.
-
-    Narrower than `Store` on purpose: a rebuild writes and never reads, and
-    a parameter typed as the full store would let a future edit here start
-    reading from the thing it is supposed to be reconstructing.
-    """
-
-    def write_provenance(self, records: list[Provenance]) -> None: ...
-
-    def write_facts(self, facts: list[Fact]) -> None: ...
+from treble.store.protocols import FactWriter
 
 
 def adapter_classes() -> dict[str, type[SourceAdapter]]:
