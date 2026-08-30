@@ -1428,7 +1428,7 @@ phase_3:
                   would not take: MANDATE_DIR was a *default argument*, bound at import,
                   so the mandate directory could never be redirected by any caller. It
                   resolves at call time now."}
-  P3_5:  {done: 0.65, blocker: data,
+  P3_5:  {done: 0.75, blocker: data,
           name: "TCA",
           notes: "Transaction cost analysis needs executions to analyse, and this
                   install has no trade or position store — the same gap that leaves

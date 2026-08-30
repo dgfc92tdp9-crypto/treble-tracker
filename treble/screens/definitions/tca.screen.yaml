@@ -1,0 +1,79 @@
+# TCA — Transaction Cost Analysis (spec §18.5, Phase 3 P3_5).
+#
+# Portfolio-wide, like PMS and PORT: execution quality is a property of the
+# book, so asking it about one security would answer a different question.
+# No yellow key.
+#
+# **Two panes, and the second is not an appendix.** §18.5 names four
+# benchmarks — arrival, VWAP, close, implementation shortfall — and this
+# install can compute one. A screen showing only the slippage column would
+# read as an execution measured against a panel of benchmarks that agreed,
+# which is the same defect PMS's "BREACHES: 0" would have been: a number
+# that looks like a verdict because the things it could not check are
+# invisible. So the lower pane carries every benchmark NOT COMPUTED with
+# its reason, and every fill that could not be measured at all.
+#
+# The two price columns are signed in opposite directions and the screen
+# says so. Slippage is against the close, where positive is cost. Price
+# improvement is against the trader's own limit, where positive is better —
+# a limit is a *worst acceptable* price, so being inside it is the good
+# direction. One convention for both would make one of them read backwards
+# on the row where it matters.
+mnemonic: TCA
+title: Transaction Cost Analysis
+rows: 22
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "TRANSACTION COST ANALYSIS"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "SYMBOL      SIDE        QUANTITY      FILL PX    SLIPPAGE vs CLOSE (bp)"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 3, col: 0, height: 7, width: 80}
+        pane_type: table_scroll
+        binding: "sys:tca_fills"
+        order: asc
+
+      - kind: static
+        at: {row: 10, col: 0}
+        text: "positive slippage is cost: a buy above the close, or a sell below it."
+        attrs: [label]
+
+      - kind: static
+        at: {row: 12, col: 0}
+        text: "BENCHMARK              STATUS          WHY"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 13, col: 0, height: 6, width: 80}
+        pane_type: table_scroll
+        binding: "sys:tca_method"
+        order: asc
+
+      - kind: link
+        at: {row: 19, col: 0}
+        text: "PMS   Mandate compliance"
+        command: "PMS"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "NOT COMPUTED is not zero cost: three of four benchmarks need data not held."
+        attrs: [label, warning]
+      - kind: static
+        at: {row: 21, col: 0}
+        text: "Order rows score fills against the trader's limit, where positive is better."
+        attrs: [label]

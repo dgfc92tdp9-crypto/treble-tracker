@@ -1,0 +1,22 @@
+TRANSACTION COST ANALYSIS
+────────────────────────────────────────────────────────────────────────────
+SYMBOL      SIDE        QUANTITY      FILL PX    SLIPPAGE vs CLOSE (bp)
++------------------------------------------------------------------------------+
+|[table_scroll:sys:tca_fills]                                                  |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+positive slippage is cost: a buy above the close, or a sell below it.
+
+BENCHMARK              STATUS          WHY
++------------------------------------------------------------------------------+
+|[table_scroll:sys:tca_method]                                                 |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+PMS   Mandate compliance
+NOT COMPUTED is not zero cost: three of four benchmarks need data not held.
+Order rows score fills against the trader's limit, where positive is better.

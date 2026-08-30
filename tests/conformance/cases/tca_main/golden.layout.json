@@ -1,0 +1,195 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "TRANSACTION COST ANALYSIS"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "SYMBOL      SIDE        QUANTITY      FILL PX    SLIPPAGE vs CLOSE (bp)"
+    },
+    {
+      "at": [
+        10,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "positive slippage is cost: a buy above the close, or a sell below it."
+    },
+    {
+      "at": [
+        12,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "BENCHMARK              STATUS          WHY"
+    },
+    {
+      "at": [
+        19,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "PMS",
+      "provenance": null,
+      "text": "PMS   Mandate compliance"
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label",
+        "warning"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "NOT COMPUTED is not zero cost: three of four benchmarks need data not held."
+    },
+    {
+      "at": [
+        21,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Order rows score fills against the trader's limit, where positive is better."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    22,
+    80
+  ],
+  "mnemonic": "TCA",
+  "panes": [
+    {
+      "binding": "sys:tca_fills",
+      "data": [
+        [
+          "IBM",
+          "buy",
+          100.0,
+          251.5,
+          60.0
+        ],
+        [
+          "IBM",
+          "sell",
+          40.0,
+          249.0,
+          -40.16
+        ]
+      ],
+      "region": [
+        3,
+        0,
+        7,
+        80
+      ],
+      "type": "table_scroll"
+    },
+    {
+      "binding": "sys:tca_method",
+      "data": [
+        [
+          "close",
+          "computed",
+          "slippage in bp of the trade date's close"
+        ],
+        [
+          "arrival",
+          "NOT COMPUTED",
+          "needs a price at the instant the order arrived; this store holds one close per day"
+        ],
+        [
+          "implementation shortfall",
+          "NOT COMPUTED",
+          "measured from the arrival price, so it inherits arrival's blocker"
+        ],
+        [
+          "vwap",
+          "NOT COMPUTED",
+          "needs intraday volume. No instrument in this store has it"
+        ],
+        [
+          "caveat",
+          "",
+          "measured against the close, struck hours after the fill: a large order is scored against the market it moved"
+        ],
+        [
+          "ACME 2026-08-28",
+          "UNMEASURED",
+          "equity:ACME carries no daily series: looked for ADJ_CLOSE, PX_LAST"
+        ],
+        [
+          "ORD1 IBM",
+          "100% filled",
+          "+139.4bp vs its limit of 255"
+        ]
+      ],
+      "region": [
+        13,
+        0,
+        6,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}

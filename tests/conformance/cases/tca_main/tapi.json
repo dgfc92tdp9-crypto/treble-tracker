@@ -1,0 +1,58 @@
+{
+  "fields": {},
+  "series": {
+    "sys:tca_fills": [
+      [
+        "IBM",
+        "buy",
+        100.0,
+        251.5,
+        60.0
+      ],
+      [
+        "IBM",
+        "sell",
+        40.0,
+        249.0,
+        -40.16
+      ]
+    ],
+    "sys:tca_method": [
+      [
+        "close",
+        "computed",
+        "slippage in bp of the trade date's close"
+      ],
+      [
+        "arrival",
+        "NOT COMPUTED",
+        "needs a price at the instant the order arrived; this store holds one close per day"
+      ],
+      [
+        "implementation shortfall",
+        "NOT COMPUTED",
+        "measured from the arrival price, so it inherits arrival's blocker"
+      ],
+      [
+        "vwap",
+        "NOT COMPUTED",
+        "needs intraday volume. No instrument in this store has it"
+      ],
+      [
+        "caveat",
+        "",
+        "measured against the close, struck hours after the fill: a large order is scored against the market it moved"
+      ],
+      [
+        "ACME 2026-08-28",
+        "UNMEASURED",
+        "equity:ACME carries no daily series: looked for ADJ_CLOSE, PX_LAST"
+      ],
+      [
+        "ORD1 IBM",
+        "100% filled",
+        "+139.4bp vs its limit of 255"
+      ]
+    ]
+  }
+}
