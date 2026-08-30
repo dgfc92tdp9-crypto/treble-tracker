@@ -42,6 +42,13 @@ class Homeserver:
     #: way a real homeserver deduplicates it.
     seen_txn: dict[str, str] = field(default_factory=dict)
     batches: list[list[tuple[str, dict[str, Any]]]] = field(default_factory=list)
+    #: Published cross-signing and device keys, as `/keys/query` returns
+    #: them: user id -> the two halves a client needs to check a chain.
+    #: Empty by default, because a homeserver that invented keys would let
+    #: `crosssigning.verify_device` verify something nobody signed.
+    master_keys: dict[str, dict[str, Any]] = field(default_factory=dict)
+    self_signing_keys: dict[str, dict[str, Any]] = field(default_factory=dict)
+    device_keys: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
 
     def user_id(self, localpart: str) -> str:
         return f"@{localpart}:{self.domain}"
@@ -75,6 +82,8 @@ class Homeserver:
             return 200, {"room_id": room}
         if route.startswith(f"{API}/rooms/") and "/send/" in route:
             return self._send(route, body or {}, self.tokens[token])
+        if route == f"{API}/keys/query":
+            return self._keys_query(body or {})
         if route == f"{API}/sync":
             return self._sync(path)
         return 404, {"errcode": "M_UNRECOGNIZED", "error": route}
@@ -90,6 +99,32 @@ class Homeserver:
         # client reads it back rather than assuming what it sent.
         self.tokens[token] = self.user_id(user.lower())
         return 200, {"access_token": token, "user_id": self.tokens[token]}
+
+    def _keys_query(self, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        """Device and cross-signing keys for the users asked about.
+
+        Serves only what was published: a homeserver inventing a key would
+        let `crosssigning.verify_device` verify a chain nobody signed,
+        which is the one thing that check exists to prevent. A user with
+        nothing published is simply absent from the response, which is what
+        a real server does and what tells a client "no cross-signing here"
+        rather than "not verified".
+        """
+        wanted = body.get("device_keys")
+        users = list(wanted) if isinstance(wanted, dict) else []
+        return 200, {
+            "device_keys": {
+                user: self.device_keys[user] for user in users if user in self.device_keys
+            },
+            "master_keys": {
+                user: self.master_keys[user] for user in users if user in self.master_keys
+            },
+            "self_signing_keys": {
+                user: self.self_signing_keys[user]
+                for user in users
+                if user in self.self_signing_keys
+            },
+        }
 
     def _send(self, route: str, body: dict[str, Any], sender: str) -> tuple[int, dict[str, Any]]:
         parts = route.split("/")

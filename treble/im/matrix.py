@@ -40,6 +40,8 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
+from treble.im.crosssigning import DeviceTrust, key_material, verify_device
+
 #: Client-server API version this speaks.
 API = "/_matrix/client/v3"
 
@@ -166,6 +168,54 @@ class MatrixClient:
             {"msgtype": "m.text", "body": body},
         )
         return str(payload["event_id"])
+
+    # -- device trust -----------------------------------------------------
+
+    def device_trust(self, user_id: str, device_id: str) -> DeviceTrust:
+        """Whether ``device_id`` is cross-signed by ``user_id``'s master key.
+
+        This is what Matrix means by a *verified* device, and it is a
+        different claim from `im/identity.py`'s: that one proves the
+        homeserver authenticated an MXID, this one proves the account
+        holder's own root key vouches for the device sending from it.
+
+        **The master key comes from the homeserver here, and that is a
+        stated weakness rather than a hidden one.** A homeserver that
+        wanted to lie could serve its own master key and a chain beneath
+        it, and this would verify. Closing that needs the key confirmed out
+        of band — SAS, or comparing a fingerprint — and until it is,
+        `DeviceTrust.master_key` travels with the answer so the premise is
+        visible to whoever reads it. A boolean alone would hide exactly
+        this.
+        """
+        payload = self._call("POST", f"{API}/keys/query", {"device_keys": {user_id: []}})
+        master = payload.get("master_keys", {}).get(user_id)
+        self_signing = payload.get("self_signing_keys", {}).get(user_id)
+        device = payload.get("device_keys", {}).get(user_id, {}).get(device_id)
+
+        if not isinstance(master, dict) or not isinstance(self_signing, dict):
+            return DeviceTrust(
+                user_id=user_id,
+                device_id=device_id,
+                verified=False,
+                master_key="",
+                reason="the homeserver published no cross-signing keys for this user",
+            )
+        if not isinstance(device, dict):
+            return DeviceTrust(
+                user_id=user_id,
+                device_id=device_id,
+                verified=False,
+                master_key=key_material(master),
+                reason=f"the homeserver published no keys for device {device_id!r}",
+            )
+        return verify_device(
+            user_id=user_id,
+            device_id=device_id,
+            master_key=key_material(master),
+            self_signing_key=self_signing,
+            device_keys=device,
+        )
 
     # -- sync ------------------------------------------------------------
 
