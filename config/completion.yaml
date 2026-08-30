@@ -1428,7 +1428,7 @@ phase_3:
                   would not take: MANDATE_DIR was a *default argument*, bound at import,
                   so the mandate directory could never be redirected by any caller. It
                   resolves at call time now."}
-  P3_5:  {done: 0.3, blocker: data,
+  P3_5:  {done: 0.5, blocker: data,
           name: "TCA",
           notes: "Transaction cost analysis needs executions to analyse, and this
                   install has no trade or position store — the same gap that leaves
@@ -1468,14 +1468,35 @@ phase_3:
                   mutants, all killed, including accepting an ack as a trade, signing
                   a sell positive, and writing a fill as an open-ended period rather
                   than an instant. Outstanding, and why this is 0.3 and still
-                  blocked on `data`: no TCA computation at all — no arrival price, no
-                  implementation shortfall, no VWAP. VWAP and arrival need intraday
-                  quotes this install does not have and cannot get for corporate
-                  bonds (measured absent 2026-08-09); a close-based benchmark is
-                  computable from the 885k twelvedata daily closes and is not yet
-                  built. No screen, and no order record — an execution knows its
-                  ClOrdID but nothing here stores the order it belongs to, so
-                  arrival-price shortfall has no arrival to measure from."}
+                  blocked on `data`: three of §18.5's four benchmarks. The
+                  close-based one now ships — analytics/tca.py scores a fill against
+                  the close of its trade date in basis points, tapi/tca.py joins the
+                  book to the 885k twelvedata closes, and LocalTapi serves it as two
+                  panels. **Two panels, not one:** a single table of slippage numbers
+                  would read as an execution measured against a panel of agreeing
+                  benchmarks, so sys:tca_method carries the three refusals beside the
+                  one number, the same line PMS draws with NOT EVALUABLE. The sign is
+                  the part that fails quietly — the same difference is a cost on a buy
+                  and a saving on a sell, so a benchmark computed without the side is
+                  right half the time and never says which half; every sign test has a
+                  partner on the other side and one asserts the two disagree, because
+                  abs(difference) passes a buy-only suite perfectly. A fill whose close
+                  is missing is reported as UNMEASURED rather than dropped: those are
+                  the fills on days the series does not cover, which is not a random
+                  sample, so excluding them would bias every average while the report
+                  still said 'average slippage'. A neighbouring day's close is refused
+                  for the same reason — substituted, it is indistinguishable from a
+                  correct answer in every report it reaches. Mutation-checked: 7
+                  mutants, all killed, including abs() for the sign, percent for basis
+                  points, and substituting an adjacent close. Outstanding: VWAP needs
+                  intraday volume no instrument here has; arrival needs a price at the
+                  order's arrival instant AND an order record that does not exist — an
+                  execution carries its ClOrdID and nothing stores the order it belongs
+                  to, so arrival is blocked on a record this repository could build
+                  before it is blocked on market data it cannot get; implementation
+                  shortfall is measured from arrival and inherits its blocker. No
+                  screen YAML yet — the panels are served by LocalTapi and bound by
+                  nothing, so TCA is reachable through TAPI and not yet visible."}
 
 phase_4:
   P4_1:  {done: 0.0, blocker: code,

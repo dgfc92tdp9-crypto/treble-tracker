@@ -673,6 +673,8 @@ class LocalTapi:
             return self._allq_evaluated(security, as_of=as_of)
         if binding == "sys:tval_residual":
             return self._tval_residual(as_of=as_of)
+        if binding in ("sys:tca_fills", "sys:tca_method"):
+            return self._tca(binding, as_of=as_of)
         # sys:provenance — the I1 DAG behind this security's current values.
         if security is None:
             # A reason, not a blank pane. SPTR unbound is what a reader
@@ -1582,6 +1584,54 @@ class LocalTapi:
                 reading.staleness(today=today),
             )
             for reading in readings
+        )
+
+    def _tca(
+        self, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`sys:tca_fills` / `sys:tca_method` — execution quality (§18.5).
+
+        Two panels rather than one, and the split is the point. The spec
+        names four benchmarks; this install can compute *one*, so a single
+        panel of slippage numbers would read as an execution measured
+        against a panel of agreeing benchmarks. `sys:tca_method` carries
+        the three refusals and the caveat on the one that is computed.
+
+        Same shape as `PMS`'s NOT EVALUABLE: the reader is told what was
+        not measured, beside what was.
+        """
+        from treble.tapi.tca import execution_quality
+
+        quality = execution_quality(self._store, as_of=as_of)
+
+        if binding == "sys:tca_method":
+            rows: list[tuple[str | float | int | None, ...]] = [
+                ("close", "computed", "slippage in bp of the trade date's close"),
+            ]
+            rows.extend(
+                (name.replace("_", " "), "NOT COMPUTED", reason)
+                for name, reason in sorted(quality.unavailable.items())
+            )
+            if quality.measured:
+                rows.append(("caveat", "", quality.measured[0].caveat))
+            for fill in quality.unmeasured:
+                rows.append((f"{fill.symbol} {fill.trade_date}", "UNMEASURED", fill.reason))
+            return tuple(rows)
+
+        if not quality.fills:
+            # A reason, not a blank pane: an install that has never traded
+            # is a true state, and "no fills" reads differently from an
+            # empty table that might be a failed query.
+            return (("no fills recorded", None, None, None, None),)
+        return tuple(
+            (
+                bench.symbol,
+                bench.side,
+                bench.quantity,
+                bench.executed_price,
+                round(bench.slippage_bp, 2),
+            )
+            for bench in quality.measured
         )
 
     def _tval_peers(self, *, as_of: datetime) -> tuple[tuple[str | float | int | None, ...], ...]:
