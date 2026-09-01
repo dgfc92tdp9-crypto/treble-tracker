@@ -28,6 +28,7 @@ tells you what to run rather than doing it behind your back.
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -294,18 +295,129 @@ def measure(data_dir: Path) -> StorageReport:
     return StorageReport(root=data_dir, components=tuple(components))
 
 
+#: Days of headroom below which the data directory is reported as a
+#: problem rather than a number.
+#:
+#: Measured on this machine, 2026-09-01: the payload store alone would take
+#: **24.15 GB/year** if every source were fetched at the cadence it
+#: declares, against **8.1 GB free**. Two GLEIF bulk files account for 23.3
+#: GB of that — 37 MB and 27 MB per fetch, both declared daily. Nothing was
+#: wrong; nothing had run them daily yet. The projection is what the disk
+#: does the moment somebody turns updates up, which is the stated goal.
+#:
+#: 180 days rather than 30, because the remedy is not quick: it is
+#: negotiating a cadence down, or moving the data directory, or switching a
+#: bulk source to deltas. A warning that arrives with a month left is a
+#: warning that arrives too late to do any of those calmly.
+RUNWAY_FLOOR_DAYS = 180.0
+
+
+@dataclass(frozen=True)
+class Growth:
+    """Projected bytes per day, and what is producing them.
+
+    Separate from :class:`StorageReport` because it answers a different
+    question. That one asks what is on the disk now and what of it is
+    waste; this asks what will be on the disk later. The incident that
+    prompted `measure` was waste already accumulated — this is the one
+    where nothing is wasted and the disk fills anyway.
+    """
+
+    per_day: int
+    #: (source id, bytes/day), largest first. Named, because "24 GB a year"
+    #: is not actionable and "gleif-rr, 37 MB every day" is.
+    contributors: tuple[tuple[str, int], ...] = ()
+
+    @property
+    def per_year(self) -> int:
+        return self.per_day * 365
+
+
+def runway_days(free_bytes: int, growth: Growth) -> float | None:
+    """Days until projected growth exhausts ``free_bytes``.
+
+    ``None`` when nothing is growing — distinct from a very large number,
+    because "no declared cadence anywhere" and "centuries of headroom" want
+    different responses and would otherwise render the same.
+    """
+    if growth.per_day <= 0:
+        return None
+    return free_bytes / growth.per_day
+
+
+def free_bytes(path: Path) -> int:
+    """Space available on the filesystem holding ``path``.
+
+    The filesystem's number, not the volume's total minus the store: other
+    things share this disk, and on the machine this was written for they
+    are 97% of it.
+    """
+    usage = shutil.disk_usage(path if path.exists() else path.parent)
+    return usage.free
+
+
+@dataclass(frozen=True)
+class RunwayVerdict:
+    """Whether the headroom is enough for the declared cadences.
+
+    Its own type rather than a reused :class:`Verdict`. That one measures
+    megabytes against a byte budget and its ``summary`` says so; filling it
+    with zeroes to carry a *time* would print "0.0 MB reclaimable, within
+    the 0.0 MB budget" beside a warning that the disk has four months left.
+    """
+
+    ok: bool
+    #: None when nothing is growing — see :func:`runway_days`.
+    days: float | None
+    floor_days: float
+    reasons: tuple[str, ...]
+
+    @property
+    def summary(self) -> str:
+        if self.days is None:
+            return "no source has both a declared cadence and a stored payload"
+        return f"{self.days:,.0f} days of headroom against a {self.floor_days:,.0f}-day floor"
+
+
+def runway_verdict(
+    free: int, growth: Growth, *, floor_days: float = RUNWAY_FLOOR_DAYS
+) -> RunwayVerdict:
+    """Whether there is enough headroom for the declared cadences. Pure.
+
+    Deliberately **not** part of :func:`verdict` and deliberately not a gate
+    failure: waste is something to clean up today, and runway is a plan to
+    revise. Failing a commit over a projection would teach people to set the
+    override and stop reading either one.
+    """
+    days = runway_days(free, growth)
+    if days is None or days >= floor_days:
+        return RunwayVerdict(ok=True, days=days, floor_days=floor_days, reasons=())
+    reasons = [
+        f"{_mb(growth.per_day)}/day projected against {_mb(free)} free — "
+        f"{days:,.0f} days of headroom, under the {floor_days:,.0f}-day floor"
+    ]
+    reasons.extend(f"{source}: {_mb(per_day)}/day" for source, per_day in growth.contributors[:5])
+    return RunwayVerdict(ok=False, days=days, floor_days=floor_days, reasons=tuple(reasons))
+
+
 __all__ = [
     "BACKUP_SUFFIXES",
     "DEFAULT_WASTE_LIMIT",
     "HOT_ROW_LIMIT",
     "PARTIAL_SUFFIX",
+    "RUNWAY_FLOOR_DAYS",
     "WASTE_LIMIT_ENV",
     "Component",
+    "Growth",
+    "RunwayVerdict",
     "StorageReport",
     "Verdict",
+    "free_bytes",
     "free_list_bytes",
     "maintenance_due",
     "measure",
+    "runway_days",
+    "runway_verdict",
     "verdict",
     "waste_limit",
 ]

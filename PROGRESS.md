@@ -19,6 +19,15 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
+> **Superseded on 2026-09-01: it is now 68%, having been 76%.** The module
+> grew to 747 statements and the tests did not follow, and nothing caught the
+> drift — the repository floor is a whole-suite 84% and the module-coverage
+> gate only asks whether a module has *any* coverage. There is no per-module
+> floor. See "Phase 1-3 sweep" below for the current attribution by method.
+> The rest of this section is the 2026-08-08 record and still explains *why*
+> the coverage is hard to win.
+
+
 The screen-binding layer is the least-covered module in the repository —
 190 statements missed, against a repository floor of 84% and a whole-suite
 figure of 89%. The module-coverage gate cannot see it, because that gate
@@ -153,6 +162,175 @@ Deferred deliberately, not forgotten: EDGAR Exhibit 21 / OpenCorporates (spec §
 **Standing directives (Jack):** accuracy above all; stress tests + real data always; API
 choices delegated (pick accuracy-maximising, report after); launch = full spec through
 Phase 5; zero external cost (ubuntu-only CI, no cloud routines; pause on token exhaustion).
+
+---
+
+## Phase 1-3 sweep (2026-09-01)
+
+A front-to-back sweep against the **live** store rather than fixtures. Three
+defects fixed, four gaps recorded. `make gate` green throughout: 173 modules,
+90.2% coverage.
+
+### The screens were showing a 2018 number as this quarter's
+
+`DES` and `FA` for AAPL rendered:
+
+    INCOME (as reported, USD)         3 months to 2026-03-28
+    Revenue       62,900,000,000
+    Net income    29,578,000,000
+
+The net income is right. The revenue is Apple's **Q4 FY2018** figure. Apple
+stopped using `us-gaap:Revenues:USD` in 2018 when it moved to ASC 606 and
+`RevenueFromContractWithCustomerExcludingAssessedTax`; the store holds
+111,184,000,000 for that quarter under the newer tag. Together the two
+numbers implied a 47% net margin for a company that runs about 26%.
+
+Nothing was corrupt. The binding asked for the latest value of a tag, and
+`LocalTapi.field` returns the latest value of a tag with **no upper bound on
+how old it may be**. The staleness flag did fire — and fired identically on
+the 2026 net income, because everything fundamental is past the 120-day
+threshold while EDGAR sits un-ingested since 2026-07-31. A flag that is true
+for every row on the screen distinguishes nothing.
+
+Fixed with `BoundCell.period_from`: the field whose period a cell must share
+to be displayed at all. A mismatch renders as missing, because that is what
+it is — the filer reported nothing under that tag for that period. An
+*instant* agrees with a *duration* when it falls on the duration's end, so a
+closing balance still shows under a flow heading.
+
+**The `fa_cashflow` conformance golden had frozen the same bug** — a 30 June
+cash balance under a "3 months to 31 March" heading — and was regenerated.
+The conformance suite could not have caught this: it feeds screens frozen
+TAPI responses, so it validates renderers, never bindings.
+
+**Still open:** choosing the right tag per filer is §14.1 standardisation and
+is not built. The guard turns a wrong number into an honest blank; it does
+not put the right number there. `LocalTapi.field` also has no way to ask for
+a *specific* period, which is the deeper reason the wrong one was reachable.
+
+### A missing value that overwrote its own label
+
+Blanking that cell produced `Cash and equivalents, carrying val—e`. The em
+dash was one character written at the cell origin while the number it
+replaced was right-aligned across twenty columns, so the label's tail
+re-emerged to its right and read as part of the value. Pre-existing for any
+null in a right-aligned column, and invisible until a null landed in one
+whose label was long enough to reach. Found *by* the first fix, not by the
+bug it fixed.
+
+### 95.6% of every refresh was a row saying nothing had changed
+
+One `treble refresh` wrote **505,461 fact rows to carry 22,453 rows of new
+information**. `fred:BAMLC0A0CM` for 2025-09-03 was stored eight times, 0.81
+in all eight, once per refresh since 2026-07-27. 32% of the whole store —
+4.8 million rows — was re-observations of values that had not moved.
+
+Correct under I2, and **linear in refresh frequency**, which makes it the
+thing standing in front of every "update more often" improvement:
+
+| cadence | rows/yr written | rows/yr of new information |
+|---|---|---|
+| daily | 184,493,265 | 8,195,345 |
+| hourly | 4,427,838,360 | 8,195,345 |
+
+`store/coalesce.py` drops an incoming row whose newest assertion **from the
+same source** is identical. Conservative deliberately: never across sources
+(reads do not partition by source, so dropping a second source's row would
+silently move which source the value traces to — an I1 change disguised as a
+space saving), and never for knowledge arriving out of order.
+
+Nothing is lost. The re-fetch is recorded once in the ingest log and once in
+provenance, which holds **one record per payload, not per fact** — 586
+records for 15 million facts.
+
+It also makes the store agree with its own contract: `core.facts` defines
+`knowledge_from` as when the system could *first* have known a value, and
+under plain append the visible row carried the *latest* re-fetch.
+
+Verified by rebuilding the same history twice — once through `write_facts`,
+once through a raw insert that coalesces nothing — and asserting both answer
+every `as_of` identically. Seven mutations of the filter, each killed. Two
+survived the first pass and were real gaps: `effective_to` was absent from
+the key's test coverage, and `value_kind` turned out to be genuinely implied
+by the typed columns (pinned by a test rather than left as a check that
+cannot fail).
+
+### The disk runs out in about four months, and not because of waste
+
+`storage.py` measures what is on the disk and what of it is reclaimable. It
+could not answer the question that actually matters here, because the answer
+has **no waste in it at all**: every payload is content-addressed, immutable,
+and the substrate I5 replays from.
+
+At the cadences the adapters declare:
+
+| source | per fetch | cadence | per year |
+|---|---|---|---|
+| gleif-rr | 37.27 MB | daily | **13.60 GB** |
+| gleif-isin | 26.64 MB | daily | **9.72 GB** |
+| edgar-bulk | 97.15 MB | 92 days | 0.39 GB |
+| dtcc-sdr | 1.01 MB | daily | 0.37 GB |
+| | | **total** | **24.15 GB/yr** |
+
+Against **8.1 GB free** on a 97%-full disk. About 120 days. Two GLEIF bulk
+files are 97% of it.
+
+Nothing had gone wrong — both had been fetched three times ever, because
+nothing schedules a refresh. This is what the disk does the day updates get
+turned up, which is the stated goal.
+
+`ingest/growth.py` projects it from what has actually been fetched (mean
+distinct payload size × declared cadence), `storage.runway_days` /
+`runway_verdict` judge it, and `treble storage` prints it every run — named
+by source, because "24 GB a year" is not actionable and "gleif-rr, 37 MB
+every day" is.
+
+**Deliberately not a gate failure.** Waste is something to clean up today;
+runway is a plan to revise, and failing a commit over a projection would
+teach people to set the override and stop reading either number.
+
+**Still open, and the real remedy:** GLEIF publishes daily *delta* files
+alongside the full golden copy. Switching those two adapters to deltas would
+remove ~23 GB/yr of the 24. That is the next piece of work if update
+frequency is going up.
+
+### The data supply had stopped, and the health report said so correctly
+
+Every source was 6.9 days stale on 2026-08-30 — nothing schedules `treble
+refresh`. `treble status` reported all 8 overdue sources accurately, which is
+the module working. Running it brought every one back live: 505,461 facts
+across 7 adapters against production endpoints, no adapter broken.
+
+**Still open:** there is no scheduler. `refresh` is designed to run on a
+timer ("mostly keyless, so it runs on a timer without a credential") and
+nothing runs it. A launchd agent is the macOS answer; it is not written.
+
+### Six sources have no declared cadence, so staleness is not judged
+
+`edgar-companyfacts`, `edgar-submissions`, `sec-nport`, `gleif`, `openfigi`,
+`coinbase-products`. For `openfigi` and `coinbase-products` that is right —
+they are permanent caches. For the three EDGAR/N-PORT sources it means the
+largest source in the store (8.0M facts) went 30 days without ingest and the
+health report had nothing to say about it. Their cadence is genuinely
+demand-driven (`populate` decides the universe), so the fix is not a cadence
+but a **coverage** check: has a filing appeared that we have not ingested.
+Not built.
+
+### Every screen renders against the live store
+
+All 26 screen definitions resolved through the real binding layer against the
+real store with no exceptions, before and after the changes. That rules out
+the crash class; it does not rule out wrong values, which is how the revenue
+defect survived — it rendered perfectly.
+
+`tapi/local.py` is at **68%**, down from the 76% this file records for
+2026-08-08: the module grew to 747 statements and the tests did not follow.
+The repository floor is 84% and the module-coverage gate only asks whether a
+module has *any* coverage, so nothing caught the drift. Largest gaps now:
+`_oas1` (71 missed), `_sprd` (68), `_rels` (60), `_swpm_basis` (49),
+`_tval_snapshots` (48), `_tca` (38). Every one of them turns stored facts
+into screen rows, which is where a wrong number reaches a person.
+
 
 ---
 

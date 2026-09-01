@@ -739,6 +739,40 @@ def replay(
 
 
 @app.command()
+def _report_runway(data_dir: Path) -> None:
+    """Say how long the disk lasts at the cadences the sources declare.
+
+    Printed even when comfortable, because the number is only useful as a
+    trend: a reader who has never seen it healthy cannot tell whether 200
+    days is a change or the way it has always been.
+    """
+    from treble.ingest.growth import project
+    from treble.store.storage import free_bytes, runway_days, runway_verdict
+
+    growth = project(IngestLog(data_dir / "ingest.db"), data_dir / "payloads")
+
+    if growth.per_day <= 0:
+        console.print(
+            "[yellow]No source has both a declared cadence and a stored payload, "
+            "so growth cannot be projected yet.[/yellow]"
+        )
+        return
+
+    free = free_bytes(data_dir)
+    days = runway_days(free, growth)
+    if days is None:  # pragma: no cover - guarded by the per_day check above
+        return
+    outcome = runway_verdict(free, growth)
+    style = "green" if outcome.ok else "red"
+    console.print(
+        f"[{style}]Projected {growth.per_day / 1024 / 1024:,.1f} MB/day "
+        f"({growth.per_year / 1024**3:,.1f} GB/yr) at the declared cadences, "
+        f"against {free / 1024**3:,.1f} GB free — {days:,.0f} days.[/{style}]"
+    )
+    for source, per_day in growth.contributors[:3]:
+        console.print(f"    {source}: {per_day / 1024 / 1024:,.1f} MB/day")
+
+
 def storage(
     data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where the store lives."),
     fix: bool = typer.Option(False, help="Reclaim what can be reclaimed losslessly."),
@@ -777,6 +811,12 @@ def storage(
     console.print(
         f"[{style}]{report.size / 1024 / 1024:,.1f} MB total, {result.summary}.[/{style}]"
     )
+
+    # What is here, then what is coming. The two are different questions
+    # and the second has no waste in it at all: the payload store is
+    # immutable, is the substrate I5 replays from, and grows anyway.
+    _report_runway(data_dir)
+
     if not fix:
         if not result.ok:
             console.print("[yellow]Run `treble storage --fix` to reclaim it.[/yellow]")
