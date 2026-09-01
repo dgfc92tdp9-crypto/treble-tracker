@@ -1132,6 +1132,66 @@ added, which is the same failure as the short row.
 
 ---
 
+## Phase 1-3 sweep (2026-09-01, third pass)
+
+Little to find, which is the point of the previous two passes. Everything the
+earlier sweeps built is holding.
+
+| check | result |
+|---|---|
+| `make gate` | green — 180 modules, 90.47% |
+| facts / subjects / sources | 15,045,539 / 405,491 / 20 |
+| ambiguous at newest knowledge | **0** (was 312) |
+| parser drift, by adapter | **0 everywhere** (dtcc-sdr was 286) |
+| accounting identities | 25 flagged of 47,846 testable (0.052%) |
+| screens against the live store | **27/27**, no failures, no footnotes |
+| supply | 13 fresh; only `trace-api` never fetched |
+
+`dtcc-sdr` drift at zero and `sec-nport` off the list entirely confirm the
+version bumps and re-ingest took. The store now holds `dtcc-credit` (1,981
+facts) and `treble-correction` (98 retractions) as sources in their own right.
+
+### A finding I over-stated, then corrected
+
+`openfigi` dates every fact `effective_from = payload.fetched_at.date()`, and
+a FIGI mapping never changes (CLAUDE.md §9.3). I first read that as a
+point-in-time defect: querying `as_of` 2026-06-01 returns nothing for a
+mapping that was always true.
+
+**That reading was wrong.** `as_of` filters on `knowledge_from`, not
+`effective_from`, and we genuinely did not know the mapping on 2026-06-01
+because we had not fetched it. Returning nothing is I2 working exactly as
+specified.
+
+What is real is narrower: the same mapping is stored under two effective
+dates, so `subject_facts` on a FIGI subject returns **18 facts across 9
+fields** — every field twice, identical values — and each fetch adds 5,877
+facts that coalescing cannot collapse, because a different `effective_from`
+is a different assertion.
+
+Checked for user-visible impact and found none: no screen binds an openfigi
+field, and a scan of all 27 screens for duplicated content lines turned up
+only pane borders.
+
+So: **storage redundancy and a modelling imprecision, not a wrong number.**
+Recorded rather than fixed. Giving a permanent mapping a stable effective
+period would be more honest, but the fetch-dated facts already stored cannot
+be superseded by it — a different `effective_from` is a different partition —
+so the change makes the duplication worse before better, for an issue that
+produces no wrong answer. `gleif` and `coinbase-products` use the same
+pattern and will develop the same redundancy when re-fetched.
+
+### Disk is the thing that actually needs attention
+
+    Projected 18.2 MB/day (6.5 GB/yr) against 4.4 GB free — 245 days.
+
+Free space has fallen from 8.5 GB to **4.4 GB** over the session, and not
+because of this project: the data directory is 790 MB. The relocation tooling
+is built, tested against a real mounted volume, and waiting on a disk.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full
