@@ -1,0 +1,115 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "CREDIT DEFAULT SWAP · METHOD"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Every assumption the numbers on the main tab rest on."
+    },
+    {
+      "at": [
+        20,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "The hazard rate is the credit triangle, an approximation, and named as one."
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    26,
+    80
+  ],
+  "mnemonic": "CDSW",
+  "panes": [
+    {
+      "binding": "sys:cdsw_method",
+      "data": [
+        [
+          "Item",
+          "Value"
+        ],
+        [
+          "Reference entity",
+          "cds:isin:US040114HX11"
+        ],
+        [
+          "Source",
+          "DTCC SEC security-based swap repository, daily cumulative credit"
+        ],
+        [
+          "Spread",
+          "as quoted on the tape; blank where only an upfront was reported"
+        ],
+        [
+          "Hazard",
+          "credit triangle h = s / (1 - R), an approximation and named as one"
+        ],
+        [
+          "Recovery",
+          "40% standard assumption"
+        ],
+        [
+          "Discount",
+          "flat 4.0% until SWPM's multi-curve discounting is wired"
+        ],
+        [
+          "Capped notionals",
+          "excluded from upfront; counted in Capped"
+        ],
+        [
+          "Redistribution",
+          "restricted — Markit RED codes and unverified DTCC terms"
+        ]
+      ],
+      "region": [
+        4,
+        0,
+        14,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "method"
+}

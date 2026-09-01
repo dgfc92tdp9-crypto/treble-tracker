@@ -975,6 +975,81 @@ written.
 
 ---
 
+## CDSW built (2026-09-01)
+
+The Phase 2 criterion that had been recorded as blocked on data. It was not
+— the probe used the CFTC endpoint and the singular slug, and single-name CDS
+are *security-based* swaps reported to the SEC. `SEC_CUMULATIVE_CREDITS`.
+
+`ingest/dtcc_credit.py` → `tapi/cdsw.py` → `screens/definitions/cdsw.screen.yaml`.
+**1,981 facts ingested, 530 credit subjects, 338 reference entities.** The
+ISDA-validated pricer that had sat unreachable since Phase 2 began now has a
+caller, and `treble.analytics.credit.cds` is out of `AWAITING_WIRING` — the
+reachability gate removed it, which is the entry doing its job.
+
+Live, for the entity with the deepest curve:
+
+    Tenor  Spread bp  Coupon bp  Upfront %  Trades  Capped
+    1Y         180.0      500.0          —     2.0     2.0
+    2Y         460.0      500.0      1.827     2.0     2.0
+    5Y         575.0      500.0      2.377     4.0     3.0
+
+    Tenor  Hazard bp  Risky PV01  Upfront %  Model
+    1Y         300.0      973.79     -3.107  credit.price_cds
+    5Y         958.3     3647.14      2.841  credit.price_cds
+
+The 5Y line is a real cross-check: the model implies **2.841%** upfront from
+the observed spread, against **2.377%** the market actually paid. The pricer
+and the tape agree to within half a point on a number neither knew about the
+other. And the 1Y upfront is negative because its spread (180bp) is below the
+coupon (500bp) — the protection seller pays, which is the right sign.
+
+### Three things measured rather than assumed
+
+**A capped notional is not a size, and nothing else in the file says so.**
+275 of 586 prints publish notional as `5,000,000+`. Dividing an exactly known
+upfront by a floor gives an **upper bound**, and publishing it as a level put
+Advanced Micro Devices on screen at a distressed quote — 915,667 on "5,000,000
+or more" reads as 18.3 points and would be 4.6 on a 20 million trade. Caught
+by disbelieving the number, not by a test.
+
+`dtcc.py` detects caps from `Block trade election indicator` and `Large
+notional off-facility swap election indicator`. **Both are blank on all 586
+rows of the credit file.** An adapter reusing them would have found no capped
+trades and reported every bound as a level, so the cap is read from the
+trailing `+` and a test pins that those columns really are empty.
+
+**Two spread notations, ten thousand apart.** ISO 20022 code 3 is a decimal
+(0.0163) and code 4 is basis points (165); both appear in one file. An
+unrecognised notation returns nothing rather than a guess.
+
+**Tenors are IMM-dated, so almost never whole.** The dominant bucket is
+**4.81 years** — 180 prints, the 5Y point maturing 2031-06-20. The rates
+adapter's 0.03-year tolerance kept 2 prints out of 586; the credit tolerance
+is half a year and snaps to the quoted grid.
+
+### What it will not say
+
+The tape quotes a spread on 62 prints in 586, because standard contracts
+trade at a fixed coupon with an upfront. A tenor quoted only as an upfront is
+**listed with a reason and no spread** — implying one needs a discount curve
+and a solve, and inventing it on a display would state a number no source
+gave. That solve is the obvious next piece of work and it belongs in
+analytics.
+
+### Keys are namespaced by identifier source and never merged
+
+`Underlier ID source-Leg 1` is a semicolon list — `LEI;ISIN;REDID` against
+three values — and across the file it is ISIN on 447 prints, REDID on 109.
+A RED code names the reference *entity*; an ISIN names a reference
+*obligation*, and two bonds of one issuer are two ISINs. So subjects are
+`cds:redid:FF667M` and `cds:isin:XS1410426024`, never merged: two subjects
+that turn out to be one entity can be linked later, and one subject that
+merged two entities is a wrong number.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full

@@ -1,0 +1,25 @@
+CREDIT DEFAULT SWAP · OBSERVED CURVE
+────────────────────────────────────────────────────────────────────────────
+As reported to the SEC security-based swap repository.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:cdsw_curve]                                                 |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+STANDARD CONTRACT, PRICED FROM THE OBSERVED SPREAD
++------------------------------------------------------------------------------+
+|[table_scroll:sys:cdsw_pricing]                                               |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+A tenor quoted only as an upfront is listed without a spread, never implied.
+MDL  Model detail
+ICVS Curve viewer

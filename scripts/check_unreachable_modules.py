@@ -55,18 +55,6 @@ ENTRY_POINTS: dict[str, str] = {
 #: the backlog. Each line is work someone can pick up, and the reason says
 #: what wiring is missing rather than pretending none is.
 AWAITING_WIRING: dict[str, str] = {
-    "treble.analytics.credit.cds": (
-        "CDSW's pricer, validated against ISDA's published grids across six "
-        "currencies. Was recorded as blocked on data. **That was wrong, and the "
-        "probe was wrong.** Re-probed 2026-09-01: single-name CDS are "
-        "security-based swaps and sit with the SEC, not the CFTC, and the slug is "
-        "plural. `SEC_CUMULATIVE_CREDITS_<date>.zip` serves 200 — 967 rows for "
-        "2026-08-28, 586 new trades, 279 distinct reference entities (Microsoft, "
-        "SoftBank, BT, Brazil, Colombia), carrying Underlying Asset Name, UPI FISN "
-        "('NA/CDS Corp SN Sr'), the standardised coupon, the traded spread and both "
-        "dates. The earlier probe only tried the CFTC path with the singular "
-        "'CREDIT', which 403s. The work is an adapter and a screen, not a data hunt."
-    ),
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
     "treble.im.e2ee": (
         "Olm and Megolm for room encryption (ADR-0012). Unreachable for a measured "

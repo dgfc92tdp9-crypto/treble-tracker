@@ -372,6 +372,7 @@ def refresh(
     """
     from treble.ingest.coinbase import CoinbaseCandlesAdapter
     from treble.ingest.dtcc import DtccSdrRatesAdapter
+    from treble.ingest.dtcc_credit import DtccSdrCreditAdapter
     from treble.ingest.ecb import EcbExchangeRatesAdapter
     from treble.ingest.ecb_hicp import EcbHicpAdapter
     from treble.ingest.fred import FredAdapter
@@ -460,6 +461,15 @@ def refresh(
         # weekend the command was not run over. Days already ingested cost
         # a fetch and write nothing new — payloads are content-addressed
         # (I5), so a repeat is an idempotent no-op rather than a duplicate.
+        # Single-name CDS from the SEC security-based swap repository. Same
+        # ten-day window as the rates tape and for the same reason: a day
+        # skipped is a permanent hole, and re-fetching a day already held
+        # costs a content-addressed payload that writes nothing (I5).
+        "dtcc-credit": lambda: DtccSdrCreditAdapter(
+            payloads,
+            log,
+            report_dates=tuple(now.date() - timedelta(days=n) for n in range(1, 11)),
+        ),
         "dtcc-sdr": lambda: DtccSdrRatesAdapter(
             payloads,
             log,

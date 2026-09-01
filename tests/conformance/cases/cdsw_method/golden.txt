@@ -1,0 +1,21 @@
+CREDIT DEFAULT SWAP · METHOD
+────────────────────────────────────────────────────────────────────────────
+Every assumption the numbers on the main tab rest on.
+
++------------------------------------------------------------------------------+
+|[table_scroll:sys:cdsw_method]                                                |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
+|                                                                              |
++------------------------------------------------------------------------------+
+
+
+The hazard rate is the credit triangle, an approximation, and named as one.

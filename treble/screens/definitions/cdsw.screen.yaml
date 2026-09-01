@@ -1,0 +1,98 @@
+# CDSW — Credit Default Swap valuation (spec §13, §7).
+#
+# The pricer behind this screen has been validated against ISDA's published
+# grids across six currencies since Phase 2 began, and had nothing to run on:
+# the store held no credit subjects. That was recorded as blocked on data and
+# it was not. Single-name CDS are *security-based* swaps, so they are reported
+# to the SEC rather than the CFTC — a different endpoint, a different slug —
+# and the earlier probe used neither.
+#
+# Two panes, deliberately, and in this order. The first is what the tape
+# *said*; the second is what the model makes of it. Merging them into one
+# table would let a reader take a hazard rate for an observation.
+#
+# The spread column is blank on most tenors and that is the market, not a
+# gap: standard contracts trade at a fixed coupon with an upfront payment, so
+# a spread is quoted on roughly one print in ten. Where only an upfront was
+# reported, the pricing pane says so rather than implying a spread — that
+# needs a discount curve and a solve, and inventing it here would put a
+# number on the screen that no source stated.
+#
+# `Capped` counts prints whose notional was published as "5,000,000+". Those
+# contribute no upfront at all: dividing an exactly known payment by a floor
+# gives an upper bound, and CLAUDE.md §6 is explicit that a dissemination cap
+# is not a size. A thin point shows as thin instead.
+mnemonic: CDSW
+title: Credit Default Swap
+rows: 26
+cols: 80
+namespaces: []
+
+tabs:
+  - name: main
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "CREDIT DEFAULT SWAP · OBSERVED CURVE"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "As reported to the SEC security-based swap repository."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 8, width: 80}
+        pane_type: table_scroll
+        binding: "sys:cdsw_curve"
+
+      - kind: static
+        at: {row: 13, col: 0}
+        text: "STANDARD CONTRACT, PRICED FROM THE OBSERVED SPREAD"
+        attrs: [label, emphasis]
+
+      - kind: pane
+        region: {row: 14, col: 0, height: 7, width: 80}
+        pane_type: table_scroll
+        binding: "sys:cdsw_pricing"
+
+      - kind: static
+        at: {row: 22, col: 0}
+        text: "A tenor quoted only as an upfront is listed without a spread, never implied."
+        attrs: [label]
+      - kind: link
+        at: {row: 23, col: 0}
+        text: "MDL  Model detail"
+        command: "MDL"
+      - kind: link
+        at: {row: 24, col: 0}
+        text: "ICVS Curve viewer"
+        command: "ICVS"
+
+  - name: method
+    cells:
+      - kind: static
+        at: {row: 0, col: 0}
+        text: "CREDIT DEFAULT SWAP · METHOD"
+        attrs: [label, emphasis]
+      - kind: static
+        at: {row: 1, col: 0}
+        text: "────────────────────────────────────────────────────────────────────────────"
+        attrs: [label]
+      - kind: static
+        at: {row: 2, col: 0}
+        text: "Every assumption the numbers on the main tab rest on."
+        attrs: [label]
+
+      - kind: pane
+        region: {row: 4, col: 0, height: 14, width: 80}
+        pane_type: table_scroll
+        binding: "sys:cdsw_method"
+
+      - kind: static
+        at: {row: 20, col: 0}
+        text: "The hazard rate is the credit triangle, an approximation, and named as one."
+        attrs: [label]

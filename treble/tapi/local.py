@@ -348,6 +348,9 @@ class LocalTapi:
         "sys:fields",
         "sys:treasury_curve",
         "sys:swap_curves",
+        "sys:cdsw_curve",
+        "sys:cdsw_pricing",
+        "sys:cdsw_method",
         "sys:swpm_valuation",
         "sys:swpm_cashflows",
         "sys:swpm_ois",
@@ -621,6 +624,8 @@ class LocalTapi:
             )
         if binding == "sys:treasury_curve":
             return self._treasury_curve(as_of=as_of)
+        if binding in ("sys:cdsw_curve", "sys:cdsw_pricing", "sys:cdsw_method"):
+            return self._cdsw(binding, as_of=as_of)
         if binding in (
             "sys:swap_curves",
             "sys:swpm_valuation",
@@ -684,6 +689,31 @@ class LocalTapi:
             # `sys:` panels returning zero rows for an unbound screen.
             return (("no security selected: SPTR traces one security's values", None, None),)
         return self._provenance_rows(security, as_of=as_of)
+
+    def _cdsw(
+        self, binding: str, *, as_of: datetime
+    ) -> tuple[tuple[str | float | int | None, ...], ...]:
+        """`CDSW` — a reference entity's observed CDS curve and its pricing.
+
+        The entity is chosen by depth of curve rather than passed in: the
+        screen takes no security today, because a CDS reference entity is
+        keyed by RED code or ISIN and the command grammar resolves tickers.
+        Wiring that resolution is the next step and is a security-master
+        question, not a pricing one.
+        """
+        from treble.tapi import cdsw
+
+        entity = cdsw.default_entity(self._store, as_of=as_of)
+        if entity is None:
+            return (
+                ("no CDS reference entities in the store",),
+                ("run `treble refresh --only dtcc-credit` to populate them",),
+            )
+        if binding == "sys:cdsw_curve":
+            return tuple(cdsw.entity_curve(self._store, entity, as_of=as_of))
+        if binding == "sys:cdsw_pricing":
+            return tuple(cdsw.entity_pricing(self._store, entity, as_of=as_of))
+        return tuple(cdsw.method(entity))
 
     def _treasury_curve(
         self, *, as_of: datetime

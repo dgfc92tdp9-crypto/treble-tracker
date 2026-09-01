@@ -1,0 +1,206 @@
+{
+  "cells": [
+    {
+      "at": [
+        0,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "CREDIT DEFAULT SWAP · OBSERVED CURVE"
+    },
+    {
+      "at": [
+        1,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "────────────────────────────────────────────────────────────────────────────"
+    },
+    {
+      "at": [
+        2,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "As reported to the SEC security-based swap repository."
+    },
+    {
+      "at": [
+        13,
+        0
+      ],
+      "attrs": [
+        "emphasis",
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "STANDARD CONTRACT, PRICED FROM THE OBSERVED SPREAD"
+    },
+    {
+      "at": [
+        22,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "A tenor quoted only as an upfront is listed without a spread, never implied."
+    },
+    {
+      "at": [
+        23,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "MDL",
+      "provenance": null,
+      "text": "MDL  Model detail"
+    },
+    {
+      "at": [
+        24,
+        0
+      ],
+      "attrs": [
+        "link"
+      ],
+      "input": null,
+      "link": "ICVS",
+      "provenance": null,
+      "text": "ICVS Curve viewer"
+    }
+  ],
+  "footnotes": [],
+  "grid": [
+    26,
+    80
+  ],
+  "mnemonic": "CDSW",
+  "panes": [
+    {
+      "binding": "sys:cdsw_curve",
+      "data": [
+        [
+          "Tenor",
+          "Spread bp",
+          "Coupon bp",
+          "Upfront %",
+          "Trades",
+          "Capped"
+        ],
+        [
+          "1Y",
+          180.0,
+          500.0,
+          null,
+          2.0,
+          2.0
+        ],
+        [
+          "2Y",
+          460.0,
+          500.0,
+          1.827,
+          2.0,
+          2.0
+        ],
+        [
+          "3Y",
+          569.0,
+          500.0,
+          null,
+          2.0,
+          2.0
+        ],
+        [
+          "5Y",
+          575.0,
+          500.0,
+          2.377,
+          4.0,
+          3.0
+        ]
+      ],
+      "region": [
+        4,
+        0,
+        8,
+        80
+      ],
+      "type": "table_scroll"
+    },
+    {
+      "binding": "sys:cdsw_pricing",
+      "data": [
+        [
+          "Tenor",
+          "Hazard bp",
+          "Risky PV01",
+          "Upfront %",
+          "Model"
+        ],
+        [
+          "1Y",
+          300.0,
+          973.79,
+          -3.107,
+          "credit.price_cds"
+        ],
+        [
+          "2Y",
+          766.7,
+          1798.82,
+          -0.678,
+          "credit.price_cds"
+        ],
+        [
+          "3Y",
+          948.3,
+          2484.4,
+          1.785,
+          "credit.price_cds"
+        ],
+        [
+          "5Y",
+          958.3,
+          3647.14,
+          2.841,
+          "credit.price_cds"
+        ]
+      ],
+      "region": [
+        14,
+        0,
+        7,
+        80
+      ],
+      "type": "table_scroll"
+    }
+  ],
+  "stale": false,
+  "tab": "main"
+}
