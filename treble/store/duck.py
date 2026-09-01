@@ -33,6 +33,7 @@ import pyarrow as pa
 from treble.core.facts import Fact, FactValue
 from treble.core.identifiers import TUID
 from treble.core.provenance import Provenance, ProvenanceId
+from treble.store.coalesce import redundant_ids_sql
 from treble.store.cold import (
     CompactionReport,
     cold_dir_for,
@@ -182,6 +183,7 @@ class DuckStore:
         self._cold_dir = (cold_dir or cold_dir_for(self._path)).resolve()
         self._conn = duckdb.connect(str(self._path))
         self._conn.execute(SCHEMA)
+        self._coalesced = 0
         self._refresh_view()
 
     def _refresh_view(self) -> None:
@@ -196,6 +198,17 @@ class DuckStore:
         view costs microseconds to recreate and cannot go stale.
         """
         self._conn.execute(f"CREATE OR REPLACE TEMP VIEW {_ALL} AS {union_sql(self._cold_dir)}")
+
+    @property
+    def coalesced(self) -> int:
+        """Rows this connection did not write because nothing had changed.
+
+        Reported rather than kept quiet: a filter in the write path that
+        nobody can see is indistinguishable from a filter that silently
+        drops real data, and the difference is the whole question. `treble
+        storage` prints it, and `ingest.base.run` records it per source.
+        """
+        return self._coalesced
 
     @property
     def path(self) -> Path:
@@ -352,13 +365,24 @@ class DuckStore:
         )
         self._conn.register("_incoming_facts", batch)
         try:
-            self._conn.execute(
+            # Rows restating a value this source already asserts are not
+            # written (`coalesce.py`). One live refresh wrote 505,461 rows
+            # to carry 22,453 of new information; the rest said "still
+            # 0.81". The cost of saying it is linear in refresh frequency,
+            # which is what makes it worth a filter in the hottest write
+            # path rather than a cleanup someone remembers to run.
+            selection = redundant_ids_sql(_ALL, "_incoming_facts")
+            self._conn.execute(f"CREATE OR REPLACE TEMP VIEW _screened_facts AS {selection}")
+            written = self._conn.execute(
                 f"INSERT INTO facts ({', '.join(FACT_COLUMNS)}) "  # noqa: S608
-                f"SELECT {', '.join(FACT_COLUMNS)} FROM _incoming_facts"
-            )
+                f"SELECT {', '.join(FACT_COLUMNS)} FROM _screened_facts "
+                "WHERE NOT redundant RETURNING 1"
+            ).fetchall()
+            self._coalesced += len(facts) - len(written)
         finally:
             # Unregister even on failure: a leftover view would shadow the
             # next write's batch and silently insert the previous one again.
+            self._conn.execute("DROP VIEW IF EXISTS _screened_facts")
             self._conn.unregister("_incoming_facts")
 
     # -- reads (as_of is required; I2) ---------------------------------------

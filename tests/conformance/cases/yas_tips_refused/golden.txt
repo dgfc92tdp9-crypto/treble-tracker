@@ -9,11 +9,11 @@ Auction yield                1.955
 Inflation-indexed              Yes
 
 ANALYTICS (computed from the terms above)
-Yield to maturity     —
-Modified duration     —
-Convexity             —
-DV01 (per 100 face)   —
-Workout date          —
+Yield to maturity                —
+Modified duration                —
+Convexity                        —
+DV01 (per 100 face)              —
+Workout date                     —
 
 ICVS Curve viewer
 SPTR Source trace

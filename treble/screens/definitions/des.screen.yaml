@@ -85,6 +85,7 @@ tabs:
       - kind: bound
         at: {row: 7, col: 14}
         field: "us-gaap:Liabilities:USD"
+        period_from: "us-gaap:Assets:USD"
         format: "{:,.0f}"
         width: 20
         conditional:
@@ -97,6 +98,7 @@ tabs:
       - kind: bound
         at: {row: 8, col: 14}
         field: "us-gaap:StockholdersEquity:USD"
+        period_from: "us-gaap:Assets:USD"
         format: "{:,.0f}"
         width: 20
         conditional:
@@ -120,6 +122,7 @@ tabs:
       - kind: bound
         at: {row: 11, col: 14}
         field: "us-gaap:Revenues:USD"
+        period_from: "us-gaap:NetIncomeLoss:USD"
         format: "{:,.0f}"
         width: 20
         conditional:

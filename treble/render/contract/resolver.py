@@ -58,6 +58,58 @@ class ScreenContext(BaseModel):
     inputs: dict[str, str] = Field(default_factory=dict)
 
 
+#: The em dash a missing value renders as (§6.3: never a zero, never blank).
+MISSING = "—"
+
+
+def _missing(spec: str, width: int) -> str:
+    """The missing-value mark, occupying the column the value would have.
+
+    A bare ``"—"`` is one character written at the cell's origin, while the
+    number it stands in for is right-aligned across the cell's width. In a
+    right-aligned money column that puts the dash roughly twenty columns to
+    the left of every figure it lines up with — and where the row's label
+    runs past the cell origin, *on top of the label*:
+
+        Cash and equivalents, carrying val—e
+
+    which is what the `fa_cashflow` golden rendered the moment a null
+    appeared in it. Pre-existing, and invisible until then only because
+    every cell in that column had a value and the screens that did show
+    nulls had labels short enough not to collide.
+    """
+    if ">" in spec:
+        return MISSING.rjust(width)
+    if "^" in spec:
+        return MISSING.center(width)
+    return MISSING
+
+
+def _same_period(value: FieldResult, governing: FieldResult) -> bool:
+    """Whether ``value`` belongs under a heading stating ``governing``'s period.
+
+    Not plain equality, because XBRL carries two shapes and a cash flow
+    statement legitimately mixes them: **durations** (`2026-01-01` to
+    `2026-03-31`, the flows) and **instants** (`2026-03-31`, the closing
+    balance that ends them). Requiring the tuples to match would blank every
+    balance line under a flow heading — correct output turned into an em
+    dash, which is its own kind of wrong.
+
+    So an instant agrees with a duration when it falls on that duration's
+    **end**: the closing balance of the period the heading names. An instant
+    three months later — which is what the `fa_cashflow` fixture held, a 30
+    June cash balance under a "3 months to 31 March" heading — does not.
+    """
+    if value.effective_from is None or governing.effective_to is None:
+        return False
+    if value.effective_from == value.effective_to:
+        return value.effective_from == governing.effective_to
+    return (value.effective_from, value.effective_to) == (
+        governing.effective_from,
+        governing.effective_to,
+    )
+
+
 def _conditional_attrs(
     result: FieldResult, conditions: tuple[ConditionalAttr, ...]
 ) -> tuple[Attr, ...]:
@@ -104,11 +156,23 @@ def resolve(
             )
         elif isinstance(cell, BoundCell):
             result = tapi.field(context.security, cell.field, cell.overrides, as_of=as_of)
+            if cell.period_from is not None:
+                governing = tapi.field(
+                    context.security, cell.period_from, cell.overrides, as_of=as_of
+                )
+                if not _same_period(result, governing):
+                    # A value from a different period than the heading above
+                    # it. Blank, not shown: see `BoundCell.period_from`.
+                    result = FieldResult(value=None)
             any_stale = any_stale or result.stale
             attrs = tuple(
                 dict.fromkeys((*cell.attrs, *_conditional_attrs(result, cell.conditional)))
             )
-            text = "—" if result.value is None else cell.format.format(result.value)
+            text = (
+                _missing(cell.format, cell.width)
+                if result.value is None
+                else cell.format.format(result.value)
+            )
             cells.append(
                 ResolvedCell(
                     row=cell.at.row,

@@ -84,6 +84,23 @@ class BoundCell(BaseModel):
     width: int = Field(gt=0, default=12)
     attrs: tuple[Attr, ...] = ()
     conditional: tuple[ConditionalAttr, ...] = ()
+    #: The field whose period this cell must share to be shown at all.
+    #:
+    #: Set it on any cell sitting under a `PeriodCell` heading. Without it a
+    #: section heading states one field's period while the rows beneath it
+    #: are free to come from any other, and nothing notices.
+    #:
+    #: Found on `DES`/`FA` for Apple on 2026-09-01: the heading read "3
+    #: months to 2026-03-28" from `NetIncomeLoss`, and the Revenue row
+    #: beneath it showed 62,900,000,000 — Apple's **Q4 FY2018** figure, from
+    #: `us-gaap:Revenues:USD`, a tag Apple abandoned in 2018 on moving to
+    #: ASC 606. The two numbers were seven years apart and read as one
+    #: quarter, giving a 47% net margin for a company that runs about 26%.
+    #:
+    #: A mismatch renders as a missing value, because that is what it is:
+    #: the filer reported nothing under *this* tag for *that* period.
+    #: Reaching for its last value from any year is the bug.
+    period_from: str | None = None
 
 
 class InputCell(BaseModel):

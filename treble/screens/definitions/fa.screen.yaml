@@ -41,6 +41,7 @@ tabs:
       - kind: bound
         at: {row: 4, col: 34}
         field: "us-gaap:Revenues:USD"
+        period_from: "us-gaap:NetIncomeLoss:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -53,6 +54,7 @@ tabs:
       - kind: bound
         at: {row: 5, col: 34}
         field: "us-gaap:IncomeTaxExpenseBenefit:USD"
+        period_from: "us-gaap:NetIncomeLoss:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -80,6 +82,7 @@ tabs:
       - kind: bound
         at: {row: 7, col: 34}
         field: "us-gaap:ComprehensiveIncomeNetOfTax:USD"
+        period_from: "us-gaap:NetIncomeLoss:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -98,6 +101,7 @@ tabs:
       - kind: bound
         at: {row: 10, col: 34}
         field: "us-gaap:EarningsPerShareBasic:USD/shares"
+        period_from: "us-gaap:NetIncomeLoss:USD"
         format: "{:>20,.2f}"
         width: 20
         conditional:
@@ -111,6 +115,7 @@ tabs:
       - kind: bound
         at: {row: 11, col: 34}
         field: "us-gaap:EarningsPerShareDiluted:USD/shares"
+        period_from: "us-gaap:NetIncomeLoss:USD"
         format: "{:>20,.2f}"
         width: 20
         conditional:
@@ -124,6 +129,7 @@ tabs:
       - kind: bound
         at: {row: 12, col: 34}
         field: "us-gaap:WeightedAverageNumberOfSharesOutstandingBasic:shares"
+        period_from: "us-gaap:NetIncomeLoss:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -136,6 +142,7 @@ tabs:
       - kind: bound
         at: {row: 13, col: 34}
         field: "us-gaap:WeightedAverageNumberOfDilutedSharesOutstanding:shares"
+        period_from: "us-gaap:NetIncomeLoss:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -197,6 +204,7 @@ tabs:
       - kind: bound
         at: {row: 5, col: 34}
         field: "us-gaap:CashAndCashEquivalentsAtCarryingValue:USD"
+        period_from: "us-gaap:Assets:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -209,6 +217,7 @@ tabs:
       - kind: bound
         at: {row: 6, col: 34}
         field: "us-gaap:Liabilities:USD"
+        period_from: "us-gaap:Assets:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -221,6 +230,7 @@ tabs:
       - kind: bound
         at: {row: 8, col: 34}
         field: "us-gaap:StockholdersEquity:USD"
+        period_from: "us-gaap:Assets:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -234,6 +244,7 @@ tabs:
       - kind: bound
         at: {row: 9, col: 34}
         field: "us-gaap:StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest:USD"
+        period_from: "us-gaap:Assets:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -298,6 +309,7 @@ tabs:
       - kind: bound
         at: {row: 5, col: 34}
         field: "us-gaap:NetCashProvidedByUsedInInvestingActivities:USD"
+        period_from: "us-gaap:NetCashProvidedByUsedInOperatingActivities:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -312,6 +324,7 @@ tabs:
       - kind: bound
         at: {row: 6, col: 34}
         field: "us-gaap:NetCashProvidedByUsedInFinancingActivities:USD"
+        period_from: "us-gaap:NetCashProvidedByUsedInOperatingActivities:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:
@@ -326,6 +339,7 @@ tabs:
       - kind: bound
         at: {row: 8, col: 34}
         field: "us-gaap:CashAndCashEquivalentsAtCarryingValue:USD"
+        period_from: "us-gaap:NetCashProvidedByUsedInOperatingActivities:USD"
         format: "{:>20,.0f}"
         width: 20
         conditional:

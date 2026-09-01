@@ -149,11 +149,13 @@
         8,
         34
       ],
-      "attrs": [],
+      "attrs": [
+        "stale"
+      ],
       "input": null,
       "link": null,
-      "provenance": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
-      "text": "       7,172,000,000"
+      "provenance": null,
+      "text": "                   —"
     },
     {
       "at": [

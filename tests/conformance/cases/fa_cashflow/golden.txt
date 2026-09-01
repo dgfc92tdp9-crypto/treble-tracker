@@ -6,7 +6,7 @@ Net cash from operating activities       5,169,000,000
 Net cash from investing activities     -10,489,000,000
 Net cash from financing activities       2,719,000,000
 
-Cash and equivalents, carrying val       7,172,000,000
+Cash and equivalents, carrying val                   —
 
 
 
