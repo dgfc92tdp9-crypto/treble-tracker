@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 
-from treble.ingest.growth import payload_sizes, project
+from treble.ingest.growth import RECENT_PAYLOADS, payload_sizes, project
 from treble.store.ingest_log import IngestLog
 
 #: A source declaring a one-day cadence, and one declaring none. Both real,
@@ -114,3 +115,62 @@ class TestProjection:
 
     def test_a_missing_payload_directory_is_not_an_error(self, tmp_path: Path) -> None:
         assert payload_sizes(tmp_path / "never-created") == {}
+
+
+class TestTheEstimateFollowsRecentFetches:
+    """An all-history mean cannot see a change in *how* a source fetches.
+
+    `gleif-rr` moved from 37 MB full copies to 90 KB deltas and the mean
+    over its whole history still projected 19.4 MB/day — true of the past,
+    wrong about every day to come, and the runway figure is read to make a
+    decision about the future.
+
+    Payload bodies here are random rather than repeated bytes: the store
+    gzips, and 100,000 identical characters land on disk as about 130. A
+    first draft of these tests measured compression instead of size.
+    """
+
+    BIG = 200_000
+    SMALL = 2_000
+
+    def _run(self, tmp_path: Path, old: int, new: int) -> int:
+        payloads = tmp_path / "payloads"
+        log = _log(tmp_path)
+        day = 1
+        for _ in range(old):
+            _record(log, DAILY, _store_payload(payloads, os.urandom(self.BIG)), day)
+            day += 1
+        for _ in range(new):
+            _record(log, DAILY, _store_payload(payloads, os.urandom(self.SMALL)), day)
+            day += 1
+        return project(log, payloads).per_day
+
+    def test_old_large_payloads_fall_out_of_the_window(self, tmp_path: Path) -> None:
+        per_day = self._run(tmp_path, old=3, new=RECENT_PAYLOADS)
+        assert per_day < self.BIG / 10, f"still averaging in the old full copies: {per_day:,}"
+
+    def test_a_partly_migrated_source_is_between_the_two(self, tmp_path: Path) -> None:
+        """Not a cliff. Two new payloads among three old ones should pull
+        the estimate down without pretending the change is complete."""
+        per_day = self._run(tmp_path, old=3, new=2)
+        assert self.SMALL < per_day < self.BIG
+
+    def test_a_source_with_fewer_payloads_than_the_window_still_projects(
+        self, tmp_path: Path
+    ) -> None:
+        """Slicing the tail of a short list must not yield nothing."""
+        payloads = tmp_path / "payloads"
+        log = _log(tmp_path)
+        digest = _store_payload(payloads, os.urandom(self.SMALL))
+        _record(log, DAILY, digest, 1)
+        assert project(log, payloads).per_day == payload_sizes(payloads)[digest]
+
+    def test_the_window_is_the_most_recent_not_the_first(self, tmp_path: Path) -> None:
+        """Proves the slice takes the tail. Reversed, the estimate would
+        lock onto whatever a source did when it was first written."""
+        payloads = tmp_path / "payloads"
+        log = _log(tmp_path)
+        _record(log, DAILY, _store_payload(payloads, os.urandom(self.SMALL)), 1)
+        for day in range(2, 2 + RECENT_PAYLOADS):
+            _record(log, DAILY, _store_payload(payloads, os.urandom(self.BIG)), day)
+        assert project(log, payloads).per_day > self.BIG / 2

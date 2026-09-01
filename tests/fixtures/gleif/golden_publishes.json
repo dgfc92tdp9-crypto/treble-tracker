@@ -1,0 +1,73 @@
+{
+  "data": [
+    {
+      "publish_date": "2026-09-01 08:00:00",
+      "rr": {
+        "type": "rr",
+        "publish_date": "2026-09-01 08:00:00",
+        "full_file": {
+          "xml": {
+            "type": "rr",
+            "format": "xml",
+            "record_count": 486115,
+            "size": 32976477,
+            "size_human_readable": "31.45 MB",
+            "delta_type": "GoldenCopy",
+            "url": "https://goldencopy.gleif.org/storage/golden-copy-files/2026/09/01/1270994/20260901-0800-gleif-goldencopy-rr-golden-copy.xml.zip",
+            "cdf_version": "RR_2.1"
+          }
+        },
+        "delta_files": {
+          "IntraDay": {
+            "xml": {
+              "type": "rr",
+              "format": "xml",
+              "record_count": 869,
+              "size": 51845,
+              "size_human_readable": "50.63 KB",
+              "delta_type": "IntraDay",
+              "url": "https://goldencopy.gleif.org/storage/golden-copy-files/2026/09/01/1271003/20260901-0800-gleif-goldencopy-rr-intra-day.xml.zip",
+              "cdf_version": "RR_2.1"
+            }
+          },
+          "LastDay": {
+            "xml": {
+              "type": "rr",
+              "format": "xml",
+              "record_count": 1536,
+              "size": 92728,
+              "size_human_readable": "90.55 KB",
+              "delta_type": "LastDay",
+              "url": "https://goldencopy.gleif.org/storage/golden-copy-files/2026/09/01/1271006/20260901-0800-gleif-goldencopy-rr-last-day.xml.zip",
+              "cdf_version": "RR_2.1"
+            }
+          },
+          "LastMonth": {
+            "xml": {
+              "type": "rr",
+              "format": "xml",
+              "record_count": 53369,
+              "size": 3456241,
+              "size_human_readable": "3.3 MB",
+              "delta_type": "LastMonth",
+              "url": "https://goldencopy.gleif.org/storage/golden-copy-files/2026/09/01/1271012/20260901-0800-gleif-goldencopy-rr-last-month.xml.zip",
+              "cdf_version": "RR_2.1"
+            }
+          },
+          "LastWeek": {
+            "xml": {
+              "type": "rr",
+              "format": "xml",
+              "record_count": 9419,
+              "size": 612029,
+              "size_human_readable": "597.68 KB",
+              "delta_type": "LastWeek",
+              "url": "https://goldencopy.gleif.org/storage/golden-copy-files/2026/09/01/1271009/20260901-0800-gleif-goldencopy-rr-last-week.xml.zip",
+              "cdf_version": "RR_2.1"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

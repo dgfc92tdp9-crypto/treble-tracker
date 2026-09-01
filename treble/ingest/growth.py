@@ -50,30 +50,50 @@ def payload_sizes(payload_root: Path) -> dict[str, int]:
     return {p.stem: p.stat().st_size for p in payload_root.rglob("*") if p.is_file()}
 
 
+#: How many of a source's most recent payloads the estimate averages.
+#:
+#: Not all of them. The mean over a source's whole history cannot see a
+#: change in *how* it fetches, and one just happened: `gleif-rr` moved from
+#: 37 MB full copies to 90 KB deltas, and an all-history mean still
+#: projected 19.4 MB/day for it — a number that was true of the past and
+#: wrong about every day to come.
+#:
+#: Five, because the delta ladder makes sizes legitimately uneven (a
+#: LastMonth catch-up after an outage is 35x a LastDay), so the newest
+#: single payload is not a safe predictor either. Five tracks a strategy
+#: change within a week of daily runs while still averaging over the
+#: ordinary variation.
+RECENT_PAYLOADS = 5
+
+
 def project(log: IngestLog, payload_root: Path) -> Growth:
     """Bytes per day the declared cadences imply, and who is producing them.
 
-    The mean of a source's *distinct* payloads rather than of its log
-    entries. A source fetched ten times that returned the same bytes twice
-    stored one file, and counting the log entry twice would inflate it by
-    the amount the content-addressed store just saved.
+    Averaged over a source's *distinct* payloads: a source fetched ten times
+    that returned the same bytes twice stored one file, and counting the log
+    entry twice would inflate it by the amount the content-addressed store
+    just saved.
+
+    Over the most recent :data:`RECENT_PAYLOADS` of them, newest last, so
+    the estimate follows a change in fetch strategy rather than averaging it
+    away against years of history.
     """
     sizes = payload_sizes(payload_root)
-    seen: dict[str, set[str]] = defaultdict(set)
+    recent: dict[str, list[str]] = defaultdict(list)
     for entry in log.read():
-        if entry.payload_hash in sizes:
-            seen[entry.source].add(entry.payload_hash)
+        if entry.payload_hash in sizes and entry.payload_hash not in recent[entry.source]:
+            recent[entry.source].append(entry.payload_hash)
 
     meta = all_sources()
     contributors: list[tuple[str, int]] = []
-    for source, hashes in seen.items():
+    for source, hashes in recent.items():
         cadence = getattr(meta.get(source), "expected_cadence_days", None)
         if not cadence or not hashes:
             # No declared cadence means staleness is not judged for this
             # source (`health.py`), and projecting one here would invent
             # the expectation that module deliberately refuses to invent.
             continue
-        mean = statistics.mean(sizes[h] for h in hashes)
+        mean = statistics.mean(sizes[h] for h in hashes[-RECENT_PAYLOADS:])
         contributors.append((source, int(mean / cadence)))
 
     contributors.sort(key=lambda pair: -pair[1])
@@ -83,4 +103,4 @@ def project(log: IngestLog, payload_root: Path) -> Growth:
     )
 
 
-__all__ = ["payload_sizes", "project"]
+__all__ = ["RECENT_PAYLOADS", "payload_sizes", "project"]

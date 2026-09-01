@@ -19,7 +19,7 @@ import io
 import json
 import zipfile
 from collections.abc import Iterator
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 from xml.etree.ElementTree import Element
 
@@ -41,18 +41,18 @@ from treble.ingest.base import (
     SourceMeta,
     utcnow,
 )
+from treble.ingest.gleif_golden import (
+    PUBLISHES_URL,
+    Window,
+    choose_window,
+    content_date,
+    covers,
+    select_file,
+)
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadHash, PayloadStore
 
 RECORDS_URL = "https://api.gleif.org/api/v1/lei-records"
-
-# Discovers the current publish id, then downloads it — the id in the
-# download URL increments with every publish (observed daily), so it
-# cannot be hardcoded (CLAUDE.md: bulk-preferred, no guessed endpoints).
-CONCATENATED_META_URL = "https://leidata.gleif.org/api/v1/concatenated-files/rr"
-CONCATENATED_DOWNLOAD_URL = (
-    "https://leidata.gleif.org/api/v1/concatenated-files/rr/get/{file_id}/zip"
-)
 
 RR_NS = {"rr": "http://www.gleif.org/data/schema/rr/2016"}
 
@@ -212,28 +212,73 @@ class GleifRelationshipAdapter(SourceAdapter):
     #: a filing that was withdrawn.
     parser_version = "3"
 
-    def fetch(self) -> Iterator[RawPayload]:
-        with httpx.Client(timeout=180.0) as client:
-            self._throttle()
-            meta_response = client.get(CONCATENATED_META_URL)
-            meta_response.raise_for_status()
-            publishes = meta_response.json().get("data") or []
-            if not publishes:
-                raise ValueError("GLEIF concatenated-files/rr metadata returned no publishes")
-            latest = max(publishes, key=lambda p: p["content_date"])
+    def known_through(self) -> datetime | None:
+        """How current the store already is, from the last payload's header.
 
+        The file's own `ContentDate`, not the time it was fetched. A copy
+        published at 08:00 and fetched at 23:00 leaves the store fifteen
+        hours behind what the fetch timestamp claims, and a delta chosen
+        against the fetch time would skip exactly that interval.
+
+        Read back out of the payload store rather than recorded separately,
+        so there is one answer rather than two that can disagree. A payload
+        that has gone missing, or whose header cannot be read, yields
+        ``None`` — which selects the full copy, the safe direction.
+        """
+        for entry in reversed(self._log.read()):
+            if entry.source != self.meta.source_id:
+                continue
+            try:
+                data = self._payloads.get(entry.payload_hash)
+            except (OSError, KeyError):
+                return None
+            return content_date(data)
+        return None
+
+    def _download(self, client: httpx.Client, url: str) -> bytes:
+        self._throttle()
+        response = client.get(url, follow_redirects=True)
+        response.raise_for_status()
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            xml_names = [name for name in archive.namelist() if name.endswith(".xml")]
+            if len(xml_names) != 1:
+                raise ValueError(
+                    f"expected exactly one XML member in the RR zip, found {xml_names}"
+                )
+            return archive.read(xml_names[0])
+
+    def fetch(self) -> Iterator[RawPayload]:
+        """Download the smallest published file that covers the gap.
+
+        Full copy when nothing is stored yet or the store has fallen more
+        than a month behind; otherwise the narrowest delta reaching back to
+        what is already known. The chosen file is then checked against its
+        own `DeltaStart` header, and a file that does not reach far enough
+        is discarded in favour of the full copy rather than applied over a
+        hole — a short delta and an uneventful day are indistinguishable
+        once the bytes are stored.
+        """
+        known = self.known_through()
+        with httpx.Client(timeout=300.0) as client:
             self._throttle()
-            url = CONCATENATED_DOWNLOAD_URL.format(file_id=latest["id"])
-            response = client.get(url)
-            response.raise_for_status()
-            with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
-                xml_names = [name for name in archive.namelist() if name.endswith(".xml")]
-                if len(xml_names) != 1:
-                    raise ValueError(
-                        f"expected exactly one XML member in the RR zip, found {xml_names}"
-                    )
-                data = archive.read(xml_names[0])
-            yield RawPayload(data=data, source_uri=url, fetched_at=utcnow())
+            index = client.get(PUBLISHES_URL, follow_redirects=True)
+            index.raise_for_status()
+            publishes = index.json()
+
+            published_at = _publish_date(publishes)
+            gap = None if known is None or published_at is None else published_at - known
+            chosen = select_file(publishes, "rr", choose_window(gap))
+            data = self._download(client, chosen.url)
+
+            if not covers(data, known_through=known):
+                # Not an error and not silently accepted: GLEIF may shift a
+                # window, or a publish may straddle one. Take the full copy,
+                # which covers everything by construction.
+                full = select_file(publishes, "rr", Window.FULL)
+                data = self._download(client, full.url)
+                chosen = full
+
+            yield RawPayload(data=data, source_uri=chosen.url, fetched_at=utcnow())
 
     def parse(self, payload: RawPayload, payload_hash: PayloadHash) -> ParsedBatch:
         root = safe_fromstring(payload.data)
@@ -343,3 +388,25 @@ class GleifRelationshipAdapter(SourceAdapter):
                 relationship_state_value(status_raw or None, registration_raw or None),
             )
         return ParsedBatch(provenance=(provenance,), facts=tuple(facts))
+
+
+def _publish_date(publishes: object) -> datetime | None:
+    """When the newest publish was cut, from the index rather than the file.
+
+    Used only to size the gap before anything is downloaded, so the choice
+    of window costs no bytes. `covers` re-checks against the file itself,
+    which is what actually decides whether it is kept.
+    """
+    if not isinstance(publishes, dict):
+        return None
+    data = publishes.get("data")
+    if not isinstance(data, list) or not data or not isinstance(data[0], dict):
+        return None
+    raw = data[0].get("publish_date")
+    if not isinstance(raw, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)

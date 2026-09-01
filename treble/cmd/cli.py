@@ -343,6 +343,7 @@ def refresh(
     from treble.ingest.ecb import EcbExchangeRatesAdapter
     from treble.ingest.ecb_hicp import EcbHicpAdapter
     from treble.ingest.fred import FredAdapter
+    from treble.ingest.gleif import GleifRelationshipAdapter
     from treble.ingest.gleif_isin import GleifIsinLeiAdapter
     from treble.ingest.health import Freshness, source_health
     from treble.ingest.treasury import TreasuryAuctionsAdapter
@@ -386,6 +387,14 @@ def refresh(
         # series a universe wants — that decision belongs to `populate`.
         "ecb-fx": lambda: EcbExchangeRatesAdapter(payloads, log, series=ECB_FX_SERIES),
         "ecb-hicp": lambda: EcbHicpAdapter(payloads, log),
+        # Added once the adapter took deltas. It declares a one-day cadence
+        # and nothing could satisfy it, so `status` reported it overdue
+        # permanently — the failure this command's docstring warns about
+        # for Twelve Data, "a health check that nothing can ever satisfy".
+        # It was excluded because the full concatenated file was 37 MB a
+        # fetch, 13.60 GB a year against 9 GB free. The LastDay delta is
+        # 90 KB, so the cadence it declares is now one it can keep.
+        "gleif-rr": lambda: GleifRelationshipAdapter(payloads, log),
         # Both of these refresh whatever the store already holds. A window
         # of a year rather than a day: FRED restates, and re-reading a span
         # that overlaps what is stored is how a revision arrives at all —

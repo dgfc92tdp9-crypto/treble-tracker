@@ -372,6 +372,88 @@ into screen rows, which is where a wrong number reaches a person.
 
 ---
 
+## GLEIF RR moved to delta files (2026-09-01)
+
+The disk projection's largest line, removed. `gleif-rr` downloaded the full
+concatenated relationship file every run — 37 MB stored, 486,115 records, of
+which about 1,500 had changed. GLEIF publishes deltas beside every golden
+copy and the adapter now takes the smallest one that covers the gap.
+
+| | per fetch | per year (daily) |
+|---|---|---|
+| before — full copy | 37.27 MB | **13.60 GB** |
+| after — LastDay delta | 92.5 KB | 0.034 GB |
+| after, plus one full base | | **0.071 GB** |
+
+**191x.** The whole-payload projection falls from 24.15 GB/yr to about
+10.6 GB/yr, and the runway from ~120 days to roughly a year.
+
+### The parser did not change
+
+A delta is the same RR-CDF document with fewer records. Verified by running
+the unmodified parser over a live LastDay file: 1,536 facts, matching the
+record count the API declared for it exactly. `parser_version` stays at 3, so
+every payload already stored replays as before (I5).
+
+### What had to be got right
+
+A delta covers a window. If more time has passed than it reaches back, the
+records in between are lost **silently**, because a short delta and an
+uneventful day produce the same thing: a small file with few records.
+
+So the window is chosen from the gap and then **verified against the file's
+own `DeltaStart` header**, which states the instant it actually covers. A
+file that does not reach back to what the store already knows is discarded
+and the full copy taken instead. The check is on the downloaded file rather
+than on arithmetic about GLEIF's publication schedule, because the schedule
+is theirs to change and the header is a fact.
+
+Two things this got right only by measuring:
+
+* The gap is `publish_date - known_through`, **not** `now - known_through`.
+  Measuring to `now` charges the delta for the hours between GLEIF
+  publishing and this machine fetching — on a daily schedule that is a
+  32-hour gap instead of 24, which selects LastWeek (598 KB) over LastDay
+  (90 KB). A 6.6x cost for an interval no file has to account for.
+* `known_through` is the last payload's `ContentDate`, **not** its
+  `fetched_at`. A copy published at 08:00 and fetched at 23:00 leaves the
+  store fifteen hours behind what the fetch timestamp claims, and a delta
+  chosen against the fetch time would skip exactly that interval.
+
+An earlier draft carried a 1.5x safety margin on the window. That was a guess
+about GLEIF's schedule standing in for a fact the file states outright, and it
+cost 6.6x on every daily run. Removed: optimistic selection, strict
+verification, escalate on failure.
+
+Nine mutations of the selection and coverage logic, all killed.
+
+### The migration self-heals
+
+The live store's last RR payload was 24 days old, from the previous adapter
+against a different host. Its `ContentDate` reads fine, so the first fetch
+after the change selects LastMonth (3.46 MB, `DeltaStart` 2026-08-01, which
+covers 2026-08-08) rather than the full copy — 10x smaller on the very fetch
+that had to bridge the change.
+
+### `gleif-rr` is now in `treble refresh`
+
+It declared a one-day cadence that no command could satisfy, so `status`
+reported it overdue permanently. It was excluded because 37 MB a day was
+unaffordable; at 90 KB the cadence it declares is one it can keep.
+
+### `gleif-isin` cannot follow
+
+Checked: `mapping.gleif.org/api/v2/isin-lei` publishes **full files only** —
+a daily ~26 MB ISIN-to-LEI mapping with no delta feed. So its 9.72 GB/yr
+stands, and is now the largest line in the projection. The options are its
+cadence (the mapping moves slowly), or not storing the whole file when the
+adapter only reads the ~1,200 ISINs the store asks about — which trades
+payload size against being able to re-parse for different ISINs later.
+Neither is decided here.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full
