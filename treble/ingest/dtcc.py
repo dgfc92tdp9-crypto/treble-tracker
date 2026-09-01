@@ -548,7 +548,20 @@ class DtccSdrRatesAdapter(SourceAdapter):
         # against a source whose terms are unread.
         rate_limit_per_second=0.2,
     )
-    parser_version = "1"
+    #: 2 — the boundary, declared after the fact. Version "1" names two
+    #: different behaviours in the live store: `swap:USD-SOFR-OIS:10Y`
+    #: TRADE_COUNT for 2026-07-13 is held as both 227 and 234, one payload,
+    #: one provenance record, `extractor_version` "1" on both. The parser
+    #: changed and its version did not, so provenance could not tell the two
+    #: readings apart and the visibility window settled them by `TIE_BREAK`
+    #: — which for equal knowledge times is ordering on the value itself,
+    #: and was surfacing 227 while the parser produced 234.
+    #:
+    #: Nothing here changed today. The bump exists so that everything
+    #: ingested from now on is distinguishable from the rows that ambiguity
+    #: is in, and `tests/ingest/test_parser_output_is_stable.py` makes the
+    #: next such change impossible to ship silently.
+    parser_version = "2"
 
     def __init__(
         self, payloads: PayloadStore, log: IngestLog, *, report_dates: tuple[date, ...]

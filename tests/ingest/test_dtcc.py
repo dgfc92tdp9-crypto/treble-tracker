@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.ingest.base import RawPayload
 from treble.ingest.dtcc import (
     CONVENTIONS,
@@ -776,3 +777,29 @@ class TestTheWindowSurvivesAWeekend:
         days that were *tried*, not off having yielded nothing."""
         self._responses(monkeypatch, published=set())
         assert list(self._adapter(tmp_path, ()).fetch()) == []
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Nothing enforced that, and the live store carries the cost: 286 dtcc
+    facts written by two different behaviours of `parser_version` "1",
+    including `swap:USD-SOFR-OIS:10Y` TRADE_COUNT for 2026-07-13 stored as
+    both 227 and 234 from one payload and one provenance record. Provenance
+    cannot tell them apart, so the visibility window settles them by
+    `TIE_BREAK` — alphabetical ordering on the value.
+
+    Change what this parser produces and this test fails. Bump
+    `parser_version` and the new reading becomes a restatement provenance
+    can distinguish, which is the whole point.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, tmp_path: Path) -> None:
+        adapter = DtccSdrRatesAdapter(
+            PayloadStore(tmp_path / "p"), IngestLog(tmp_path / "l.db"), report_dates=(REPORT_DATE,)
+        )
+        data = FIXTURE.read_bytes()
+        batch = adapter.parse(
+            RawPayload(data=data, source_uri=SOURCE, fetched_at=FETCHED), payload_hash(data)
+        )
+        check_parser_digest("dtcc-sdr", DtccSdrRatesAdapter.parser_version, batch)

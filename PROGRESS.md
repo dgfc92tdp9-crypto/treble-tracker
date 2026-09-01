@@ -768,6 +768,91 @@ run found the reverse.
 
 ---
 
+## The 312 ambiguous keys: an I5 violation, found twice (2026-09-01)
+
+Not a tie-break problem. **A parser changed what it produced without changing
+its `parser_version`** — and it happened in two adapters independently.
+
+### The evidence
+
+`swap:USD-SOFR-OIS:10Y` TRADE_COUNT for 2026-07-13 was stored as **both 227
+and 234**. One payload, one ingest-log entry, one provenance record,
+`extractor_version` "1" on both rows. Re-running the parser today over that
+same payload yields 234 and produces no duplicates at all — so 227 came from
+an earlier behaviour of a parser still calling itself version 1.
+
+Because provenance keys on the *declared* version, nothing could tell the two
+readings apart, and the visibility window settled them by `TIE_BREAK`, which
+for equal knowledge times is ordering on the value. **It was surfacing 227.**
+A live wrong number, chosen by arithmetic on the value rather than evidence.
+
+`sec-nport` is the same violation found independently: version "1" covers two
+subject *schemes* — the old `otc:<counterparty>:<kind>:<date>`, which put
+every contract a fund held with one broker on one subject, and the
+six-segment key `derivative_subject` builds now.
+
+### The mechanism
+
+`tests/ingest/test_parser_output_is_stable.py` hashes each adapter's parse
+over its recorded fixture and commits the digest, keyed by `parser_version`.
+Change what a parser produces and the test fails by name, telling you to bump
+the version — at which point provenance distinguishes the readings and the
+newer one is a restatement rather than a contradiction.
+
+Verified by changing `MIN_TRADES_PER_TENOR` from 3 to 4 and leaving the
+version alone: it fails with the before/after digests and both branches of
+what to do about it. Wired into `dtcc` and `nport`, the two that drifted;
+one line per adapter to extend.
+
+### The repair
+
+**dtcc — fixed.** The 15 affected report dates were re-ingested, writing at
+today's knowledge time so the correct reading supersedes under
+latest-knowledge-wins. 58,989 facts parsed, **189 stored** — coalescing wrote
+only the corrections. `swap:USD-SOFR-OIS:10Y` for 2026-07-13 now reads 234.
+
+**nport — cannot be repaired by appending.** The *key* changed, so today's
+parser writes to different subjects and the old ones are simply never
+generated again. They are inert — nothing constructs those names — but they
+remain, which is what the version bump now records.
+
+Both adapters bumped to `parser_version = "2"`. Nothing changed in either
+parser today; the bump exists so everything ingested from now on is
+distinguishable from the rows the ambiguity is in.
+
+### Where it stands
+
+| | before | after |
+|---|---|---|
+| ambiguous at their **newest** knowledge (what a query resolves) | 312 | **110** |
+| ambiguous at any knowledge (history, correctly kept) | 312 | 312 |
+| distinct keys in the store | | 10,345,536 |
+
+The history figure does not move and should not: nothing is deleted, and the
+contradictory rows are a true record of what was believed then (I2). The 110
+remaining are dtcc keys where the correct value already happened to be the
+one `TIE_BREAK` surfaced — right answer, contradictory sibling still present
+— and the nport subjects nothing generates any more.
+
+### Three audit mistakes of mine worth recording
+
+The first audit reported **6 million** facts the parser "would not produce".
+Wrong three times over, each time in my checking rather than the code:
+
+* Not filtering by `extractor_version`, so every legitimate version bump
+  (gleif-rr 1→2→3) looked like drift. 5,968,392 phantom findings.
+* `openfigi`'s 17,631 was the same payload ingested on three dates, each
+  stamping its own `effective_from` — 3,240 stored against 1,080 produced,
+  exactly threefold.
+* A balance-sheet identity run against `StockholdersEquity`, which excludes
+  non-controlling interests, reported 22.7% of filings as broken.
+
+Every one was caught by looking at a concrete case instead of trusting the
+aggregate.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full

@@ -259,7 +259,19 @@ class NportAdapter(SourceAdapter):
         redistribution_restricted=False,
         rate_limit_per_second=10.0,
     )
-    parser_version = "1"
+    #: 2 — the same boundary as `dtcc`, and found the same way. Version "1"
+    #: covers two subject schemes: `otc:<counterparty>:<kind>:<date>`, which
+    #: put every contract a fund held with one broker on a single subject,
+    #: and the six-segment key `derivative_subject` builds now. Both are in
+    #: the store under `extractor_version` "1", so 37 keys hold contradictory
+    #: values that nothing can attribute to one reading or the other.
+    #:
+    #: Unlike dtcc's, these cannot be superseded by re-ingesting: the *key*
+    #: changed, so today's parser writes to different subjects and the old
+    #: ones simply stop being generated. They are inert — nothing constructs
+    #: those names any more — but they are still there, and this is the
+    #: version boundary that says why.
+    parser_version = "2"
 
     def __init__(
         self,

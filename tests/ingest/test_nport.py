@@ -12,6 +12,7 @@ from xml.etree.ElementTree import Element
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.core.identifiers import parse_position_subject, validate_lei
 from treble.ingest.base import RawPayload
 from treble.ingest.nport import NportAdapter, _currency, holding_subject
@@ -489,3 +490,22 @@ class TestBothCurrencyForms:
             self._holding('<curCd>N/A</curCd><currencyConditional curCd="EUR"/>')
         )
         assert currency == "EUR"
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    This adapter is the second place that went wrong. `parser_version` "1"
+    covers two different subject schemes in the live store — the old
+    `otc:<counterparty>:<kind>:<date>`, which put every contract a fund held
+    with one broker on a single subject, and the six-segment key
+    `derivative_subject` builds now. 37 keys hold contradictory values that
+    nothing can attribute to one reading or the other.
+
+    Two adapters, the same gap, found independently. This is the enforcement.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, adapter: NportAdapter) -> None:
+        raw = payload()
+        batch = adapter.parse(raw, payload_hash(raw.data))
+        check_parser_digest("sec-nport", NportAdapter.parser_version, batch)
