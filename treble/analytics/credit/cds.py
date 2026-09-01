@@ -211,3 +211,102 @@ def par_spread(spec: CdsSpec, hazard: float, discount_rate: DiscountSource) -> f
     if annuity <= 0.0:
         raise ValueError("no risky annuity: the premium leg has no value to solve against")
     return float(priced.protection_pv / annuity)
+
+
+#: Hazard rates the solve will search between.
+#:
+#: Zero is the floor by definition. The ceiling is 5.0 — a 500% annual
+#: hazard, which survives a year with probability 0.7%. Nothing trades
+#: there; it is a bracket end, chosen high enough that a genuinely
+#: distressed name is inside it and finite so a bad input fails fast
+#: instead of iterating forever.
+HAZARD_FLOOR = 0.0
+HAZARD_CEILING = 5.0
+
+#: Bisection steps. Fixed rather than "until converged" so the answer is a
+#: deterministic function of its inputs — the same property `parser_version`
+#: protects for ingest, applied to a solver. 200 halvings take the bracket
+#: below 1e-59, far past double precision, so this is a ceiling that is
+#: never reached rather than a tolerance anyone tunes.
+SOLVE_STEPS = 200
+
+
+class UpfrontOutOfRangeError(ValueError):
+    """The observed upfront cannot be produced by any hazard rate.
+
+    Its own type because the caller's response differs from every other
+    failure here: an upfront outside the achievable band means the trade was
+    not a standard contract on these terms — a different recovery, a
+    different coupon, or a payment that is not points-upfront at all — and
+    the honest display is "not implied", not a clamped number at the bracket
+    end.
+    """
+
+
+@model(
+    model_id="credit.hazard_from_upfront",
+    version="1.0",
+    spec_section="§13",
+    summary="The hazard rate implied by a traded upfront on a fixed-coupon CDS",
+)
+def hazard_from_upfront(spec: CdsSpec, upfront: float, discount_rate: DiscountSource) -> float:
+    """Solve the hazard rate that reproduces an observed upfront payment.
+
+    Standard CDS trade at a fixed coupon — 100bp or 500bp — with a payment
+    at settlement, so the market's view of credit arrives as *points
+    upfront* rather than as a spread. This inverts `price_cds` to recover
+    it, and `spread_from_upfront` turns it into the number people quote.
+
+    ``upfront`` is a cash amount in the same units as ``spec.notional``,
+    signed the way `CdsPricing.upfront` is: positive means the protection
+    buyer pays.
+
+    **Bisection, not Newton.** The upfront is strictly increasing in the
+    hazard — a worse credit makes protection dearer and its premium leg
+    shorter, so both terms of `protection_pv - premium_pv` move the same
+    way — which makes bisection unconditionally convergent on a bracket
+    that straddles the answer. Newton would be faster and would need a
+    derivative that the accrued-on-default term makes awkward, in exchange
+    for a failure mode that returns a wrong number rather than no number.
+    """
+    low, high = HAZARD_FLOOR, HAZARD_CEILING
+    at_low = price_cds.__wrapped__(spec, low, discount_rate).upfront  # type: ignore[attr-defined]
+    at_high = price_cds.__wrapped__(spec, high, discount_rate).upfront  # type: ignore[attr-defined]
+    if not at_low <= upfront <= at_high:
+        raise UpfrontOutOfRangeError(
+            f"an upfront of {upfront:,.2f} is outside what any hazard rate produces for "
+            f"this contract ({at_low:,.2f} at a zero hazard, {at_high:,.2f} at "
+            f"{HAZARD_CEILING:.0%}). The trade was not a standard contract on these terms."
+        )
+
+    for _ in range(SOLVE_STEPS):
+        middle = (low + high) / 2.0
+        if price_cds.__wrapped__(spec, middle, discount_rate).upfront < upfront:  # type: ignore[attr-defined]
+            low = middle
+        else:
+            high = middle
+    return (low + high) / 2.0
+
+
+@model(
+    model_id="credit.spread_from_upfront",
+    version="1.0",
+    spec_section="§13",
+    summary="The par spread implied by a traded upfront on a fixed-coupon CDS",
+)
+def spread_from_upfront(spec: CdsSpec, upfront: float, discount_rate: DiscountSource) -> float:
+    """The running spread a traded upfront corresponds to.
+
+    Composed of the two models above rather than solved directly, so the
+    number carries the same conventions as everything else on the screen:
+    the hazard comes from inverting `price_cds`, and the spread from
+    `par_spread`, which reads the legs rather than the credit triangle.
+
+    A quoted spread and one implied this way are **not interchangeable on a
+    display**. The first is what a counterparty agreed; the second is what
+    this model says that payment means under a 40% recovery and a flat
+    discount curve. `tapi.cdsw` keeps them in separate panes for that
+    reason, and the model id travels with the implied one.
+    """
+    hazard = hazard_from_upfront.__wrapped__(spec, upfront, discount_rate)  # type: ignore[attr-defined]
+    return float(par_spread.__wrapped__(spec, hazard, discount_rate))  # type: ignore[attr-defined]

@@ -55,7 +55,7 @@ from collections.abc import Iterator, Sequence
 from datetime import UTC, date, datetime
 
 from treble.core.facts import Fact
-from treble.core.identifiers import TUID
+from treble.core.identifiers import TUID, looks_like_isin
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.ingest.base import ParsedBatch, RawPayload, SourceAdapter, SourceMeta
 from treble.ingest.dtcc import (
@@ -132,7 +132,33 @@ def identifiers(row: dict[str, str]) -> dict[str, str]:
     values = [v.strip() for v in (row.get("Underlier ID-Leg 1") or "").split(";")]
     if len(sources) != len(values):
         return {}
-    return {s: v for s, v in zip(sources, values, strict=True) if s and v}
+    return {
+        source: value
+        for source, value in zip(sources, values, strict=True)
+        if source and value and _identifier_is_real(source, value)
+    }
+
+
+def _identifier_is_real(source: str, value: str) -> bool:
+    """Whether a value is an identifier at all, or a placeholder wearing one.
+
+    The tape carries `XSSNRREFOBL0` in the ISIN column — "XS senior reference
+    obligation", a stand-in used when the specific obligation is not being
+    named. On 2026-08-28 it appears against **five different reference
+    entities**: Volvo, Alstom, Deutsche Bank and two more. Keyed on it, they
+    became one curve, and that curve priced Volkswagen at 1,475bp.
+
+    An ISIN's check digit settles it without a denylist: `XSSNRREFOBL0` and
+    `XSLACREFOBL0` both fail it and every real ISIN in the file passes. A
+    placeholder invented next quarter is caught by the same rule, which a
+    list of known bad strings would not be.
+
+    Only ISINs are checked, and deliberately. A Markit RED code has no check
+    digit to verify, so there is nothing to test it against — and inventing a
+    shape rule for it would reject valid codes to catch a placeholder nobody
+    has seen.
+    """
+    return looks_like_isin(value) if source == "ISIN" else True
 
 
 def best_identifier(row: dict[str, str]) -> tuple[str, str] | None:
@@ -363,7 +389,14 @@ class DtccSdrCreditAdapter(SourceAdapter):
         redistribution_restricted=True,
         rate_limit_per_second=0.2,
     )
-    parser_version = "1"
+    #: 2 — placeholder ISINs rejected. Version 1 keyed on `XSSNRREFOBL0`,
+    #: which is not an identifier: it is "XS senior reference obligation",
+    #: a stand-in the tape uses when the specific obligation is not named,
+    #: and on 2026-08-28 it stood in for five different entities. Their
+    #: prints became one curve, and that curve priced Volkswagen at
+    #: 1,475bp. The check digit rejects it; every real ISIN in the file
+    #: passes.
+    parser_version = "2"
 
     def __init__(
         self,

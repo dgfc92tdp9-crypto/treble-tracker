@@ -206,3 +206,55 @@ class TestTheParse:
             RawPayload(data=data, source_uri=SOURCE, fetched_at=FETCHED), payload_hash(data)
         )
         check_parser_digest("dtcc-credit", DtccSdrCreditAdapter.parser_version, batch)
+
+
+class TestAPlaceholderIsNotAnIdentifier:
+    """`XSSNRREFOBL0` is "XS senior reference obligation", not an ISIN.
+
+    The tape uses it when the specific obligation is not being named, and on
+    2026-08-28 it stands against **five different reference entities** —
+    Volvo, Alstom, Deutsche Bank and two more. Keyed on it they became one
+    curve, and that curve priced Volkswagen at 1,475bp.
+
+    Caught by disbelieving the number. The check digit is what makes the
+    rejection general: a placeholder invented next quarter fails it too,
+    which a list of known bad strings would not.
+    """
+
+    def test_the_placeholder_fails_its_check_digit(self) -> None:
+        from treble.core.identifiers import looks_like_isin
+
+        assert not looks_like_isin("XSSNRREFOBL0")
+        assert not looks_like_isin("XSLACREFOBL0")
+
+    def test_real_isins_in_this_file_pass(self, rows: list[dict[str, str]]) -> None:
+        """Proves the rule discriminates rather than rejecting the column."""
+        from treble.core.identifiers import looks_like_isin
+
+        real = [v for r in rows for s, v in identifiers(r).items() if s == "ISIN"]
+        assert len(real) > 300
+        assert all(looks_like_isin(v) for v in real)
+
+    def test_it_really_stood_for_several_entities(self, rows: list[dict[str, str]]) -> None:
+        """The reason it had to go, asserted against the file rather than
+        taken on trust. If a later file uses it for one entity only, this
+        fails and the rejection needs restating."""
+        names = {
+            (r.get("Underlying Asset Name") or "").strip()
+            for r in rows
+            if "XSSNRREFOBL0" in (r.get("Underlier ID-Leg 1") or "")
+            and r.get("Underlying Asset Name")
+        }
+        assert len(names) >= 3, f"only {len(names)} entities used the placeholder"
+
+    def test_no_placeholder_subject_survives_the_parse(self, facts: tuple) -> None:
+        assert not [f for f in facts if "REFOBL" in str(f.subject)]
+
+    def test_a_row_whose_only_id_is_a_placeholder_yields_nothing(self) -> None:
+        """Not "falls back to the name" — an unattributable print is
+        dropped. A curve blended from five issuers is worse than a missing
+        one."""
+        assert (
+            identifiers({"Underlier ID source-Leg 1": "ISIN", "Underlier ID-Leg 1": "XSSNRREFOBL0"})
+            == {}
+        )

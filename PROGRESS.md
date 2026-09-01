@@ -1050,6 +1050,88 @@ merged two entities is a wrong number.
 
 ---
 
+## The upfront solve, and a placeholder that was pricing five companies as one (2026-09-01)
+
+Standard CDS trade at a fixed coupon with a payment at settlement, so the
+market's view arrives as *points upfront* on most prints and as a spread on
+roughly one in ten. `credit.spread_from_upfront` inverts `price_cds` to read
+the first as the second, and upfront-only tenors now carry a spread.
+
+### The solve
+
+Bisection on the hazard rate, not Newton. The upfront is strictly increasing
+in the hazard — a worse credit makes protection dearer *and* its premium leg
+shorter, so both terms of `protection_pv - premium_pv` move the same way —
+which makes bisection unconditionally convergent. Newton would be faster,
+would need a derivative the accrued-on-default term makes awkward, and would
+trade a guaranteed answer for a wrong one.
+
+200 fixed steps rather than "until converged", so the answer is a
+deterministic function of its inputs — the property `parser_version` protects
+for ingest, applied to a solver. That takes a 5.0-wide bracket below 1e-59.
+
+Validated three ways:
+
+* **Exact round trip.** Hazard → upfront → hazard returns to 1e-12.
+* **Against the tape's own other quantity.** A 2.377% upfront on the 5Y
+  implies **564.9bp**, and the tape *quoted* **575bp** on that name's 5Y —
+  10bp apart, from two independent fields neither of which knew about the
+  other.
+* **An invariant needing no data.** A contract settling at zero upfront
+  implies a spread equal to its coupon.
+
+The spread round trip is *not* exact and the test says why: `hazard_from_spread`
+is the credit triangle and `par_spread` reads the legs, so the gap is the
+accrued-on-default term. Measured at a consistent **0.37%–0.51%** across
+50bp–3,000bp, and the test asserts that band rather than a loose tolerance, so
+a change to either model shows as a number that moved.
+
+### Quoted and implied are not interchangeable
+
+They share a column and the **model id says which is which** —
+`credit.price_cds` against `credit.spread_from_upfront`. The observed pane
+still shows no spread where none was quoted: the implied number belongs to
+the model, not to the tape.
+
+### A placeholder ISIN was pricing five companies as one
+
+`XSSNRREFOBL0` is not an ISIN. It is "XS senior reference obligation", the
+stand-in the tape uses when the specific obligation is not named, and on
+2026-08-28 it stands against **five different reference entities** — Volvo,
+Alstom, Deutsche Bank and two more. Keyed on it their prints became one
+curve, and that curve priced **Volkswagen at 1,475bp**.
+
+Caught by disbelieving the number, then confirmed against the file. The fix
+is structural rather than a denylist: `core.identifiers.looks_like_isin`
+verifies the check digit, `XSSNRREFOBL0`, `XSLACREFOBL0`, `XSSUBREFOBL0` and
+`XSNOREFOBL00` all fail it, and every real ISIN in the file passes. A
+placeholder invented next quarter fails the same rule.
+
+Only ISINs are checked. A Markit RED code has no check digit, so there is
+nothing to verify it against, and inventing a shape rule would reject valid
+codes to catch a placeholder nobody has seen.
+
+`parser_version` bumped 1 → 2, and the 61 keys across 13 placeholder subjects
+already in the store were **retracted** (`store/retract.py`) — the machinery
+built for the nport subject-scheme change, used for exactly the same shape of
+problem a few hours later.
+
+### Two display bugs the tests found
+
+* A "neither a spread nor an upfront" row carried **five cells against a
+  six-column header**, so its reason rendered in the `Upfront %` column and
+  every column after it was wrong. Introduced by adding the Spread column.
+* `default_entity` counted *subjects*, and a subject exists for as long as
+  anything was ever written to it — so once the placeholders were retracted
+  the screen opened on an entity whose every cell was an em dash.
+
+Both are now tested, and the pricing tests index cells by **column name**
+rather than position: three of them broke by *shifting* when the column was
+added, which is the same failure as the short row.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full
