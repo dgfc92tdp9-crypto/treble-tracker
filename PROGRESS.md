@@ -500,6 +500,87 @@ all killed, including both "a consumer reverts to the publication rate" and
 
 ---
 
+## Full refresh verification (2026-09-01)
+
+A forced refresh of all ten sources, plus `make drift` against every live
+endpoint. Two results and one defect.
+
+### Everything works, and coalescing is doing nearly all the work
+
+Nine of ten sources succeeded. The tenth is below.
+
+    63,356 facts parsed  ->  95 rows stored     (99.85% coalesced)
+    payload store        ->  +1.8 MB
+    elapsed              ->  8m 29s
+
+`make drift` passed clean — 11 tests, every live source's schema still
+matching its recorded fixture.
+
+### The GLEIF ladder, visible in the log
+
+    2026-08-09 09:56   leidata concatenated file   (old adapter, 37 MB)
+    2026-09-01 16:15   rr-last-month.xml.zip       (24-day gap, 3.46 MB)
+    2026-09-01 16:55   rr-last-day.xml.zip         (40 min later, 0.09 MB)
+
+Catch-up then steady state, chosen without being told, each verified
+against its own `DeltaStart`.
+
+### `twelvedata` failed two consecutive runs, and it was ours
+
+`RemoteProtocolError: peer closed connection without sending complete
+message body (incomplete chunked read)`, both times, after about fifteen of
+its forty-five symbols.
+
+It was not the vendor being unusually flaky. The adapter made 45 bare
+`httpx.get` calls at eight requests a minute — **six unbroken minutes of
+network** — with no retry, so any single truncated response ended the whole
+source. Over a six-minute window that is close to inevitable, which is why
+it happened twice out of two.
+
+`SourceAdapter._get` now throttles and retries: three attempts, 1s then 2s
+backoff. Retriable is **transport errors plus 429 and 5xx**; a 4xx other
+than 429 is raised immediately, because a bad key or an unknown symbol
+repeated three times turns a clear error into a slow one while spending the
+quota that would have fixed it.
+
+Put on the base class rather than in the adapter so the other sixteen
+adapters can adopt it; none were changed.
+
+Mutation testing found one real gap. Widening `except httpx.TransportError`
+to its parent `httpx.HTTPError` killed no test: status errors are caught by
+the clause above it, so the only behaviour that changed was for
+`RequestError` subclasses nothing exercised. The boundary is now pinned —
+**retry only when nothing was observed.** A connection reset means no
+response arrived and asking again may differ; a body that arrived and would
+not decode will not decode the second time either.
+
+### Two mistakes of mine worth recording
+
+* I ran `make drift` alongside the refresh after grepping only
+  `test_fixture_drift.py` for store access. `-m drift` also selects
+  `tests/drift/test_adapter_coverage.py`, which opens `data/ingest.db`, and
+  two tests failed on a DuckDB lock conflict I had created. An unstated
+  environment assumption (failure mode D) — and for a moment it looked like
+  a source problem.
+* The command queued to wait for the refresh used
+  `until ! pgrep -f "bin/treble refresh"`, whose own shell command line
+  contains that string, so it matched itself and would have waited forever.
+  The same shape as grepping output that contains the pattern being
+  searched for.
+* Checking the result with `treble status | grep -c fresh` from the wrong
+  directory printed `0`, which reads exactly like "zero sources are fresh"
+  rather than "the command did not run". Failure mode A again, three times
+  in one session, each time in a *check* rather than in the code.
+
+### Final state
+
+Ten of ten sources fresh. `trace-api` is the only one not flowing and is
+correctly reported `never` — awaiting a FINRA credential rotation, not
+broken.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full

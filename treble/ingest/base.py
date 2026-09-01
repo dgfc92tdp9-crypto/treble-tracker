@@ -20,12 +20,31 @@ from collections.abc import Iterator, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+import httpx
 from pydantic import BaseModel, ConfigDict
 
 from treble.core.facts import Fact
 from treble.core.provenance import Provenance
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadHash, PayloadStore
+
+#: How many times a throttled GET is attempted before giving up.
+#:
+#: Three, not more: the failures this exists for are single truncated
+#: responses, and a source that fails three times in a row is reporting
+#: something a fourth attempt will not change. More attempts against a rate
+#: limit also spend the quota that would have recovered on its own.
+MAX_ATTEMPTS = 3
+
+#: First backoff, doubled per attempt (1s, 2s). Short because the token
+#: bucket already paces requests — this waits for a *transient* fault to
+#: pass, not for a quota to refill.
+RETRY_BACKOFF_SECONDS = 1.0
+
+#: Statuses worth repeating. 429 is the rate limiter asking for a pause;
+#: 5xx is the vendor's own failure. Everything else in 4xx means the
+#: request was wrong and will be wrong again.
+RETRIABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 
 
 class TokenBucket:
@@ -124,6 +143,59 @@ class SourceAdapter(ABC):
     def _throttle(self) -> None:
         if self._bucket is not None:
             self._bucket.acquire()
+
+    def _get(
+        self,
+        url: str,
+        *,
+        params: Mapping[str, str] | None = None,
+        timeout: float = 60.0,
+        attempts: int = MAX_ATTEMPTS,
+    ) -> httpx.Response:
+        """A throttled GET that survives one bad response.
+
+        Added after `twelvedata` failed two runs in a row with
+        ``RemoteProtocolError: peer closed connection without sending
+        complete message body``. It fetches 45 symbols at eight requests a
+        minute — six unbroken minutes of calls — and a single truncated
+        response ended the whole source. Fifteen payloads had already been
+        stored; the sixteenth killed the run.
+
+        Retrying is sound here because every call this makes is a GET of a
+        published document: repeating one cannot double an order or an
+        entry, and the payload store is content-addressed, so a response
+        that arrives twice is stored once.
+
+        **What is not retried is the point.** A 4xx other than 429 is the
+        request being wrong — a bad key, an unknown symbol, a withdrawn
+        tier — and repeating it three times turns a clear error into a
+        slow one while using up the quota that would have fixed it.
+
+        The exception is re-raised rather than wrapped, so the caller still
+        sees the vendor's own error, and ``params`` never reaches a message
+        or a log: for several adapters it carries the API key.
+        """
+        last: Exception | None = None
+        for attempt in range(attempts):
+            self._throttle()
+            try:
+                response = httpx.get(url, params=params, timeout=timeout)
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code not in RETRIABLE_STATUS:
+                    raise
+                last = exc
+            except httpx.TransportError as exc:
+                # Connection reset, truncated body, read timeout: the
+                # response never arrived intact, so nothing was observed
+                # and nothing is lost by asking again.
+                last = exc
+            else:
+                return response
+            if attempt + 1 < attempts:
+                time.sleep(RETRY_BACKOFF_SECONDS * (2**attempt))
+        assert last is not None  # noqa: S101 - the loop cannot exit without one
+        raise last
 
     @abstractmethod
     def fetch(self) -> Iterator[RawPayload]:

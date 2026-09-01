@@ -47,8 +47,6 @@ import os
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
 
-import httpx
-
 from treble.core.facts import Fact
 from treble.core.provenance import ExtractionMethod, Provenance
 from treble.ingest.base import ParsedBatch, RawPayload, SourceAdapter, SourceMeta
@@ -123,8 +121,12 @@ class TwelveDataDailyAdapter(SourceAdapter):
                 "without a NAME= prefix becomes a command whose name is the secret."
             )
         for symbol in self._symbols:
-            self._throttle()
-            response = httpx.get(
+            # `_get` throttles and retries a truncated or rate-limited
+            # response. Forty-five symbols at eight requests a minute is six
+            # unbroken minutes of calls, and before this a single dropped
+            # connection ended the whole source — twice in a row, on
+            # 2026-09-01, after fifteen symbols had already been stored.
+            response = self._get(
                 API_URL,
                 params={
                     "symbol": symbol,
@@ -132,9 +134,7 @@ class TwelveDataDailyAdapter(SourceAdapter):
                     "outputsize": str(self._outputsize),
                     "apikey": key,
                 },
-                timeout=60.0,
             )
-            response.raise_for_status()
             yield RawPayload(
                 data=response.content,
                 # Built without the key. `str(response.url)` would carry it
