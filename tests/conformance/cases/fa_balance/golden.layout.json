@@ -175,6 +175,32 @@
     },
     {
       "at": [
+        11,
+        0
+      ],
+      "attrs": [
+        "label"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "Total liabilities and equity"
+    },
+    {
+      "at": [
+        11,
+        34
+      ],
+      "attrs": [
+        "stale"
+      ],
+      "input": null,
+      "link": null,
+      "provenance": null,
+      "text": "                   —"
+    },
+    {
+      "at": [
         16,
         0
       ],

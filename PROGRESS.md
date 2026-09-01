@@ -668,6 +668,106 @@ second verified copy one command; which disk it goes on is Jack's call.
 
 ---
 
+## Making the Apple defect structurally impossible (2026-09-01)
+
+A second sweep of phases 1–3, aimed at one question: *what stops a wrong
+number reaching a screen again?* The `period_from` fix stopped **that**
+number. It did not stop the class.
+
+### Three layers now, not one
+
+| layer | question it answers | mechanism |
+|---|---|---|
+| `BoundCell.period_from` | did this value come from the period the heading claims? | resolver blanks a mismatch |
+| `scripts/check_screen_periods.py` | did anyone *forget* to ask? | gate stage |
+| `core/consistency.py` | do the numbers agree with each other? | footnote + cell marks |
+
+The middle one is the important addition. `period_from` was **opt-in**, and
+CLAUDE.md §1 is explicit that invariants are "enforced by a mechanism, not
+by discipline" — a new screen could reintroduce the defect by omission. The
+gate now fails if a bound cell sits at or below a `period` cell's row
+without declaring which period governs it. The rule is positional because
+reading is positional; cells *above* the first heading (DES's shares
+outstanding, public float) are not under one and are left alone.
+
+Verified by reintroducing the defect: removing one `period_from` from `FA`
+fails the gate by name.
+
+### The identities were chosen by measurement, and one obvious one is wrong
+
+Spec §14.1 requires that "a statement that does not foot is rejected
+automatically". Candidates were run over the live store and kept only if
+they hold almost always — an identity that fails often is noise, and noise
+teaches a reader to ignore the column.
+
+| identity | testable | break | kept |
+|---|---|---|---|
+| Assets = filer's own total | 35,751 | **0.05%** | yes |
+| AssetsCurrent ≤ Assets | 28,682 | **0.01%** | yes |
+| LiabilitiesCurrent ≤ Liabilities | 24,566 | **0.01%** | yes |
+| EPS × shares vs *available to common* | 255 | **1.18%** | yes |
+| EPS × shares vs *net income* | 1,007 | 16.19% | **no** |
+| Assets = Liabilities + StockholdersEquity | 31,505 | 11.18% | **no** |
+
+The fifth row is the point. Earnings per share is computed on income
+*available to common shareholders* — different wherever preferred dividends
+or non-controlling interests exist — so the intuitive form of the check is
+wrong about one filing in six. The correct form is wrong about one in
+eighty-five.
+
+The sixth was investigated rather than assumed. Filers restate one leg of
+the balance sheet without the others, so the **source** stops footing. One
+case traced end to end: a shell company's 2022 equity moved from −54,280 to
+−9,718,769 between the 2025q1 and 2025q2 SEC datasets, with assets and
+liabilities unrestated. Different `knowledge_from`, later knowledge wins —
+**bitemporality working exactly as designed**, and a true statement about
+the filing rather than a defect here.
+
+### On the live store: 25 flagged out of 47,846
+
+    statements assembled  102,950
+    with >=2 tagged lines  47,846
+    flagged                    25   (0.05%)
+
+Twenty-five cases a person could actually look at, rather than five
+thousand nobody would.
+
+### A check that was wired, green, and inert
+
+`FA`'s balance tab did not bind `LiabilitiesAndStockholdersEquity`, so the
+strongest identity had nothing to compare and could never fire. Wired,
+passing, and useless. The tab now carries the filer's own total — a real
+balance-sheet line as well as the input the check needs — and a test asserts
+both sides of the identity are bound.
+
+The `fa_balance` conformance fixture records that field as **absent** rather
+than equal to Assets. It would be arithmetically right and still a
+fabrication: the fixture's purpose is to be a recording of what a source
+returned, and that filer did not tag it.
+
+### Eight mutations, all killed
+
+Including the two that matter: `violations = check_statement(statement)`
+replaced with `()`, and the cell-marking condition replaced with `False`.
+The wiring is tested as well as the rule this time — last sweep's mutation
+run found the reverse.
+
+### Open
+
+* **312 keys hold two different values at the same knowledge time.** Not a
+  restatement — genuinely concurrent contradictory evidence, resolved by
+  `TIE_BREAK`, which is alphabet rather than evidence. Deterministic but not
+  reasoned. Worth a rule that prefers the value consistent with the rest of
+  the statement.
+* **114 balance sheets report zero assets.** Almost certainly shells, but
+  unexamined.
+* Income-statement identities (revenue less costs equals operating income)
+  are not built; the tag variation across filers is much wider than the
+  balance sheet's and would need the §14.1 standardisation mapping first.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full

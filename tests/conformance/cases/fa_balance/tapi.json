@@ -34,6 +34,10 @@
       "provenance_id": "c06a043ec5916b6da725e1a1eb3391c77303bb2b1e09b86dfa1a8b2099ce408a",
       "effective_from": "2026-06-30",
       "effective_to": "2026-06-30"
+    },
+    "us-gaap:LiabilitiesAndStockholdersEquity:USD": {
+      "value": null,
+      "stale": false
     }
   },
   "series": {}

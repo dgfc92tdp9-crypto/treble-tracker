@@ -12,6 +12,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from treble.core.consistency import check as check_statement
 from treble.core.identifiers import SecurityQuery
 from treble.render.contract.buffer import (
     CellBuffer,
@@ -148,6 +149,15 @@ def resolve(
     cells: list[ResolvedCell] = []
     panes: list[ResolvedPane] = []
     any_stale = False
+    # Field values as assembled for *this* screen, checked against the
+    # accounting identities once every cell is resolved. `period_from`
+    # answers "did this number come from the period the heading claims";
+    # this answers the question it cannot — whether the numbers on the
+    # screen agree with each other (spec §14.1).
+    statement: dict[str, float] = {}
+    #: Index in `cells` -> the field it is bound to, so a failing identity
+    #: can mark exactly the cells that produced it.
+    bound_at: dict[int, str] = {}
 
     for cell in tab.cells:
         if isinstance(cell, StaticCell):
@@ -168,6 +178,9 @@ def resolve(
             attrs = tuple(
                 dict.fromkeys((*cell.attrs, *_conditional_attrs(result, cell.conditional)))
             )
+            if isinstance(result.value, int | float) and not isinstance(result.value, bool):
+                statement[cell.field] = float(result.value)
+            bound_at[len(cells)] = cell.field
             text = (
                 _missing(cell.format, cell.width)
                 if result.value is None
@@ -233,6 +246,25 @@ def resolve(
                 )
             )
 
+    # Spec §14.1: a statement that does not foot is not presented as though
+    # it does. Reported as a footnote rather than by blanking the figures —
+    # every one of them may be exactly what the filer said, and which is
+    # wrong is not something this layer can know.
+    violations = check_statement(statement)
+    footnotes = tuple(
+        f"These figures do not reconcile — {violation}. Every value is as "
+        "filed; the disagreement is between them."
+        for violation in violations
+    )
+    if violations:
+        flagged = {field for violation in violations for field in violation.fields}
+        cells = [
+            cell.model_copy(update={"attrs": (*cell.attrs, Attr.WARNING)})
+            if bound_at.get(index) in flagged and Attr.WARNING not in cell.attrs
+            else cell
+            for index, cell in enumerate(cells)
+        ]
+
     return CellBuffer(
         mnemonic=definition.mnemonic,
         tab=tab.name,
@@ -241,4 +273,5 @@ def resolve(
         cells=tuple(cells),
         panes=tuple(panes),
         stale=any_stale,
+        footnotes=footnotes,
     )
