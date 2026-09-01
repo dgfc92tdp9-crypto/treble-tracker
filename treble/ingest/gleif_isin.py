@@ -94,6 +94,24 @@ class GleifIsinLeiAdapter(SourceAdapter):
         rate_limit_per_second=0.5,
         # Republished every day, including weekends.
         expected_cadence_days=1.0,
+        # Pulled weekly, though. The file is a full ISIN-to-LEI mapping —
+        # 26.6 MB stored, every day, with no delta feed: checked
+        # 2026-09-01, mapping.gleif.org/api/v2/isin-lei publishes full
+        # files only, unlike the golden-copy API that let `gleif-rr` drop
+        # from 37 MB a day to 90 KB. At a daily pull this source alone is
+        # 9.72 GB/yr against 10.5 GB free, and after the RR change it was
+        # the largest line in the projection by a factor of five.
+        #
+        # Weekly costs a lag: an instrument issued on Monday may not map to
+        # its issuer's LEI until the following Monday. That is tolerable
+        # here in a way a daily 26 MB download is not, because the mapping
+        # is an identifier join rather than a price — a missing ISIN
+        # resolves to no LEI and shows as absent, not as a wrong answer.
+        #
+        # It also means a broken endpoint is noticed in 15 days rather than
+        # 3 (`health._tolerance`). That is the real cost of this line and
+        # the reason to revisit it if a delta feed ever appears.
+        fetch_cadence_days=7.0,
     )
     parser_version = "1"
 

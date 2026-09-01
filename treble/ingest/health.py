@@ -121,7 +121,7 @@ def source_health(log: IngestLog, *, now: datetime | None = None) -> tuple[Sourc
 
     out: list[SourceHealth] = []
     for source_id, meta in all_sources().items():
-        cadence = meta.expected_cadence_days
+        cadence = meta.effective_cadence_days
         last = latest.get(source_id)
         age = None if last is None else (at - last).total_seconds() / 86400.0
         if last is None:

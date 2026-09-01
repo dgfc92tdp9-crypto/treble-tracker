@@ -454,6 +454,52 @@ Neither is decided here.
 
 ---
 
+## `gleif-isin` pulled weekly (2026-09-01)
+
+The largest remaining line in the disk projection, cut sevenfold. The ISIN-to-LEI
+mapping is a 26.6 MB full file with **no delta feed** — checked, and unlike
+`gleif-rr`, `mapping.gleif.org/api/v2/isin-lei` publishes full files only. At a
+daily pull it was 9.72 GB/yr against ~10 GB free.
+
+| | before | after |
+|---|---|---|
+| gleif-isin | 25.4 MB/day | **3.6 MB/day** |
+| whole projection | 16.5 GB/yr | **8.8 GB/yr** |
+| runway | 231 days | **343 days** |
+
+### The fields had to be split first
+
+`SourceMeta.expected_cadence_days` is documented as *"how often this source
+expects to have something new"* — a fact about the source. GLEIF republishes
+this file every day, including weekends, and the comment above the field said
+so. Setting it to `7.0` would have recorded our schedule by overwriting their
+description, leaving a future reader believing GLEIF publishes weekly.
+
+So `fetch_cadence_days` now carries the decision, `expected_cadence_days`
+keeps the fact, and `effective_cadence_days` is the one rule both consumers
+(`health`, `growth`) read. A source with no separate policy is unaffected.
+
+Mutation-tested, because the two are easy to conflate again — a consumer
+reading `expected_cadence_days` directly still compiles, still passes its own
+tests, and quietly schedules a source seven times too often. Five mutations,
+all killed, including both "a consumer reverts to the publication rate" and
+"the schedule is recorded by editing GLEIF's description".
+
+### What weekly costs
+
+* **Lag.** An instrument issued on Monday may not map to its issuer's LEI
+  until the following Monday. Tolerable here in a way a daily 26 MB download
+  is not, because the mapping is an identifier join rather than a price: a
+  missing ISIN resolves to no LEI and shows as absent, never as a wrong
+  answer.
+* **Slower detection.** A source pulled less often is checked less often, so
+  a broken endpoint is noticed in 15 days rather than 3
+  (`health._tolerance` — cadence doubled plus a day). That is the real cost
+  of this line, and the reason to revisit it if a delta feed appears.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full

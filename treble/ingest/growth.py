@@ -87,7 +87,7 @@ def project(log: IngestLog, payload_root: Path) -> Growth:
     meta = all_sources()
     contributors: list[tuple[str, int]] = []
     for source, hashes in recent.items():
-        cadence = getattr(meta.get(source), "expected_cadence_days", None)
+        cadence = getattr(meta.get(source), "effective_cadence_days", None)
         if not cadence or not hashes:
             # No declared cadence means staleness is not judged for this
             # source (`health.py`), and projecting one here would invent

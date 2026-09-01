@@ -67,6 +67,30 @@ class SourceMeta(BaseModel):
     #: rather than lazy: inventing a cadence generates false alarms, and a
     #: report that cries wolf is worse than no report.
     expected_cadence_days: float | None = None
+    #: How often *we* choose to pull it, in days. ``None`` means "as often
+    #: as it publishes" — :attr:`effective_cadence_days`.
+    #:
+    #: Separate from `expected_cadence_days` because they answer different
+    #: questions and only coincide while we fetch everything as fast as it
+    #: appears. The first is a fact about the source; this is a decision
+    #: about us, usually made on cost. Collapsing them means recording the
+    #: decision by overwriting the fact — so a reader later learns that
+    #: GLEIF publishes its ISIN mapping weekly, which is not true.
+    #:
+    #: Set this and the source stays honestly described while the schedule
+    #: changes. What it costs is stated at :func:`health.source_health`: a
+    #: source pulled less often is also *checked* less often, so a dead
+    #: endpoint goes unnoticed for longer.
+    fetch_cadence_days: float | None = None
+
+    @property
+    def effective_cadence_days(self) -> float | None:
+        """The interval anything scheduling or judging this source should use.
+
+        One place for the rule, because the alternative is every caller
+        remembering to prefer one field over the other and one of them not.
+        """
+        return self.fetch_cadence_days or self.expected_cadence_days
 
 
 class RawPayload(BaseModel):
