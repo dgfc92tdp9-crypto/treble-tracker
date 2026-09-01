@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.ingest.base import RawPayload
 from treble.ingest.edgar_bulk import EdgarBulkFinancialsAdapter, _accepted_utc, _period_start
 from treble.store.ingest_log import IngestLog
@@ -187,3 +188,32 @@ class TestParserIsPure:
         )
         raw = RawPayload(data=data, source_uri="https://sec.gov/x", fetched_at=FETCHED)
         assert adapter.parse(raw, payload_hash(data)).facts == ()
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters changed output while keeping their version — `dtcc-sdr`,
+    `sec-nport` and `openfigi` — and each was found only after the wrong rows
+    were in the store.
+
+    The config is *fixed* here — one quarter, one filer — so the digest
+    changes if and only if the parser does.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, tmp_path: Path) -> None:
+        adapter = EdgarBulkFinancialsAdapter(
+            PayloadStore(tmp_path / "p"),
+            IngestLog(tmp_path / "l.db"),
+            quarters=("2026q1",),
+            contact_email="test@example.com",
+            ciks=frozenset({IBM}),
+        )
+        data = ARCHIVE.read_bytes()
+        raw = RawPayload(
+            data=data,
+            source_uri="https://www.sec.gov/…/2026q1.zip",
+            fetched_at=FETCHED,
+        )
+        batch = adapter.parse(raw, payload_hash(data))
+        check_parser_digest("edgar-bulk", EdgarBulkFinancialsAdapter.parser_version, batch)

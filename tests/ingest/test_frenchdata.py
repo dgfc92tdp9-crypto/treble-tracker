@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.core.facts import Fact
 from treble.ingest.base import RawPayload
 from treble.ingest.frenchdata import (
@@ -273,3 +274,18 @@ class TestUserAgent:
         monkeypatch.delenv(CONTACT_ENV, raising=False)
         monkeypatch.delenv("TREBLE_EDGAR_CONTACT", raising=False)
         assert "@" not in french_user_agent()
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters changed output while keeping their version — `dtcc-sdr`,
+    `sec-nport` and `openfigi` — and each was found only after the wrong rows
+    were in the store.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, tmp_path: Path) -> None:
+        data = (FIXTURES / FACTORS).read_bytes()
+        raw = RawPayload(data=data, source_uri=f"{BASE_URL}/{FACTORS}", fetched_at=FETCHED)
+        batch = adapter(tmp_path).parse(raw, payload_hash(data))
+        check_parser_digest("frenchdata", FrenchDataAdapter.parser_version, batch)

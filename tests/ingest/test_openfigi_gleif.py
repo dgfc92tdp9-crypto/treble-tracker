@@ -206,3 +206,15 @@ class TestAMappingIsNotAFactAboutADay:
         raw = openfigi_envelope()
         batch = openfigi.parse(raw, payload_hash(raw.data))
         check_parser_digest("openfigi", OpenFigiAdapter.parser_version, batch)
+
+
+class TestTheGleifParserDoesNotChangeWithoutItsVersion:
+    """The per-LEI record adapter, guarded alongside the mapping one."""
+
+    def test_the_parse_matches_its_recorded_digest(self, gleif: GleifAdapter) -> None:
+        data = GLEIF_RAW.read_bytes()
+        raw = RawPayload(
+            data=data, source_uri="https://api.gleif.org/api/v1/lei-records", fetched_at=FETCHED
+        )
+        batch = gleif.parse(raw, payload_hash(data))
+        check_parser_digest("gleif", GleifAdapter.parser_version, batch)

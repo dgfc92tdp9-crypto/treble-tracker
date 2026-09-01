@@ -2,6 +2,9 @@
   "coinbase": {
     "1": "a836f1bc82a968dcd7e23791e35219ed"
   },
+  "coinbase-products": {
+    "1": "8238c4a3b4930a6123f756d9f3e1259e"
+  },
   "dtcc-credit": {
     "2": "2ffbbda0adb44b044f02f926858d9970"
   },
@@ -14,11 +17,26 @@
   "ecb-hicp": {
     "1": "f1af37234eea528172c1a8da72fb59e8"
   },
+  "edgar-bulk": {
+    "1.0": "5e3189dfc11c3b7a233cb30aa5a361a8"
+  },
   "edgar-companyfacts": {
     "1": "f758142f65fdc3f3613e4ad8818b196c"
   },
+  "edgar-submissions": {
+    "1": "581d848cc1763340d6b16671e928d12e"
+  },
   "fred": {
     "1": "9e18dbb071a2d6c5d2bd03ec45a865c3"
+  },
+  "frenchdata": {
+    "1.0": "932995737cadac564a714300092b97a1"
+  },
+  "gleif": {
+    "1": "a78d800dbc8f4b66a020c622ed4cf93d"
+  },
+  "gleif-isin": {
+    "1": "4f53cda18c2baa0c0354bb5f9a3ecbe5"
   },
   "gleif-rr": {
     "3": "11888bc2b6ce4213c1157fb757f358b7"
@@ -28,6 +46,9 @@
   },
   "sec-nport": {
     "2": "1dda8601530b3429af73b88f0bab84ce"
+  },
+  "trace-api": {
+    "0-unimplemented": "d8c9fc0423e66f6957e0545067d22172"
   },
   "treasury-auctions": {
     "1": "acdd06103a3ec1a429193127833032a8"

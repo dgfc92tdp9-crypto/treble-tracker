@@ -171,9 +171,16 @@ class TestTheParserDoesNotChangeWithoutItsVersion:
     than the three that happened to burn us.
     """
 
-    def test_the_parse_matches_its_recorded_digest(
+    def test_companyfacts_matches_its_recorded_digest(
         self, facts_adapter: EdgarCompanyFactsAdapter
     ) -> None:
         raw = payload(COMPANYFACTS)
         batch = facts_adapter.parse(raw, payload_hash(raw.data))
         check_parser_digest("edgar-companyfacts", EdgarCompanyFactsAdapter.parser_version, batch)
+
+    def test_submissions_matches_its_recorded_digest(
+        self, submissions_adapter: EdgarSubmissionsAdapter
+    ) -> None:
+        raw = payload(SUBMISSIONS)
+        batch = submissions_adapter.parse(raw, payload_hash(raw.data))
+        check_parser_digest("edgar-submissions", EdgarSubmissionsAdapter.parser_version, batch)

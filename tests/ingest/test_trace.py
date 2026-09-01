@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.ingest.base import RawPayload
 from treble.ingest.trace import (
     SIZE_CAPPED_FIELD,
@@ -128,3 +129,22 @@ def test_size_capped_field_is_declared() -> None:
     # The dissemination-cap flag must exist before the parser is written, so
     # the parser cannot forget it (CLAUDE.md §6, §11).
     assert SIZE_CAPPED_FIELD == "trace:size_capped"
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters changed output while keeping their version — `dtcc-sdr`,
+    `sec-nport` and `openfigi` — and each was found only after the wrong rows
+    were in the store.
+
+    Recorded from the fixture even though this source has never been
+    fetched live — it is awaiting a FINRA credential. A parser guarded
+    only once data arrives is unguarded for exactly the run that first
+    writes rows to the store.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, tmp_path: Path) -> None:
+        raw = treasury_payload()
+        batch = treasury_adapter(tmp_path).parse(raw, payload_hash(raw.data))
+        check_parser_digest("trace-api", TraceApiAdapter.parser_version, batch)

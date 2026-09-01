@@ -1244,9 +1244,26 @@ fails the build unless it is in `UNGUARDED` with a reason. Verified in both
 directions — an adapter losing its digest fails, and an adapter still listed
 as outstanding after being guarded fails too.
 
-The seven outstanding: `edgar-bulk` and `gleif-isin` need recorded parse
-config, so a digest would pin one universe rather than the parser; `trace-api`
-has never been fetched; the other four are simply not wired yet and say so.
+**All twenty are now guarded and `UNGUARDED` is empty.** Three of the seven
+had been excused on reasoning that did not survive being written down:
+
+* `edgar-bulk` and `gleif-isin` "need recorded parse config, so a digest would
+  pin one universe rather than the parser". Wrong — the config in a fixture
+  test is *fixed*, so the digest changes if and only if the parser does, which
+  is exactly what is wanted.
+* `trace-api` was excused for never having been fetched. It has a recorded
+  fixture, and a parser guarded only once real data arrives is unguarded for
+  precisely the run that first writes rows to the store.
+
+The other four were simply unwired.
+
+### Ruff caught a shadowed test, not a style problem
+
+`test_edgar.py` guards two adapters, and appending a second class of the same
+name left the first **shadowed** — the companyfacts digest would never have
+run, while the file looked guarded and the gate counted it. Merged into one
+class with two named tests. `F811` reported it as a redefinition; it was a
+silently disabled check.
 
 ### Everything else held
 

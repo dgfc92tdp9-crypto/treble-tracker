@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.ingest.base import RawPayload
 from treble.ingest.gleif_isin import (
     FIELD,
@@ -145,3 +146,20 @@ class TestTheSourceIsDeclaredHonestly:
         from treble.ingest.registry import all_sources
 
         assert "gleif-isin" in all_sources()
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters changed output while keeping their version — `dtcc-sdr`,
+    `sec-nport` and `openfigi` — and each was found only after the wrong rows
+    were in the store.
+
+    The config is *fixed* here, which is the point: a digest over one
+    payload and one ISIN set changes if and only if the parser does.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, tmp_path: Path) -> None:
+        adapter = _adapter(tmp_path, "US4592001014", "US0378331005")
+        batch = _parse(adapter)
+        check_parser_digest("gleif-isin", GleifIsinLeiAdapter.parser_version, batch)

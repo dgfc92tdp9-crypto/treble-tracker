@@ -28,22 +28,22 @@ from treble.ingest.replay import adapter_classes  # noqa: E402
 
 DIGESTS = REPO / "tests" / "ingest" / "parser_digests.json"
 
-#: Adapters with no recorded digest yet, and the reason.
-UNGUARDED: dict[str, str] = {
-    "edgar-bulk": (
-        "Needs recorded parse config (the filer set), so a digest would pin one "
-        "universe rather than the parser. Guard it with a fixed config alongside "
-        "the fixture."
-    ),
-    "gleif-isin": (
-        "Needs recorded parse config (the requested ISINs) for the same reason as edgar-bulk."
-    ),
-    "edgar-submissions": "Fixture test exists; digest not wired yet.",
-    "frenchdata": "Fixture test exists; digest not wired yet.",
-    "gleif": "Per-LEI record lookup, four payloads on the live store; not wired yet.",
-    "coinbase-products": "Fixture test exists; digest not wired yet.",
-    "trace-api": "Never fetched — awaiting a FINRA credential, so nothing to record.",
-}
+#: Adapters with no recorded digest, and why.
+#:
+#: **Empty, and that is the state to keep it in.** Every shipped adapter
+#: records a digest of its parse over a recorded fixture, so a parser that
+#: changes what it produces without changing `parser_version` fails the
+#: build rather than being found later in the store.
+#:
+#: Two entries lived here briefly on the reasoning that `edgar-bulk` and
+#: `gleif-isin` "need recorded parse config, so a digest would pin one
+#: universe rather than the parser". That was wrong: the config in a fixture
+#: test is *fixed*, so the digest changes if and only if the parser does,
+#: which is exactly what is wanted. A third, `trace-api`, was excused for
+#: never having been fetched — but it has a recorded fixture, and a parser
+#: guarded only once real data arrives is unguarded for precisely the run
+#: that first writes rows.
+UNGUARDED: dict[str, str] = {}
 
 
 def main() -> int:
@@ -72,10 +72,8 @@ def main() -> int:
         print(f"parser digests: UNGUARDED names {source}, which ships no adapter.", file=sys.stderr)
     if missing or stale or unknown:
         return 1
-    print(
-        f"parser digests: {len(recorded)} of {len(shipped)} adapters guarded "
-        f"({len(UNGUARDED)} outstanding, each with a reason)"
-    )
+    outstanding = "" if not UNGUARDED else f", {len(UNGUARDED)} outstanding with a reason"
+    print(f"parser digests: {len(recorded)} of {len(shipped)} adapters guarded{outstanding}")
     return 0
 
 

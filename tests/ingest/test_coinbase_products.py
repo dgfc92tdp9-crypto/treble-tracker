@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.core.facts import Fact
 from treble.ingest.base import RawPayload
 from treble.ingest.coinbase import (
@@ -170,3 +171,22 @@ def test_replay_reproduces_the_same_facts(tmp_path: Path) -> None:
     replayed = list(source.replay())
     assert len(replayed) == 1
     assert replayed[0].facts == parse(tmp_path / "other")
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters changed output while keeping their version — `dtcc-sdr`,
+    `sec-nport` and `openfigi` — and each was found only after the wrong rows
+    were in the store.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, tmp_path: Path) -> None:
+        data = (FIXTURES / "product_BTC-USD.json").read_bytes()
+        raw = RawPayload(
+            data=data,
+            source_uri=PRODUCTS_URL.format(product="BTC-USD"),
+            fetched_at=FETCHED,
+        )
+        batch = adapter(tmp_path).parse(raw, payload_hash(data))
+        check_parser_digest("coinbase-products", CoinbaseProductsAdapter.parser_version, batch)
