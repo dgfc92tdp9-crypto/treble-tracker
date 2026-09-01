@@ -907,6 +907,74 @@ aggregate.
 
 ---
 
+## The two remaining blockers, re-probed (2026-09-01)
+
+They are not the same kind of problem, and only one of them is real.
+
+### CDSW is not blocked. The probe was wrong.
+
+Recorded since 2026-08-07 as blocked on data: "the DTCC CFTC tape serves
+`CFTC_CUMULATIVE_RATES_<date>.zip` (200) but the analogous CREDIT filename
+403s".
+
+Both halves of that are true and the conclusion does not follow. **Single-name
+CDS are security-based swaps, so they sit with the SEC, not the CFTC** — and
+the slug is plural:
+
+    CFTC_CUMULATIVE_CREDIT_2026_08_28.zip    403
+    SEC_CUMULATIVE_CREDITS_2026_08_28.zip    200
+
+967 rows for one day, 586 of them new trades, **279 distinct reference
+entities** — Microsoft, SoftBank, British Telecom, Brazil, Colombia. Every
+column a CDS curve needs is there: `Underlying Asset Name`, `UPI FISN`
+("NA/CDS Corp SN Sr", "NA/CDS Sov SN Sr"), `Fixed rate-Leg 1` (the
+standardised coupon), `Spread-Leg 1`, `Effective Date`, `Expiration Date`,
+notional, and the same NEWT/TRAD lifecycle fields the rates adapter already
+filters on.
+
+The pricer is already written and validated against ISDA's published grids
+across six currencies. What is missing is an adapter and a screen — ordinary
+work, not a data hunt. Doing it also clears `treble.analytics.credit.cds`
+from `AWAITING_WIRING`.
+
+One thing the tape will need: `Republic of Colombia` and `REPUBLIC OF
+COLOMBIA` are separate strings in the same file, so reference entities need
+normalising before they can key a curve.
+
+### Room E2EE is genuinely blocked, and the options all cost more than waiting
+
+Re-probed the same day:
+
+| | |
+|---|---|
+| `vodozemac` latest | still **0.10.0**; `SessionKey` still exposes only `to_base64` |
+| `python-olm` wheels | **manylinux only** — no macOS wheel, so this Mac falls back to the sdist that ADR-0011 measured failing |
+| `brew info libolm` | still no formula |
+| `cargo` | present, 1.97.1 |
+
+So the state ADR-0012 recorded is unchanged, and the three ways out each
+cost something real:
+
+* **Vendor a patched binding.** Adding `SessionKey::from_base64` to the PyO3
+  layer is a small patch and `cargo` is here — but it trades vodozemac's one
+  virtue (a prebuilt wheel, no system dependency) for a fork that every
+  install must compile, and a Rust toolchain requirement on a project whose
+  Phase 1–2 promise is "no containers, no compiler".
+* **Build libolm from source.** No Homebrew formula, no `cmake` installed,
+  and libolm is the deprecated library the ecosystem left.
+* **Upstream the constructor and wait.** Costs nothing and fixes it for
+  everyone, and the pinning test in `tests/im/test_e2ee.py` already fails the
+  day it lands.
+
+**Recommendation: wait.** Olm — device-to-device — is complete and round
+trips through the Matrix wire form, so verification and key-request traffic
+work today. Room encryption is four lines from working the moment the
+binding gains one method, and the test that will announce it is already
+written.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full
