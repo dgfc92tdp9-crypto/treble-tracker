@@ -33,6 +33,7 @@ stage "unread members"    "$VENV/python" scripts/check_unread_members.py
 stage "reachability"      "$VENV/python" scripts/check_unreachable_modules.py
 # The working copy rather than the code: a correct compaction nobody runs.
 stage "screen periods"    "$VENV/python" scripts/check_screen_periods.py
+stage "parser digests"    "$VENV/python" scripts/check_parser_digests.py
 stage "storage budget"    "$VENV/python" scripts/check_storage_budget.py
 
 printf '\nGATE GREEN — safe to commit\n'

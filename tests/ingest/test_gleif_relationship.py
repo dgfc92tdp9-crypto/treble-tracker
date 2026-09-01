@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.core.entity_graph import (
     parse_relationship_state,
     parse_relationship_state_field,
@@ -268,3 +269,18 @@ class TestMalformedRelationshipPeriods:
 
     def test_an_ordinary_period_is_unaffected(self) -> None:
         assert self._parse(self._rr("2020-01-01", "2024-01-01")) > 0
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters have already changed output while keeping their version —
+    `dtcc-sdr` (227 against 234 for one payload), `sec-nport` (two subject
+    schemes) and `openfigi` (a moving effective date). Each was found after
+    the wrong rows were in the store. This is the guard, and it is on every
+    adapter rather than the three that happened to burn us.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, adapter: GleifRelationshipAdapter) -> None:
+        batch = adapter.parse(raw(), payload_hash(raw().data))
+        check_parser_digest("gleif-rr", GleifRelationshipAdapter.parser_version, batch)

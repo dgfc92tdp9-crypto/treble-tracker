@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.analytics._ql import BusinessDay, DayCount
 from treble.analytics.bonds.pricing import price_from_yield
 from treble.analytics.bonds.spec import FixedBondSpec, Frequency
@@ -87,3 +88,18 @@ def test_bond_math_reproduces_auction_price_yield_pair() -> None:
         spec, float(record["high_yield"]) / 100.0, as_of=date.fromisoformat(record["issue_date"])
     )
     assert result.value == pytest.approx(float(record["high_price"]), abs=1e-3)
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters have already changed output while keeping their version —
+    `dtcc-sdr`, `sec-nport` and `openfigi` — and each was found after the
+    wrong rows were in the store. This is the guard, on every adapter rather
+    than the three that happened to burn us.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, adapter: TreasuryAuctionsAdapter) -> None:
+        payload = load_payload()
+        batch = adapter.parse(payload, payload_hash(payload.data))
+        check_parser_digest("treasury-auctions", TreasuryAuctionsAdapter.parser_version, batch)

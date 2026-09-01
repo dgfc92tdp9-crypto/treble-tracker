@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.ingest.base import RawPayload
 from treble.ingest.edgar import (
     EdgarCompanyFactsAdapter,
@@ -159,3 +160,20 @@ class TestSubmissions:
         first_accn = recent["accessionNumber"][0]
         expected = datetime.fromisoformat(recent["acceptanceDateTime"][0].replace("Z", "+00:00"))
         assert mapping[first_accn] == expected
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters have already changed output while keeping their version —
+    `dtcc-sdr`, `sec-nport` and `openfigi` — and each was found after the
+    wrong rows were in the store. This is the guard, on every adapter rather
+    than the three that happened to burn us.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(
+        self, facts_adapter: EdgarCompanyFactsAdapter
+    ) -> None:
+        raw = payload(COMPANYFACTS)
+        batch = facts_adapter.parse(raw, payload_hash(raw.data))
+        check_parser_digest("edgar-companyfacts", EdgarCompanyFactsAdapter.parser_version, batch)

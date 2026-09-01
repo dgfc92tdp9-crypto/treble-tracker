@@ -1,14 +1,41 @@
 {
+  "coinbase": {
+    "1": "a836f1bc82a968dcd7e23791e35219ed"
+  },
   "dtcc-credit": {
     "2": "2ffbbda0adb44b044f02f926858d9970"
   },
   "dtcc-sdr": {
     "2": "9a8aceb31f4288ccdbbae0ca69268612"
   },
+  "ecb-fx": {
+    "1": "a64e9ee12c477b04774f86101e87a2cd"
+  },
+  "ecb-hicp": {
+    "1": "f1af37234eea528172c1a8da72fb59e8"
+  },
+  "edgar-companyfacts": {
+    "1": "f758142f65fdc3f3613e4ad8818b196c"
+  },
+  "fred": {
+    "1": "9e18dbb071a2d6c5d2bd03ec45a865c3"
+  },
+  "gleif-rr": {
+    "3": "11888bc2b6ce4213c1157fb757f358b7"
+  },
   "openfigi": {
     "2": "29958deff1d6cc050534e0d2ddbdc3d8"
   },
   "sec-nport": {
     "2": "1dda8601530b3429af73b88f0bab84ce"
+  },
+  "treasury-auctions": {
+    "1": "acdd06103a3ec1a429193127833032a8"
+  },
+  "treasury-curve": {
+    "1": "bdc03e529455dc4291cb248af69e86cd"
+  },
+  "twelvedata": {
+    "1": "8f80488d5e19b37f5d3241f0405136b5"
   }
 }

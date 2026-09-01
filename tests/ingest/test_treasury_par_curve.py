@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.ingest.base import RawPayload
 from treble.ingest.treasury_curve import (
     FIELD,
@@ -153,3 +154,20 @@ class TestTheSourceIsDeclaredHonestly:
     def test_all_fourteen_tenors_are_mapped(self) -> None:
         assert len(TENORS) == 14
         assert TENORS["1.5 Month"] == "6W"
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters have already changed output while keeping their version —
+    `dtcc-sdr`, `sec-nport` and `openfigi` — and each was found after the
+    wrong rows were in the store. This is the guard, on every adapter rather
+    than the three that happened to burn us.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, adapter: TreasuryCurveAdapter) -> None:
+        batch = adapter.parse(
+            RawPayload(data=REAL, source_uri="https://example.invalid/x", fetched_at=FETCHED),
+            "0" * 64,
+        )
+        check_parser_digest("treasury-curve", TreasuryCurveAdapter.parser_version, batch)

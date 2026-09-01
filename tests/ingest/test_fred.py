@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.ingest.base import RawPayload
 from treble.ingest.fred import FredAdapter, series_subject
 from treble.store.ingest_log import IngestLog
@@ -82,3 +83,18 @@ def test_run_stores_raw_before_parse_and_replays(tmp_path: Path) -> None:
     # Replay without network reproduces the identical batch.
     replayed = list(adapter.replay())
     assert replayed == batches
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters have already changed output while keeping their version —
+    `dtcc-sdr`, `sec-nport` and `openfigi` — and each was found after the
+    wrong rows were in the store. This is the guard, on every adapter rather
+    than the three that happened to burn us.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, adapter: FredAdapter) -> None:
+        payload = load_payload()
+        batch = adapter.parse(payload, payload_hash(payload.data))
+        check_parser_digest("fred", FredAdapter.parser_version, batch)

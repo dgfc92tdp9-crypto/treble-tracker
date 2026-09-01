@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.ingest.base import RawPayload
 from treble.ingest.ecb_hicp import (
     INDEX_FIELD,
@@ -107,3 +108,18 @@ class TestItRefusesRatherThanInvents:
         a release-calendar rule would be a guess wearing a fact's clothes."""
         batch = adapter.parse(_payload("hicp_index.csv", "M.U2.N.000000.4.INX"), HASH)
         assert {f.knowledge_from for f in batch.facts} == {FETCHED}
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters have already changed output while keeping their version —
+    `dtcc-sdr` (227 against 234 for one payload), `sec-nport` (two subject
+    schemes) and `openfigi` (a moving effective date). Each was found after
+    the wrong rows were in the store. This is the guard, and it is on every
+    adapter rather than the three that happened to burn us.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, adapter: EcbHicpAdapter) -> None:
+        batch = adapter.parse(_payload("hicp_index.csv", "M.U2.N.000000.4.INX"), HASH)
+        check_parser_digest("ecb-hicp", EcbHicpAdapter.parser_version, batch)

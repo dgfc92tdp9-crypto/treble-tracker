@@ -1214,6 +1214,53 @@ is built, tested against a real mounted volume, and waiting on a disk.
 
 ---
 
+## Phase 1-3 sweep (2026-09-01, fourth pass)
+
+Aimed at what earlier passes had not touched, and found the thinnest check in
+the repository.
+
+### I5 is verified against 2 adapters out of 20
+
+`scripts/check_replay.py` passes — 38,548 facts reproduced exactly — but it
+seeds from `cmd.seed`, whose job is bootstrapping an install, so it covers
+**edgar-companyfacts and treasury-auctions and nothing else**. None of the
+four adapters whose `parser_version` changed today is in it.
+
+`tests/ingest/test_replay.py::TestEveryShippedAdapter` pins the *structural*
+facts — which adapters are discoverable, which need recorded config, that
+config survives JSON — but nothing asserted that a given adapter's parse
+*reproduces*.
+
+### The guard that was already built, made universal
+
+The parser digest from earlier today is exactly that check, and it was wired
+to the four adapters that had already burned us. Three of them had drifted
+silently — `dtcc-sdr`, `sec-nport`, `openfigi` — which is three independent
+occurrences and a good reason to think the other sixteen carry the same risk.
+
+Now **13 of 20** adapters record a parse digest, and
+`scripts/check_parser_digests.py` is a gate stage: an adapter with no digest
+fails the build unless it is in `UNGUARDED` with a reason. Verified in both
+directions — an adapter losing its digest fails, and an adapter still listed
+as outstanding after being guarded fails too.
+
+The seven outstanding: `edgar-bulk` and `gleif-isin` need recorded parse
+config, so a digest would pin one universe rather than the parser; `trace-api`
+has never been fetched; the other four are simply not wired yet and say so.
+
+### Everything else held
+
+| check | result |
+|---|---|
+| `make gate` | green — 90.5%, now with a parser-digest stage |
+| I5 replay | exact, 38,548 facts, 2 sources |
+| ambiguity at newest knowledge | 0 |
+| accounting identities | 25 of 47,846 (0.052%) |
+| screens | 27/27 |
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full

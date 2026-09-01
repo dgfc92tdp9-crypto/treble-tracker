@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.ingest.test_parser_output_is_stable import check as check_parser_digest
 from treble.ingest.base import RawPayload
 from treble.ingest.ecb import EcbExchangeRatesAdapter, fx_subject
 from treble.store.ingest_log import IngestLog
@@ -104,3 +105,25 @@ def test_parsing_is_pure(tmp_path: Path) -> None:
     assert (
         adapter.parse(raw, payload_hash(data)).facts == adapter.parse(raw, payload_hash(data)).facts
     )
+
+
+class TestTheParserDoesNotChangeWithoutItsVersion:
+    """I5: a parser is a pure function of (payload, parser version).
+
+    Three adapters have already changed output while keeping their version —
+    `dtcc-sdr` (227 against 234 for one payload), `sec-nport` (two subject
+    schemes) and `openfigi` (a moving effective date). Each was found after
+    the wrong rows were in the store. This is the guard, and it is on every
+    adapter rather than the three that happened to burn us.
+    """
+
+    def test_the_parse_matches_its_recorded_digest(self, tmp_path: Path) -> None:
+        data = FIXTURE.read_bytes()
+        adapter = EcbExchangeRatesAdapter(
+            PayloadStore(tmp_path / "p"),
+            IngestLog(tmp_path / "l.db"),
+            series=("D.USD.EUR.SP00.A",),
+        )
+        raw = RawPayload(data=data, source_uri=SOURCE, fetched_at=FETCHED)
+        batch = adapter.parse(raw, payload_hash(data))
+        check_parser_digest("ecb-fx", EcbExchangeRatesAdapter.parser_version, batch)
