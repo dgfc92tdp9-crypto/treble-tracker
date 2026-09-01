@@ -581,6 +581,93 @@ broken.
 
 ---
 
+## The store gets its own disk (2026-09-01)
+
+Every lever inside the repository has now been pulled — gzip, coalescing,
+GLEIF deltas, a weekly ISIN cadence — taking the projection from 24.15 to
+**8.8 GB/yr**. None of them changes the shape of the problem: the payload
+store is what I5 replays from, it is append-only by construction, and twenty
+years of point-in-time data needs twenty years of disk. The question stopped
+being how to store less and became **where**.
+
+`treble relocate <path>` copies, verifies, and only then removes the
+original. See [ADR-0013](docs/decisions/0013-the-store-moves-to-its-own-disk.md)
+and [docs/storage.md](docs/storage.md).
+
+### Verification, not a file count
+
+Every payload is read back at the target through `PayloadStore.get`, which
+checks it against its content address, and fact counts are compared across
+both stores. A truncated or dropped file is caught during the move rather
+than the next time somebody asks for a price. **Nothing is deleted until the
+copy is proved**, so an interruption leaves the original intact and the
+target incomplete — the safe way round.
+
+### No configuration, because configuration is the failure
+
+The old directory keeps `RELOCATED.json` naming the new one, and
+`cmd.paths` follows it through chains, refusing loops. Nothing to export and
+nothing to remember.
+
+That is not convenience. `paths.default_data_dir` exists because a relative
+data path once meant launching from the wrong directory "silently created a
+fresh empty store and rendered a screen of honest-looking dashes with no
+error". A store held in place by an environment variable reproduces that
+failure exactly, the first time anyone opens a shell without it.
+
+### Proved against a real volume, not a simulation
+
+An APFS sparse image was created, mounted, relocated onto, **detached**, and
+the guard fired; then reattached, and all 20 payloads verified against their
+content addresses.
+
+    mounted    resolved: /Volumes/TrebleProof/treble-data
+               20 payloads verified
+    detached   EXIT 2 — "the store was moved to ...; is that volume mounted?"
+    reattached 20 payloads verified, workstation opens, EXIT 0
+
+Exit code 2 is distinct from 1 so a scheduled job can tell "the disk is not
+attached" from "the command failed". The message is printed rather than
+raised: Typer renders an uncaught exception as a rich traceback with the
+sentence wrapped across the bottom of it, and a person who has just
+unplugged a drive needs the sentence.
+
+### Three things the checks caught that review would not have
+
+* **The import contract.** Putting the signposts in `treble/store/` made
+  `render -> cmd.paths -> store` a transitive violation of I7. Moved to
+  `core/datadir.py`, which is honest: nothing in it touches DuckDB, a
+  payload or a fact — it reads two small JSON files saying where those
+  things are, and every layer may ask that.
+* **The guard over-fired.** `verify` treated any differing origin as a
+  relocation, so `--data-dir /tmp/whatever` was told its store "was moved"
+  to a path the caller had just typed. The CLI suite went red on every
+  command that passes a temporary directory. It now takes that branch only
+  when a pointer chain actually ends there.
+* **Mutation testing found the one property that mattered was untested.**
+  Deleting the `verify_arrival` call from `relocate` killed nothing: the
+  verification had thorough tests and the *wiring* had none. A refactor
+  dropping that call would have shipped a move that deletes the original and
+  checks afterwards — the one ordering that loses the store on exactly the
+  occasion the check was worth running. Four tests now drive `relocate`
+  itself with a deliberately damaged copy.
+
+A fourth mutation, removing loop detection from `resolve`, hung the suite
+rather than failing it. That is the guard being load-bearing, but it means
+mutation runs over this module need a per-case timeout.
+
+### What is decided and what is not
+
+**Decided:** the store moves to its own disk; relocation is verified; an
+absent store is refused rather than recreated.
+
+**Not decided:** a backup policy. One disk is capacity, not safety, and the
+payloads are the only part that cannot be rebuilt. `--keep-original` makes a
+second verified copy one command; which disk it goes on is Jack's call.
+
+
+---
+
 ## Phase 0 — planning
 
 - [x] Specification read in full

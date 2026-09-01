@@ -183,6 +183,7 @@ class TestEveryDocumentedCommandIsRegistered:
             "compact",
             "replay",
             "storage",
+            "relocate",
             "homeserver",
             "simulator",
         }

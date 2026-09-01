@@ -23,8 +23,15 @@ from rich.console import Console
 from rich.table import Table
 
 from treble.cmd.env import load_env
-from treble.cmd.paths import default_data_dir
+from treble.cmd.paths import configured_data_dir, default_data_dir
 from treble.cmd.seed import FIXTURES, seed, seed_available, seed_company_index
+from treble.core.datadir import (
+    StoreLocationError,
+    new_identity,
+    read_marker,
+    verify,
+    write_marker,
+)
 from treble.core.universe import load_universe_config
 from treble.ems.simulator import Simulator
 from treble.ems.transport import HOST, SimulatorServer
@@ -36,6 +43,8 @@ from treble.render.server import DEFAULT_HOST, DEFAULT_PORT
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadStore
+from treble.store.relocate import plan as relocation_plan
+from treble.store.relocate import relocate as run_relocation
 from treble.store.storage import maintenance_due, measure, verdict
 from treble.vault.worm import Vault
 
@@ -87,8 +96,31 @@ def _contact_email(supplied: str | None) -> str:
     return email
 
 
+#: Exit code when the store is not where it should be — distinct from 1 so
+#: a script can tell "the disk is not attached" from "the command failed".
+STORE_UNAVAILABLE = 2
+
+
 def _open_stores(data_dir: Path) -> tuple[PayloadStore, IngestLog, DuckStore]:
+    # Before creating anything. `mkdir(parents=True, exist_ok=True)` on a
+    # path whose disk is not mounted either fails obscurely or — once
+    # something else has created that path — quietly builds a second, empty
+    # store beside the real one, and every screen then reads zero without
+    # saying why. See `store.identity`.
+    try:
+        verify(data_dir, origin=configured_data_dir())
+    except StoreLocationError as exc:
+        # Printed rather than raised. A person who has just unplugged a
+        # drive needs the sentence, not the stack that produced it, and
+        # Typer renders an uncaught exception as a rich traceback with the
+        # message wrapped across the bottom of it.
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=STORE_UNAVAILABLE) from exc
     data_dir.mkdir(parents=True, exist_ok=True)
+    if read_marker(data_dir) is None:
+        # Adopting an unmarked directory rather than refusing it: every
+        # install predating the marker is in exactly that state.
+        write_marker(data_dir, new_identity())
     return (
         PayloadStore(data_dir / "payloads"),
         IngestLog(data_dir / "ingest.db"),
@@ -788,6 +820,67 @@ def _report_runway(data_dir: Path) -> None:
     )
     for source, per_day in growth.contributors[:3]:
         console.print(f"    {source}: {per_day / 1024 / 1024:,.1f} MB/day")
+
+
+@app.command()
+def relocate(
+    target: Path = typer.Argument(..., help="Where the store should live from now on."),
+    data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="The store to move."),
+    label: str | None = typer.Option(None, help="A note recorded in the new store's marker."),
+    keep_original: bool = typer.Option(
+        False, help="Copy without removing the original, leaving a second copy."
+    ),
+    dry_run: bool = typer.Option(False, help="Report what would move, and move nothing."),
+) -> None:
+    """Move the data directory to another disk, verifying it arrived.
+
+    The store grows and the disk does not: at the cadences the sources
+    declare it adds about 9 GB a year. `treble storage` prints how long
+    that leaves; this is what to do about it.
+
+    Nothing is deleted until the copy is proved. Every payload is read back
+    at the target through the path that verifies it against its content
+    address, and the fact counts are compared — so a truncated or dropped
+    file is caught here rather than the next time somebody asks for a
+    price. An interruption leaves the original intact.
+
+    Afterwards the old directory holds a pointer to the new one and the
+    workstation follows it. There is nothing to export and nothing to
+    remember, which is deliberate: a store held in place by an environment
+    variable reads empty the first time somebody opens a new shell without
+    it.
+
+    `--keep-original` copies without removing, because one external disk is
+    capacity and not safety. The payloads are the only part that cannot be
+    rebuilt from anything else.
+    """
+    ready = relocation_plan(data_dir, target)
+    console.print(
+        f"[bold]{ready.bytes_to_move / 1024**3:,.2f} GB[/bold] from {ready.source}\n"
+        f"to {ready.target}, which has "
+        f"{ready.target_free / 1024**3:,.1f} GB free."
+    )
+    if not ready.ok:
+        for problem in ready.problems:
+            console.print(f"[red]refused:[/] {problem}")
+        raise typer.Exit(code=1)
+    if dry_run:
+        console.print("[green]The move would proceed.[/green] Re-run without --dry-run.")
+        return
+
+    moved = run_relocation(
+        ready,
+        label=label,
+        on_progress=lambda message: console.print(f"  {message}"),
+        remove_source=not keep_original,
+    )
+    console.print(f"[green]The store now lives at {moved}.[/green]")
+    if keep_original:
+        console.print(
+            f"[yellow]The original at {ready.source} was kept and is still what "
+            "the workstation opens. Remove it yourself once you are satisfied, then "
+            f"run `treble relocate {moved}` again to leave the pointer.[/yellow]"
+        )
 
 
 @app.command()
