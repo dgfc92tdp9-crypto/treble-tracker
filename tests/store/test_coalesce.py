@@ -314,3 +314,54 @@ class TestEveryAsOfAnswerIsUnchanged:
         to 0.81 after 0.85) and day 10 (0.81 after a null) are changes."""
         coalesced = self._coalesced(tmp_path / "coa.db")
         assert coalesced.coalesced == 5
+
+
+class TestTheCountReconcilesWithTheStore:
+    """`treble refresh` reports `parsed - coalesced` as what it stored.
+
+    That arithmetic is only right if the counter and the row count move
+    together on every write. If they ever drift the command reports a
+    number nobody can reconcile against the store — worse than the parsed
+    figure it replaced, because it looks reconciled.
+    """
+
+    def _write(self, store: DuckStore, values: list[float | None], day: int) -> tuple[int, int]:
+        """One batch, returning (rows added, rows coalesced)."""
+        record = _provenance("fred", _at(day))
+        store.write_provenance([record])
+        facts = [
+            Fact(
+                subject=SUBJECT,
+                field=FIELD,
+                value=value,  # type: ignore[arg-type]
+                effective_from=date(2025, 9, 3) + timedelta(days=i),
+                knowledge_from=_at(day),
+                provenance_id=record.id,
+            )
+            for i, value in enumerate(values)
+        ]
+        rows, coalesced = store.fact_count(), store.coalesced
+        store.write_facts(facts)
+        return store.fact_count() - rows, store.coalesced - coalesced
+
+    def test_added_plus_coalesced_is_the_batch(self, tmp_path: Path) -> None:
+        store = DuckStore(tmp_path / "s.db")
+        batch: list[float | None] = [1.0, 2.0, 3.0, None]
+
+        added, coalesced = self._write(store, batch, 0)
+        assert (added, coalesced) == (len(batch), 0), "a first write coalesces nothing"
+
+        added, coalesced = self._write(store, batch, 1)
+        assert added + coalesced == len(batch)
+        assert added == 0, "nothing changed, so nothing should have been stored"
+
+    def test_a_partly_changed_batch_splits_correctly(self, tmp_path: Path) -> None:
+        """The case the report exists for: some of it is news."""
+        store = DuckStore(tmp_path / "s.db")
+        self._write(store, [1.0, 2.0, 3.0], 0)
+        added, coalesced = self._write(store, [1.0, 99.0, 3.0], 1)
+        assert (added, coalesced) == (1, 2)
+
+    def test_an_empty_batch_moves_neither(self, tmp_path: Path) -> None:
+        store = DuckStore(tmp_path / "s.db")
+        assert self._write(store, [], 0) == (0, 0)

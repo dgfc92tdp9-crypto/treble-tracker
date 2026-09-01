@@ -294,6 +294,24 @@ alongside the full golden copy. Switching those two adapters to deltas would
 remove ~23 GB/yr of the 24. That is the next piece of work if update
 frequency is going up.
 
+### A command stopped existing and the gate stayed green
+
+While wiring the runway report, a helper was inserted between
+`@app.command()` and `def storage(...)`. The decorator bound to the helper:
+`treble storage` ceased to exist, a `_report_runway` command appeared in its
+place, and `make gate` passed — lint, `mypy --strict`, 90% coverage, every
+structural check. Nothing asserted the CLI's surface, so the only way to find
+it was to run the command.
+
+`tests/cmd/test_cli.py::TestEveryDocumentedCommandIsRegistered` lists the
+expected commands explicitly rather than deriving them from the app, which
+would compare the registry against itself and pass whatever it contained.
+Verified by reproducing the accident: all three assertions fail.
+
+Worth noting the shape — it is the same one as `us-gaap:Revenues`. Both
+render or run perfectly; both are wrong about *which thing* they are showing;
+and no test asked the question that would have told them apart.
+
 ### The data supply had stopped, and the health report said so correctly
 
 Every source was 6.9 days stale on 2026-08-30 — nothing schedules `treble

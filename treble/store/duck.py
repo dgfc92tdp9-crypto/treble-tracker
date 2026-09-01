@@ -205,8 +205,13 @@ class DuckStore:
 
         Reported rather than kept quiet: a filter in the write path that
         nobody can see is indistinguishable from a filter that silently
-        drops real data, and the difference is the whole question. `treble
-        storage` prints it, and `ingest.base.run` records it per source.
+        drops real data, and the difference is the whole question.
+
+        `treble refresh` reads it per source, so its output says what was
+        *stored* rather than what was parsed. Those differed by 92.8% on
+        the first live run after this was added — 61,769 facts parsed,
+        4,471 rows stored — and the parsed figure would have reported a
+        source as flowing when it had published nothing new.
         """
         return self._coalesced
 

@@ -463,11 +463,13 @@ def refresh(
             console.print(f"[dim]{source_id}: already fresh, skipped[/dim]")
             continue
         try:
-            written = 0
+            parsed = 0
+            before = store.coalesced
             for batch in builders[source_id]().run():
                 store.write_provenance(list(batch.provenance))
                 store.write_facts(list(batch.facts))
-                written += len(batch.facts)
+                parsed += len(batch.facts)
+            unchanged = store.coalesced - before
         except Exception as exc:
             # Reported and carried past, because the common case for this
             # command is exactly that one source has broken. Aborting would
@@ -475,7 +477,14 @@ def refresh(
             console.print(f"[red]{source_id}: {type(exc).__name__}: {exc}[/]")
             continue
         ran += 1
-        console.print(f"[green]{source_id}[/]: {written} facts")
+        # What was *stored*, not what was parsed. On the live install this
+        # refresh parsed 61,769 facts and stored 4,471: reporting the first
+        # number would say a source is flowing when it has published nothing
+        # new since the last run, which is the one thing this line is read
+        # to find out.
+        stored = parsed - unchanged
+        note = f" ({unchanged:,} unchanged)" if unchanged else ""
+        console.print(f"[green]{source_id}[/]: {stored:,} new facts{note}")
     console.print(f"refreshed {ran} of {len(targets)} source(s); run `treble status` to confirm")
     _maintain(store)
 
@@ -738,7 +747,6 @@ def replay(
         raise typer.Exit(1)
 
 
-@app.command()
 def _report_runway(data_dir: Path) -> None:
     """Say how long the disk lasts at the cadences the sources declare.
 
@@ -773,6 +781,7 @@ def _report_runway(data_dir: Path) -> None:
         console.print(f"    {source}: {per_day / 1024 / 1024:,.1f} MB/day")
 
 
+@app.command()
 def storage(
     data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where the store lives."),
     fix: bool = typer.Option(False, help="Reclaim what can be reclaimed losslessly."),

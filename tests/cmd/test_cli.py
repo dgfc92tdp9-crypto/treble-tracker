@@ -152,3 +152,62 @@ class TestStatus:
         from treble.store.ingest_log import IngestLog
 
         assert IngestLog(data_dir / "ingest.db").read() == []
+
+
+class TestEveryDocumentedCommandIsRegistered:
+    """A command can stop existing without any other test noticing.
+
+    While the runway reporting was being added, a helper was inserted
+    between `@app.command()` and `def storage(...)`. The decorator bound to
+    the helper, `treble storage` ceased to exist, a `_report_runway`
+    command appeared in its place — and `make gate` stayed green: lint,
+    types, 90% coverage, every structural check. Nothing asserted the CLI's
+    surface, so the only way to find it was to run the command.
+
+    Listed explicitly rather than derived from the app, which would compare
+    the registry against itself and pass whatever it contained.
+    """
+
+    #: Every command `treble --help` is expected to offer. Adding one is a
+    #: deliberate act; losing one should not be a quiet one.
+    EXPECTED = frozenset(
+        {
+            "populate",
+            "init",
+            "addin",
+            "status",
+            "refresh",
+            "tui",
+            "serve",
+            "universes",
+            "compact",
+            "replay",
+            "storage",
+            "homeserver",
+            "simulator",
+        }
+    )
+
+    def _registered(self) -> set[str]:
+        return {
+            command.name or (command.callback.__name__ if command.callback else "")
+            for command in app.registered_commands
+        }
+
+    def test_no_command_has_gone_missing(self) -> None:
+        assert self._registered() >= self.EXPECTED
+
+    def test_no_private_helper_became_a_command(self) -> None:
+        """The other half of the same accident: the helper that stole the
+        decorator was registered as a user-facing command called
+        `_report_runway`."""
+        private = {name for name in self._registered() if name.startswith("_")}
+        assert not private, f"private helpers exposed as commands: {sorted(private)}"
+
+    def test_the_help_text_lists_them(self) -> None:
+        """End to end through Typer, so a command that is registered but
+        unreachable still fails."""
+        result = runner.invoke(app, ["--help"])
+        assert result.exit_code == 0
+        for name in sorted(self.EXPECTED):
+            assert name in result.output, f"{name} is missing from `treble --help`"
