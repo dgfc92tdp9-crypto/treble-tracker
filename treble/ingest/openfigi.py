@@ -56,6 +56,30 @@ def figi_subject(figi: str) -> TUID:
     return TUID(f"figi:{figi.upper()}")
 
 
+#: The effective period every FIGI mapping is filed under.
+#:
+#: `date.min`, and open-ended: **a FIGI never changes** (CLAUDE.md §9.3,
+#: which is also why the mapping cache never needs invalidation). The
+#: mapping is not a fact about a day, so it must not be filed under one.
+#:
+#: It was, and the cost was measured on the live store. `effective_from`
+#: was `payload.fetched_at.date()`, so each fetch of the *same*
+#: content-addressed payload created a new effective period — a different
+#: partition, which write-path coalescing cannot collapse because a
+#: different `effective_from` is a different assertion. 5,877 mappings were
+#: stored 17,631 times across two fetch dates, and `subject_facts` on a
+#: FIGI subject returned every field twice.
+#:
+#: A sentinel rather than a plausible-looking epoch: 1970 could be mistaken
+#: for a claim about when the instrument existed, and nothing here knows
+#: that. `date.min` reads as "for all the time this store can speak about",
+#: which is exactly the claim being made.
+#:
+#: **Errors keep the fetch date**, deliberately. An identifier that failed
+#: to map today may map next month, so *that* is a fact about a day.
+MAPPING_PERIOD_START = date.min
+
+
 class OpenFigiAdapter(SourceAdapter):
     meta = SourceMeta(
         source_id="openfigi",
@@ -66,7 +90,10 @@ class OpenFigiAdapter(SourceAdapter):
         redistribution_restricted=False,
         rate_limit_per_second=25.0 / 60.0,  # keyless tier; key raises to 250/min
     )
-    parser_version = "1"
+    #: 2 — mappings filed under a stable effective period rather than the
+    #: fetch date. See `MAPPING_PERIOD_START`: version 1 stored 5,877
+    #: mappings 17,631 times because each fetch minted a new partition.
+    parser_version = "2"
 
     def __init__(
         self,
@@ -145,7 +172,7 @@ class OpenFigiAdapter(SourceAdapter):
                             subject=subject,
                             field=f"openfigi:{key}",
                             value=None if value is None else str(value),
-                            effective_from=as_of,
+                            effective_from=MAPPING_PERIOD_START,
                             knowledge_from=payload.fetched_at,
                             provenance_id=provenance.id,
                         )
@@ -156,7 +183,7 @@ class OpenFigiAdapter(SourceAdapter):
                         subject=subject,
                         field=f"openfigi:mapped:{job.get('idType', 'UNKNOWN')}",
                         value=str(job.get("idValue", "")),
-                        effective_from=as_of,
+                        effective_from=MAPPING_PERIOD_START,
                         knowledge_from=payload.fetched_at,
                         provenance_id=provenance.id,
                     )

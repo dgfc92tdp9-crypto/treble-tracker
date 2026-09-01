@@ -1174,12 +1174,34 @@ field, and a scan of all 27 screens for duplicated content lines turned up
 only pane borders.
 
 So: **storage redundancy and a modelling imprecision, not a wrong number.**
-Recorded rather than fixed. Giving a permanent mapping a stable effective
-period would be more honest, but the fetch-dated facts already stored cannot
-be superseded by it — a different `effective_from` is a different partition —
-so the change makes the duplication worse before better, for an issue that
-produces no wrong answer. `gleif` and `coinbase-products` use the same
-pattern and will develop the same redundancy when re-fetched.
+
+**Fixed the same day** (`parser_version` 1 → 2). Mappings are now filed under
+`MAPPING_PERIOD_START = date.min`, open-ended — "for all the time this store
+can speak about", which is the claim a permanent identifier actually makes. A
+sentinel rather than a plausible epoch: 1970 could be mistaken for a statement
+about when the instrument existed, and nothing here knows that.
+
+**Errors keep the fetch date**, deliberately. An identifier that failed to map
+today may map next month, so *that* is a fact about a day, and filing it as
+timeless would say the thing can never be mapped.
+
+Measured before and after, three fetches of one payload on three days:
+
+    before   3,240 facts stored, 0 coalesced,     every field returned twice
+    after    1,080 facts stored, 2,160 coalesced, every field returned once
+
+**The two fetch-dated partitions already in the store stay.** They hold the
+right value and cannot be superseded — a different `effective_from` is a
+different partition — and retracting them is *unsafe here*: `subject_facts`
+returns partitions in ascending effective order, so a consumer building a
+`{field: value}` dict takes the last one, and a null at the newest dated
+partition would shadow the good value. The growth is what mattered and the
+growth has stopped.
+
+`gleif` and `coinbase-products` use the same fetch-dated pattern. They are
+**not** changed: an entity's legal name and a product listing genuinely can
+change, so a dated observation is the right shape for them. The rule is the
+permanence CLAUDE.md §9.3 asserts for FIGIs specifically, not a blanket one.
 
 ### Disk is the thing that actually needs attention
 
