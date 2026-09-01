@@ -55,6 +55,15 @@ older knowledge, and whether it is redundant depends on what was visible
 *then* rather than now. Those are written unconditionally: the saving is
 not worth a rule with a case in it nobody exercises.
 
+**Not while the store contradicts itself.** If the newest knowledge time
+for a key already holds two different values, an incoming fact is written
+even when it matches one of them. That state is not a restatement but a
+contradiction — on the live store it came from a parser that changed its
+output without changing its `parser_version` — and the incoming value
+resolves it by becoming unambiguously newest. Without this, the repair was
+silently skipped for the 73 keys where the correct answer happened to be
+the one `TIE_BREAK` was already surfacing.
+
 **Values only.** This preserves the *value* every `as_of` query returns,
 exactly — that is what `tests/store/test_coalesce.py` asserts across a
 generated history. It deliberately does **not** preserve `knowledge_from`
@@ -141,6 +150,17 @@ _SCREEN_TEMPLATE = """
               AND n.source_system = b.source_system
               AND {value_match}
               AND n.knowledge_from <= b.knowledge_from
+              -- ...and the store is not *ambiguous* at that instant. Two
+              -- different values sharing one knowledge time is not a
+              -- restatement, it is a contradiction, and a value that
+              -- settles it is new information however familiar it looks.
+              AND NOT EXISTS (
+                  SELECT 1 FROM current rival
+                  WHERE {rival_key_match}
+                    AND rival.source_system = n.source_system
+                    AND rival.knowledge_from = n.knowledge_from
+                    AND NOT ({rival_value_match})
+              )
         ) AS redundant
         FROM batch b
 """
@@ -170,6 +190,8 @@ def redundant_ids_sql(all_facts: str, incoming: str) -> str:
         incoming=incoming,
         key_match=_match(KEY_COLUMNS, "n", "b"),
         value_match=_match(VALUE_COLUMNS, "n", "b"),
+        rival_key_match=_match(KEY_COLUMNS, "rival", "n"),
+        rival_value_match=_match(VALUE_COLUMNS, "rival", "n"),
     )
 
 

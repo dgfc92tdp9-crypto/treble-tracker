@@ -35,6 +35,14 @@ ENTRY_POINTS: dict[str, str] = {
     "treble.plant.kafka": "Transport chosen at deployment, not at import.",
     "treble.ingest.frenchdata": "Adapter run out of band by scripts/backfill_port.py.",
     "treble.ingest.trace": "Adapter run out of band against a downloaded TRACE file.",
+    "treble.store.retract": (
+        "Corrections applied out of band. A retraction asserts that values under a "
+        "key cannot be attributed to anything — used on 2026-09-01 for 37 sec-nport "
+        "keys left by a superseded subject scheme. Deliberately not reachable from "
+        "the application: a workstation that can retract its own facts as part of "
+        "normal operation is one where a bug can quietly erase an answer, and the "
+        "whole point is that the record of what was believed survives."
+    ),
     "treble.store.compare": (
         "Store-to-store comparison, called by scripts/check_replay.py in the nightly "
         "deep run. Deliberately not imported by the application: comparing two stores "

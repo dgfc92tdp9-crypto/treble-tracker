@@ -834,6 +834,60 @@ remaining are dtcc keys where the correct value already happened to be the
 one `TIE_BREAK` surfaced — right answer, contradictory sibling still present
 — and the nport subjects nothing generates any more.
 
+### The remaining 110, resolved (2026-09-01)
+
+**Zero keys are now ambiguous at their newest knowledge time.**
+
+    312  ->  110  ->  0     ambiguous where a query resolves it
+    312  ->  312  ->  312   ambiguous somewhere in history (nothing deleted)
+
+Two different causes needing two different fixes.
+
+#### 73 dtcc keys: coalescing was skipping the repair
+
+Values like `0.04081575` against `0.040825` — and `TIE_BREAK` happened to be
+surfacing the one the parser produces. So re-ingesting the correct answer
+matched the value already winning, coalescing saw "nothing changed", and the
+contradictory pair stayed newest.
+
+`store/coalesce.py` now treats a key that is *ambiguous at its newest
+knowledge time* as never redundant: two values sharing one knowledge time is
+not a restatement but a contradiction, and a value that settles it is new
+information however familiar it looks. Re-ingesting the 15 dates then wrote
+**73 facts out of 58,989 parsed** — exactly the ambiguous keys and nothing
+else.
+
+#### 37 nport keys: unattributable, not wrong
+
+These could not be repaired by appending at all. The old scheme
+`otc:<counterparty>:<kind>:<date>` put every contract a fund held with one
+broker on one subject, so the values are *correct numbers under a key that
+cannot say which contract each belongs to*. Re-ingesting writes to the new
+six-segment subjects; the old ones are never generated again, so nothing
+supersedes them.
+
+`store/retract.py` writes a **null at a new knowledge time** — the store
+already distinguishes that from every stated value by `value_kind`, and
+latest-knowledge-wins resolves the key to "no value", which is the honest
+answer: we hold numbers here and cannot say what any of them is about.
+
+The provenance is `DERIVED` with `input_ids` naming the records being
+retracted, which is exactly what I1 asks of a derived value, so `SPTR` walks
+back from a retracted key to the rows that could not be told apart and the
+reason sits on the record rather than in a commit message. It is filed under
+`treble-correction`, not `sec-nport`: the SEC did not say this, and filing it
+under the source's name would also make the health report count it as that
+source flowing.
+
+**Nothing was deleted.** 15,043,497 facts, up by 37. An `as_of` before the
+correction still returns what was believed then, ambiguity and all — which is
+the property the bitemporal design exists to provide, and the reason a null
+was written rather than a row removed.
+
+`retract.py` is deliberately unreachable from the application. A workstation
+that can retract its own facts during normal operation is one where a bug can
+quietly erase an answer.
+
 ### Three audit mistakes of mine worth recording
 
 The first audit reported **6 million** facts the parser "would not produce".

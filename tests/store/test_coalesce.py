@@ -365,3 +365,66 @@ class TestTheCountReconcilesWithTheStore:
     def test_an_empty_batch_moves_neither(self, tmp_path: Path) -> None:
         store = DuckStore(tmp_path / "s.db")
         assert self._write(store, [], 0) == (0, 0)
+
+
+class TestAValueThatSettlesAContradictionIsWritten:
+    """Two values at one knowledge time is not a restatement.
+
+    The live store held 73 keys in that state — a parser that changed its
+    output without changing its `parser_version`, so provenance could not
+    tell the readings apart and `TIE_BREAK` settled them by ordering on the
+    value. Re-ingesting the correct answer wrote nothing, because it matched
+    the value already winning, and the contradiction stayed newest.
+
+    A value that resolves an ambiguity is new information however familiar
+    it looks.
+    """
+
+    def _contradict(self, store: DuckStore, a: float, b: float, day: int) -> None:
+        """Two different values for one key at one knowledge time — written
+        underneath the filter, because the filter is what stops it."""
+        for value in (a, b):
+            record = _provenance("fred", _at(day))
+            store.write_provenance([record])
+            store._conn.execute(
+                "INSERT INTO facts (subject, field, value_kind, value_num, value_int, "
+                "value_text, value_bool, value_date, effective_from, effective_to, "
+                "knowledge_from, provenance_id) VALUES (?, ?, 'num', ?, NULL, NULL, NULL, "
+                "NULL, ?, NULL, ?, ?)",
+                [SUBJECT, FIELD, value, EFF, _at(day), record.id],
+            )
+
+    def test_the_settling_value_is_stored(self, tmp_path: Path) -> None:
+        store = DuckStore(tmp_path / "s.db")
+        self._contradict(store, 0.81, 0.85, 0)
+        assert store.fact_count() == 2
+
+        _observe(store, 0.81, _at(1))
+        assert store.fact_count() == 3, "the value settling the contradiction was skipped"
+        assert store.coalesced == 0
+
+    def test_the_contradiction_no_longer_stands_at_the_newest_time(self, tmp_path: Path) -> None:
+        """The point of writing it: one value, unambiguously newest."""
+        store = DuckStore(tmp_path / "s.db")
+        self._contradict(store, 0.81, 0.85, 0)
+        _observe(store, 0.81, _at(1))
+        (fact,) = store.history(SUBJECT, FIELD, as_of=_at(5))
+        assert fact.value == 0.81
+        assert fact.knowledge_from == _at(1)
+
+    def test_a_settled_store_still_coalesces(self, tmp_path: Path) -> None:
+        """Proves the rule turns on the contradiction rather than switching
+        coalescing off. Once settled, repetition is redundant again."""
+        store = DuckStore(tmp_path / "s.db")
+        self._contradict(store, 0.81, 0.85, 0)
+        _observe(store, 0.81, _at(1))
+        before = store.fact_count()
+        _observe(store, 0.81, _at(2))
+        assert store.fact_count() == before
+        assert store.coalesced == 1
+
+    def test_an_unambiguous_store_is_unaffected(self, tmp_path: Path) -> None:
+        store = DuckStore(tmp_path / "s.db")
+        _observe(store, 0.81, _at(0))
+        _observe(store, 0.81, _at(1))
+        assert store.fact_count() == 1
