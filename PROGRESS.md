@@ -323,6 +323,26 @@ across 7 adapters against production endpoints, no adapter broken.
 timer ("mostly keyless, so it runs on a timer without a credential") and
 nothing runs it. A launchd agent is the macOS answer; it is not written.
 
+### `gleif-rr` declares a cadence no command can satisfy
+
+It declares one day. `treble refresh` does not build it — the entity-graph
+bulk file is `populate`-driven — so nothing can bring it back and it reports
+overdue permanently. That is exactly what `refresh`'s own docstring warns
+about for Twelve Data: "a health check that nothing can ever satisfy is worse
+than no health check, because it teaches the reader to ignore the column."
+After this sweep it is the only overdue source, at 23.2 days.
+
+**Deliberately not fixed by adding it to `refresh`.** It is also the largest
+single line in the growth projection — 37 MB/fetch daily, 13.60 GB/yr — so
+satisfying the cadence as declared would consume the remaining disk in about
+eight months on its own. The two findings are the same finding: the source
+that cannot be refreshed is the one that would fill the disk if it were.
+
+The options are to move it to GLEIF's daily *delta* files (which is also what
+removes ~23 of the 24 GB/yr), or to declare the cadence it is actually run
+at. Both are decisions about how current the entity graph needs to be, so
+neither is made here.
+
 ### Six sources have no declared cadence, so staleness is not judged
 
 `edgar-companyfacts`, `edgar-submissions`, `sec-nport`, `gleif`, `openfigi`,
