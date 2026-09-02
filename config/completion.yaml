@@ -1539,13 +1539,22 @@ phase_4:
                   existing greeks are finite-difference, see bonds.effective_duration
                   and its bump parameter. The @model registry already supplies the I3
                   envelope a compiled payoff would have to carry."}
-  P4_2:  {done: 0.0, blocker: data,
+  P4_2:  {done: 0.0, blocker: code,
           name: "RISK XVA",
-          notes: "Curves and a volatility surface both exist. What XVA needs beyond
-                  them is counterparty credit — CDS spreads — and that is the wall
-                  CDSW already hit: zero credit subjects in the store, DTCC's credit
-                  slice 403s, no free spread source found. A CVA computed from an
-                  assumed hazard rate would be a number about an assumption."}
+          notes: "Reclassified from `data` on 2026-09-02. The note this replaces said
+                  `zero credit subjects in the store, DTCC's credit slice 403s, no free
+                  spread source found`, and all three clauses are now false: the 403 was
+                  a wrong probe (single-name CDS are security-based swaps, so the SEC
+                  slug, not the CFTC one), `dtcc-credit` has fetched 20 payloads, and the
+                  store holds 274 entity curves across 530 tenor subjects. Curves and a
+                  volatility surface already existed. So XVA is engineering now — exposure
+                  simulation, netting sets, CSA and collateral — not a search for a source.
+                  What is still missing is *breadth*: 274 reference entities is a credit
+                  universe, not a counterparty universe, and a netting set names the
+                  counterparty rather than the reference name. Expect CVA to be
+                  computable for the subset of counterparties that are themselves traded
+                  reference entities, and NOT COMPUTED for the rest — carried by name, as
+                  TCA carries its three unmeasured benchmarks."}
   P4_3:  {done: 0.0, blocker: terms,
           name: "Mortgage stack: prepayment model fitted to agency loan-level data, CMO waterfalls"}
   P4_4:  {done: 0.0, blocker: data,

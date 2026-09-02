@@ -1770,13 +1770,17 @@ responses and read identically as prose:
 
 | kind | meaning | items |
 |---|---|---|
-| `code` | engineering only, nothing external needed | P3_1, P3_2, P3_4, P4_1, P5_2, P5_4, P5_5 |
-| `data` | needs a source this install does not have | P3_5, P4_2, P4_4, P5_3 |
+| `code` | engineering only, nothing external needed | P3_1, P3_2, P3_4, P4_1, **P4_2**, P5_2, P5_4, P5_5 |
+| `data` | needs a source this install does not have | P3_5, P4_4, P5_3 |
 | `terms` | a source exists; its licence forbids or is unread | P4_3 |
 | `cost` | cannot be done for nothing, which this project forbids | P5_1 |
 | `unverified` | **the assessment itself is unchecked** | P3_3 |
 
-Seven of fourteen are pure engineering. The one marked `unverified` is the
+Eight of fourteen are pure engineering — P4_2 moved there on 2026-09-02 when its
+stated blocker turned out to be a wrong probe rather than a missing source; see
+the ledger note.
+
+Seven of fourteen were pure engineering when this was written. The one marked `unverified` is the
 one to probe first: `EMS` FIX connectivity needs a simulator, `ems` was
 deferred out of Phase 2 on the assumption a free one exists, and **nobody
 has checked**. Recording that as `code` would have been a guess dressed as
