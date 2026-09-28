@@ -17,6 +17,29 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
 **Completion: 69.16%**
 
+### Decided 2026-09-28: Phase 4 fits the prepayment model on sampled vintages
+
+`P4_3` will fit against a **vintage sample** of agency loan-level data, not the full
+history. Not a compromise: a prepayment model needs loans representative across rate
+cycles, LTV, FICO, geography and servicer — not every loan ever issued. Sizing: Fannie
+Mae's complete single-family loan performance archive is ~48 GB compressed (~700 GB
+unzipped) and Freddie Mac's is comparable; a vintage sample is single-digit GB. Free disk
+is now 48.1 GB (was 8.9 GB on 09-09), so the sample fits and the full archive still does
+not. The external disk of [ADR-0013](docs/decisions/0013-the-store-moves-to-its-own-disk.md)
+is therefore **optional rather than blocking** — `treble relocate` stays built and proved.
+
+**The licence was read (it was the open question in `P4_3`) and it constrains the product,
+not only the ingest.** Fannie Mae requires registration, and its terms prohibit
+distributing the data to third parties or using it for external commercial purposes
+without express written consent. Internal analysis and model-fitting are permitted. The
+spec's **open, published prepayment model (§10.3) remains fine — published *parameters*
+are derived, not the data** — but the loan-level payloads must never be redistributed.
+I5 stores source bytes verbatim and this repo has a GitHub remote, so **before any ingest:
+prove `data/payloads` cannot reach the remote, and read the full Loan Performance Data
+License and Subscription Agreement at registration.** Freddie Mac's terms are still unread.
+
+Nothing starts yet: no phase N+1 before phase N passes in CI on a clean checkout.
+
 ### Known quality gap: `tapi/local.py` at 60% (2026-08-08)
 
 > **Superseded on 2026-09-01: it is now 68%, having been 76%.** The module
@@ -1770,15 +1793,15 @@ responses and read identically as prose:
 
 | kind | meaning | items |
 |---|---|---|
-| `code` | engineering only, nothing external needed | P3_1, P3_2, P3_4, P4_1, **P4_2**, P5_2, P5_4, P5_5 |
+| `code` | engineering only, nothing external needed | P3_1, P3_2, P3_4, P4_1, **P4_2**, **P4_3**, P5_2, P5_4, P5_5 |
 | `data` | needs a source this install does not have | P3_5, P4_4, P5_3 |
-| `terms` | a source exists; its licence forbids or is unread | P4_3 |
+| `terms` | a source exists; its licence forbids or is unread | none — P4_3 until 2026-09-28 |
 | `cost` | cannot be done for nothing, which this project forbids | P5_1 |
 | `unverified` | **the assessment itself is unchecked** | P3_3 |
 
-Eight of fourteen are pure engineering — P4_2 moved there on 2026-09-02 when its
-stated blocker turned out to be a wrong probe rather than a missing source; see
-the ledger note.
+Nine of fourteen are pure engineering. P4_2 moved there on 2026-09-02 when its
+stated blocker turned out to be a wrong probe rather than a missing source, and
+P4_3 on 2026-09-28 when its licence was finally read; see the ledger notes.
 
 Seven of fourteen were pure engineering when this was written. The one marked `unverified` is the
 one to probe first: `EMS` FIX connectivity needs a simulator, `ems` was
@@ -1786,10 +1809,43 @@ deferred out of Phase 2 on the assumption a free one exists, and **nobody
 has checked**. Recording that as `code` would have been a guess dressed as
 an assessment.
 
-`P4_3` is the KBRA lesson waiting to happen again: Fannie Mae and Freddie
-Mac publish agency loan-level performance data at no charge behind a
-registration and a data licence, and whether those terms permit this use is
-**unread**. Read them before assuming either way.
+### P4_3: the licence, read (2026-09-28)
+
+This paragraph used to say the Fannie and Freddie terms were **unread**, and to
+warn that P4_3 was the KBRA lesson waiting to happen again. They have now been
+read, and the warning was pointed at the wrong risk.
+
+**The flag was hiding three pieces with three different statuses.** CMO
+waterfalls were never blocked — they come from prospectuses via §9.4. Fitting
+the model locally is permitted by both licences. What is restricted is
+**distribution**, and the §8 criterion asks for a model *fitted*, not
+*published*. So `terms` was the wrong kind and the criterion is `code`.
+
+**The distribution constraint is real.** Freddie defines a Derived Product
+broadly and prohibits making one available to a third party with or without
+charge — being free is not the test. Its research exception turns on
+*noncommercial*, which an institutional workstation cannot simply assume.
+Fannie offers no research exception at all, only written consent.
+
+**Resolution: ship the model and the fitting harness, never the fitted
+coefficients.** Each install fits locally under its own accepted terms. This
+serves §10.3's aim better than §10.3's wording does — a procedure anyone can
+rerun is reproducible where coefficients are only inspectable — but it
+contradicts the spec sentence claiming Treble ships an open, published
+prepayment model, which needs amending. Per §10 that is a spec change to
+record, not to diverge from quietly.
+
+**One consequence binds the adapter before it exists.** §6 wants a recorded
+fixture and the digest gate wants one for every adapter, but real loan-level
+rows cannot be committed to a public repo — redistribution in part, the one
+clause with no ambiguity either side. The fixture must be **generated, never
+sampled**; a sampled fixture is a piece of the dataset.
+
+**Caveat governing all of the above:** read from search-result summaries, not
+the primary documents — WebFetch and the browser were both refused by a
+classifier outage that day. Consistent across independent results, but a
+secondary reading is not a settled one. Re-read the primaries before code is
+written against them.
 
 ### A defect the breakdown exposed
 

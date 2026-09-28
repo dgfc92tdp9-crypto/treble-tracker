@@ -1555,8 +1555,48 @@ phase_4:
                   computable for the subset of counterparties that are themselves traded
                   reference entities, and NOT COMPUTED for the rest — carried by name, as
                   TCA carries its three unmeasured benchmarks."}
-  P4_3:  {done: 0.0, blocker: terms,
-          name: "Mortgage stack: prepayment model fitted to agency loan-level data, CMO waterfalls"}
+  P4_3:  {done: 0.0, blocker: code,
+          name: "Mortgage stack: prepayment model fitted to agency loan-level data, CMO waterfalls",
+          notes: "Licence read 2026-09-28; reclassified from `terms`. The one flag was
+                  hiding three pieces with three different statuses. CMO waterfalls were
+                  never blocked at all — they come from prospectuses via §9.4, not from
+                  loan-level data. Fitting the model locally is permitted by both
+                  licences: Freddie allows retrieval and use for internal analysis of the
+                  credit performance of the described assets, and Fannie licenses the data
+                  royalty-free for internal use, purpose-restricted to analysis of its MBS
+                  and CRT. What is restricted is *distribution*, and the gate criterion
+                  asks for a model `fitted`, not `published` — so the licence does not
+                  block this criterion, and `terms` was the wrong kind.
+                  The distribution constraint is real and is recorded so it is not
+                  rediscovered: Freddie defines a Derived Product broadly (any development
+                  or service offering derived from, incorporating or relying on the data)
+                  and prohibits making one available to a third party `with or without
+                  charge`, so being free is not the test; its research exception turns on
+                  `noncommercial`, which an institutional workstation cannot simply assume.
+                  Fannie offers no research exception, only written consent. Resolution:
+                  ship the model and the fitting harness, never the fitted coefficients,
+                  and let each install fit locally under its own accepted terms. This
+                  serves §10.3's stated aim better than §10.3's own wording — a fitting
+                  procedure anyone can rerun is reproducible, where published coefficients
+                  are only inspectable — but it does contradict the sentence claiming
+                  Treble `ships an open, published prepayment model`, which needs amending
+                  to model specification and fitting procedure.
+                  One consequence binds the adapter before it exists: CLAUDE.md §6 wants a
+                  recorded fixture per adapter and the digest gate wants one for all of
+                  them, but real loan-level rows cannot be committed to a public repo —
+                  that is redistribution in part, the one clause with no ambiguity in
+                  either licence. The fixture must be GENERATED, never sampled; a sampled
+                  fixture is a piece of the dataset. The digest is unharmed, since its job
+                  is detecting parser change and synthetic input does that as well as real
+                  input — the same argument that retired the edgar-bulk and gleif-isin
+                  excuses.
+                  CAVEAT, and it governs the rest: this reading came from search-result
+                  summaries, not the primary documents. WebFetch and the browser pane were
+                  both refused by a classifier outage on the day it was made. The clause
+                  language was consistent across independent results and the shape is not
+                  in doubt, but a secondary reading is not a settled one. Re-read both
+                  primary documents before code is written against them; recording this as
+                  settled would be failure mode E."}
   P4_4:  {done: 0.0, blocker: data,
           name: "TIDX",
           notes: "Index construction needs constituents and their weights. No free
