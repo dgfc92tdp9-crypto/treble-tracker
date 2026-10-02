@@ -56,6 +56,15 @@ ENTRY_POINTS: dict[str, str] = {
 #: what wiring is missing rather than pretending none is.
 AWAITING_WIRING: dict[str, str] = {
     "treble.analytics.derivatives.totalreturn": "§12.1 pricer; no screen calls it yet.",
+    "treble.analytics.mortgage.waterfall": (
+        "§10.3 CMO waterfall, first increment: tranche priorities (sequential and pro "
+        "rata) over the collateral engine, mutation-checked 12/12. No TAPI binding yet "
+        "and deliberately so — the screen it belongs behind needs a *deal* to render, "
+        "and the structures come from Ginnie Mae REMIC factor files via an adapter that "
+        "does not exist. Wiring it to a screen that can only show a hand-built deal "
+        "would put a demonstration where §10.3 asks for published structures. The "
+        "adapter is the next increment; this entry goes when it lands."
+    ),
     "treble.im.e2ee": (
         "Olm and Megolm for room encryption (ADR-0012). Unreachable for a measured "
         "reason rather than an unfinished one: vodozemac 0.10.0 exposes no "

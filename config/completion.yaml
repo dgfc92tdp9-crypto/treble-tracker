@@ -1555,8 +1555,26 @@ phase_4:
                   computable for the subset of counterparties that are themselves traded
                   reference entities, and NOT COMPUTED for the rest — carried by name, as
                   TCA carries its three unmeasured benchmarks."}
-  P4_3:  {done: 0.0, blocker: code,
+  P4_3:  {done: 0.15, blocker: code,
           name: "Mortgage stack: prepayment model fitted to agency loan-level data, CMO waterfalls",
+          basis: "Counted against §10.3's own lists, not by impression. The criterion has
+                  two halves, weighted equally. **Prepayment model: 0.0** — nothing fitted,
+                  and the fitting needs a registration only Jack can make. **CMO
+                  waterfalls: 0.3** — of the six structural features §10.3 names (tranche
+                  priorities, PAC/TAC bands, support tranches, IO/PO strips, floaters and
+                  inverse floaters, residuals) **one** ships: tranche priorities, both
+                  sequential and pro rata. The other five are refused by name at
+                  construction rather than mispriced as fixed-rate sequentials. Of the
+                  eleven measures in §10.3's output table, **four** ship: CPR, SMM, PSA and
+                  WAL. The collateral cash-flow engine is not on either list and is a
+                  prerequisite for everything on both, which is what lifts the half above
+                  1-of-6. Mutation-checked 12 of 12, including the two mutants that
+                  survived the first pass. 0.5 x 0.3 = 0.15.
+                  NOT counted: the engine has no TAPI binding and no screen, and no real
+                  deal has been repriced. By CLAUDE.md §7 it is therefore unvalidated —
+                  conservation identities and closed-form cases are not golden values, and
+                  tests/analytics/test_golden_quantlib.py measured that exact gap when
+                  self-consistency tests missed one mutation in four.",
           notes: "Licence read 2026-09-28; reclassified from `terms`. The one flag was
                   hiding three pieces with three different statuses. CMO waterfalls were
                   never blocked at all — they come from prospectuses via §9.4, not from
