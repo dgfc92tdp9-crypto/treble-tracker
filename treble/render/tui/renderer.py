@@ -41,7 +41,15 @@ _BRAILLE = "⣀⣄⣤⣦⣶⣷⣿"
 
 
 def sparkline(values: list[float], width: int) -> str:
-    """A braille sparkline — the TUI's answer to a chart pane.
+    """A braille sparkline — one row, for panes only one row high.
+
+    **This decimates, and callers with room for a real chart should not use
+    it.** `points[::step]` keeps every `step`-th observation and discards the
+    rest, so with 5,017 closes in 78 columns it draws 78 of them and throws
+    away 98.4% — a high or low falling between two samples is simply not on
+    the chart. That is tolerable in a one-row glance and is not tolerable on
+    a screen called Price Graph, which is why `chart_lines` aggregates
+    instead. Kept for panes of height 1 and for the inline case.
 
     Returns an empty string for fewer than two points rather than drawing a
     flat line, which would imply data that is not there.
@@ -60,6 +68,132 @@ def sparkline(values: list[float], width: int) -> str:
         _BRAILLE[min(len(_BRAILLE) - 1, int((v - lo) / span * (len(_BRAILLE) - 1)))]
         for v in sampled
     )
+
+
+#: Width reserved for the y-axis gutter: six digits, a space and the rule.
+#: Fixed rather than fitted to the data, so two charts of the same security
+#: at different as-of dates have their plot areas in the same columns and
+#: can be read against each other.
+_AXIS_WIDTH = 8
+
+#: Drawn with a full block rather than a line character. A column here is a
+#: *range* — every observation in that time bucket — and `│` reads as a
+#: single path through the middle of it, which is the thing the old
+#: one-row sparkline wrongly implied.
+_BAR = "█"
+
+
+def chart_lines(
+    pane: ResolvedPane, *, height: int, width: int, label: str | None = None
+) -> list[str]:
+    """A time series as a high-low bar chart filling the pane's region.
+
+    **Replaces a one-row sparkline drawn into a twelve-row box.** `GP`
+    allocates `height: 12, width: 80` to its chart and the renderer emitted
+    a label plus a single braille row, padding the other ten with blanks.
+    So the screen named Price Graph used one twelfth of the space it asked
+    for, and compressed 5,017 observations into 78 characters by throwing
+    98.4% of them away.
+
+    Two things change. The chart uses its height, and each column
+    **aggregates** the observations in its time bucket to a minimum and a
+    maximum rather than sampling one of them. That matters beyond
+    appearance: on a price chart the extremes are most of what is being
+    looked for, and a decimating chart hides exactly the spike or the gap
+    that the viewer is checking for. A column is drawn from its bucket's
+    low to its bucket's high, so nothing in the series can fall outside
+    what is on screen.
+
+    The y-axis carries the top and bottom of the drawn range, and the
+    midpoint when there is room. Without them a line chart states only a
+    shape, and the shape of a 2% range and a 200% range are identical.
+    """
+    numeric = [float(row[-1]) for row in pane.data if row and isinstance(row[-1], int | float)]
+    plot_width = max(width - _AXIS_WIDTH, 1)
+    if len(numeric) < 2 or height < 2:
+        # One point is not a series, and a flat line drawn from it would
+        # assert a history that was never observed.
+        return [f"[{pane.binding}] {len(numeric)} point(s) — not plotted"[:width]]
+
+    # Aggregate into one bucket per column. `ceil` division rather than
+    # floor: flooring leaves a remainder that lands in no bucket, which
+    # silently drops the most recent observations — the ones most likely to
+    # be the reason the chart was opened.
+    buckets: list[tuple[float, float]] = []
+    size = -(-len(numeric) // plot_width)
+    for start in range(0, len(numeric), size):
+        window = numeric[start : start + size]
+        buckets.append((min(window), max(window)))
+
+    lo = min(b[0] for b in buckets)
+    hi = max(b[1] for b in buckets)
+    span = hi - lo
+
+    # One row goes to the time axis. A price chart whose horizontal extent
+    # is unlabelled states a shape and not a history: the same line is five
+    # days or twenty years, and `GP` holds both.
+    plot_height = max(height - 1, 1)
+    rows = [[" "] * plot_width for _ in range(plot_height)]
+    for column, (low, high) in enumerate(buckets[:plot_width]):
+        if span == 0:
+            # A genuinely flat series: one row in the middle, not a filled
+            # block, and the axis labels say the range is zero.
+            rows[plot_height // 2][column] = _BAR
+            continue
+        top = int((hi - high) / span * (plot_height - 1)) if plot_height > 1 else 0
+        bottom = int((hi - low) / span * (plot_height - 1)) if plot_height > 1 else 0
+        for row in range(top, bottom + 1):
+            rows[row][column] = _BAR
+
+    def gutter(index: int) -> str:
+        """A right-aligned axis label that fits the field it is given.
+
+        Formatted down rather than overflowed. `.6g` on a four-figure price
+        is seven characters against a six-character field, which pushed the
+        `│` rule one column right on exactly the rows that carry a label —
+        so the axis bent around its own numbers. Significant digits are
+        dropped until it fits, because a misaligned rule misreads the whole
+        chart while a label of 171.3 instead of 171.344 misreads nothing.
+        """
+        field = _AXIS_WIDTH - 2
+        value: float | None = None
+        if index == 0:
+            value = hi
+        elif index == plot_height - 1:
+            value = lo
+        elif plot_height >= 5 and index == (plot_height - 1) // 2:
+            value = (hi + lo) / 2
+        if value is None:
+            return " " * (_AXIS_WIDTH - 1)
+        for digits in (6, 5, 4, 3):
+            text = f"{value:.{digits}g}"
+            if len(text) <= field:
+                return f"{text:>{field}} "
+        return f"{text[:field]:>{field}} "
+
+    lines = [gutter(i) + "│" + "".join(r) for i, r in enumerate(rows)]
+
+    # The time axis: first and last observation, from the series' own date
+    # column. Read from the data rather than passed in, so it cannot drift
+    # out of step with the line above it.
+    stamps = [str(row[0]) for row in pane.data if row and row[0] is not None]
+    if stamps:
+        # Direction is read from the stamps, not from the pane's declared
+        # order: the resolver has already applied that order and reversed
+        # the data, so `ResolvedPane` does not carry it — and a second copy
+        # of the same fact is a second thing that can disagree.
+        first, last = stamps[0], stamps[-1]
+        if first > last:
+            first, last = last, first
+        gap = max(plot_width - len(first) - len(last), 1)
+        axis = f"{first}{' ' * gap}{last}"
+    else:
+        axis = ""
+    lines.append(" " * (_AXIS_WIDTH - 1) + "└" + axis[:plot_width])
+
+    if label:
+        lines[0] = (label[:width]).ljust(width)[:width]
+    return [line[:width] for line in lines][:height]
 
 
 def table_lines(pane: ResolvedPane, *, height: int, width: int) -> list[str]:
@@ -109,11 +243,15 @@ def render_pane(pane: ResolvedPane) -> list[str]:
     height, width = pane.region.height, pane.region.width
     lines: list[str] = []
     if pane.pane_type is PaneType.TIMESERIES and pane.data:
-        numeric = [float(row[-1]) for row in pane.data if row and isinstance(row[-1], int | float)]
-        spark = sparkline(numeric, max(width - 2, 1))
-        lines.append(f"[{pane.pane_type.value}:{pane.binding}]"[:width])
-        if spark:
-            lines.append(spark)
+        if height >= 2:
+            lines.extend(chart_lines(pane, height=height, width=width))
+        else:
+            # One row to work with: the sparkline is all that fits, and its
+            # decimation is honest at that size.
+            numeric = [
+                float(row[-1]) for row in pane.data if row and isinstance(row[-1], int | float)
+            ]
+            lines.append(sparkline(numeric, max(width - 2, 1)))
     elif pane.pane_type is PaneType.TABLE_SCROLL:
         lines.extend(table_lines(pane, height=height, width=width))
     else:

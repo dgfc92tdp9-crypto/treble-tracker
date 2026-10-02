@@ -38,7 +38,7 @@ from treble.ems.transport import HOST, SimulatorServer
 from treble.ingest.base import SourceAdapter
 from treble.ingest.health import Freshness, overdue, source_health
 from treble.ingest.populate import Populator
-from treble.ingest.replay import rebuild
+from treble.ingest.replay import adapter_classes, rebuild, replay_source
 from treble.render.server import DEFAULT_HOST, DEFAULT_PORT
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
@@ -731,6 +731,71 @@ def compact(
         console.print(
             f"[yellow]Left hot — namespace not a safe file name: "
             f"{', '.join(report.skipped)}[/yellow]"
+        )
+
+
+@app.command()
+def reparse(
+    source: list[str] = typer.Option(..., help="Source ids to re-parse. Required."),
+    data_dir: Path = typer.Option(DEFAULT_DATA_DIR, help="Where payloads and the log live."),
+) -> None:
+    """Re-read stored payloads with the current parser, into the live store.
+
+    **For a `parser_version` bump, not for a repair.** When a parser starts
+    extracting a field it previously discarded, every payload already on
+    disk contains that field: the payload store is content-addressed and
+    immutable (I5), so the new fields are recoverable without a single
+    network call. `twelvedata` was the case that prompted this — 224 stored
+    payloads had carried `open`, `high` and `low` since the first fetch and
+    the parser kept only `close` and `volume`. Re-fetching 45 symbols at
+    eight requests a minute to obtain data already held would have been
+    six minutes of calls against a rate-limited free tier for nothing.
+
+    Distinct from `replay`, which deliberately writes a **new** database so
+    there is something to compare the old one against. This writes into the
+    store you have, because the intent is not to verify a rebuild but to
+    complete one.
+
+    Safe to repeat. Facts whose value is unchanged are dropped by the
+    write-path coalescing rather than appended, so re-parsing twice adds
+    nothing the second time — the count of unchanged rows is reported so
+    that "nothing was new" is visible rather than inferred.
+    """
+    store = DuckStore(data_dir / "treble.db")
+    payloads = PayloadStore(data_dir / "payloads")
+    log = IngestLog(data_dir / "ingest.db")
+    classes = adapter_classes()
+
+    unknown = [s for s in source if s not in classes]
+    if unknown:
+        # Named rather than skipped: a typo that silently re-parses nothing
+        # reads exactly like a source that had nothing to add.
+        raise typer.BadParameter(
+            f"no adapter for {', '.join(unknown)}. Known: {', '.join(sorted(classes))}",
+            param_hint="--source",
+        )
+
+    for source_id in source:
+        written = failed = 0
+        entries = 0
+        before = store.coalesced
+        for seq, outcome in replay_source(source_id, classes[source_id], payloads, log):
+            entries += 1
+            if isinstance(outcome, Exception):
+                # Carried past, with the sequence number, because one
+                # unparseable payload among 224 should not cost the other
+                # 223 — and because the seq is what makes it findable.
+                console.print(f"  [red]seq {seq}: {type(outcome).__name__}: {outcome}[/]")
+                failed += 1
+                continue
+            store.write_provenance(list(outcome.provenance))
+            store.write_facts(list(outcome.facts))
+            written += len(outcome.facts)
+        unchanged = store.coalesced - before
+        console.print(
+            f"{source_id:<20} {entries:>4} payloads  {written:>10,} parsed  "
+            f"{written - unchanged:>10,} new  {unchanged:>10,} unchanged"
+            + (f"  [red]{failed} failed[/]" if failed else "")
         )
 
 

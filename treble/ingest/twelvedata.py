@@ -76,6 +76,28 @@ RATE_PER_SECOND = 0.12
 PRICE_FIELD = "ADJ_CLOSE"
 VOLUME_FIELD = "VOLUME"
 
+#: Open, high and low, added at `parser_version` 2 on 2026-10-02.
+#:
+#: **They were in every payload from the first fetch and the parser threw
+#: them away.** 224 stored payloads already carry `open`, `high` and `low`;
+#: only `close` and `volume` were kept, which made candlesticks, OHLC bars
+#: and every high/low study (ATR, Ichimoku, stochastics, parabolic SAR —
+#: §6.4) impossible from a store that held the data all along. It also made
+#: a price chart's per-column extremes the extremes *of closes*, which is
+#: not what a high-low range means.
+#:
+#: Carrying the same `ADJ_` prefix as the close, because they share its
+#: adjustment — established by measurement rather than by reading the
+#: vendor's docs. Raw exchange prices are quantised to whole cents and an
+#: adjusted series is not: across AAPL's oldest 200 rows only **38 of 800**
+#: OHLC values sit on an exact cent, against 304 of 800 in the newest 200.
+#: If `close` were adjusted and the other three were not, those three would
+#: be ~100% cent-quantised throughout. They are not, so one factor scales
+#: all four.
+OPEN_FIELD = "ADJ_OPEN"
+HIGH_FIELD = "ADJ_HIGH"
+LOW_FIELD = "ADJ_LOW"
+
 
 class TwelveDataError(RuntimeError):
     """The vendor reported an error, with its own message preserved."""
@@ -96,7 +118,7 @@ class TwelveDataDailyAdapter(SourceAdapter):
         redistribution_restricted=True,
         rate_limit_per_second=RATE_PER_SECOND,
     )
-    parser_version = "1"
+    parser_version = "2"
 
     def __init__(
         self,
@@ -180,29 +202,45 @@ class TwelveDataDailyAdapter(SourceAdapter):
                 # is a row this parser does not understand, and inventing a
                 # value for it would put a fabricated return in the panel.
                 continue
-            facts.append(
-                Fact(
-                    subject=subject,
-                    field=PRICE_FIELD,
-                    value=close,
-                    effective_from=day,
-                    effective_to=day,
-                    # The vendor stamps no publication time, so the knowledge
-                    # date is when this was retrieved — never the wall clock
-                    # at parse time, which would make replay non-deterministic.
-                    knowledge_from=payload.fetched_at,
-                    provenance_id=provenance.id,
+            opened = self._number(row.get("open"))
+            high = self._number(row.get("high"))
+            low = self._number(row.get("low"))
+            if high is not None and low is not None and not low <= close <= high:
+                # Refused rather than stored. `low <= close <= high` held on
+                # all 5,000 of AAPL's rows when this was added, so a
+                # violation is not a market condition — it is a vendor-side
+                # mix-up or a field this parser has misread, and a bar whose
+                # close sits outside its own range would draw a candle that
+                # cannot exist. Raising loses the symbol; storing it puts an
+                # impossible bar on a chart and an impossible range into
+                # every high/low study computed from it.
+                raise TwelveDataError(
+                    f"{symbol} {day}: close {close} is outside the bar's own range "
+                    f"[{low}, {high}]. All 5,000 rows satisfied this when OHLC was "
+                    "added, so this is a vendor error or a misread field, not a market"
                 )
-            )
-            volume = self._number(row.get("volume"))
-            if volume is not None:
+            for field, value in (
+                (PRICE_FIELD, close),
+                (OPEN_FIELD, opened),
+                (HIGH_FIELD, high),
+                (LOW_FIELD, low),
+                (VOLUME_FIELD, self._number(row.get("volume"))),
+            ):
+                if value is None:
+                    # A missing field is not a zero. Omitted, so the store
+                    # says "not reported" rather than "reported as nothing".
+                    continue
                 facts.append(
                     Fact(
                         subject=subject,
-                        field=VOLUME_FIELD,
-                        value=volume,
+                        field=field,
+                        value=value,
                         effective_from=day,
                         effective_to=day,
+                        # The vendor stamps no publication time, so the
+                        # knowledge date is when this was retrieved — never
+                        # the wall clock at parse time, which would make
+                        # replay non-deterministic.
                         knowledge_from=payload.fetched_at,
                         provenance_id=provenance.id,
                     )
@@ -236,7 +274,10 @@ class TwelveDataDailyAdapter(SourceAdapter):
 __all__ = [
     "API_KEY_ENV",
     "API_URL",
+    "HIGH_FIELD",
+    "LOW_FIELD",
     "MAX_OUTPUTSIZE",
+    "OPEN_FIELD",
     "PRICE_FIELD",
     "RATE_PER_SECOND",
     "VOLUME_FIELD",

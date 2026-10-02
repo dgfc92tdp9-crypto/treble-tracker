@@ -47,17 +47,93 @@ class TestSparkline:
         assert len(sparkline([float(i) for i in range(100)], width=8)) <= 8
 
 
-class TestPaneRendering:
-    def test_timeseries_pane_draws_a_sparkline(self) -> None:
-        pane = ResolvedPane(
-            region=Rect(row=0, col=0, height=3, width=20),
+class TestTheTimeseriesChart:
+    """What a chart pane must guarantee, now that it draws one.
+
+    This replaces a test asserting the pane rendered the string
+    `[timeseries:PX_LAST]` — the placeholder it emitted before any chart
+    existed. That test passed for as long as `GP` drew a one-row sparkline
+    into a twelve-row region, because the placeholder was all it checked.
+    """
+
+    @staticmethod
+    def _pane(points: list[float], *, height: int = 12, width: int = 80) -> ResolvedPane:
+        return ResolvedPane(
+            region=Rect(row=0, col=0, height=height, width=width),
             pane_type=PaneType.TIMESERIES,
             binding="PX_LAST",
-            data=(("d1", 1.0), ("d2", 5.0), ("d3", 3.0)),
+            data=tuple((f"2020-01-{i % 28 + 1:02d}", v) for i, v in enumerate(points)),
         )
+
+    def test_the_chart_uses_the_height_it_is_given(self) -> None:
+        # The defect this whole change exists for: eleven of twelve rows
+        # were blank because the renderer drew a single sparkline row.
+        lines = render_pane(self._pane([float(i) for i in range(500)]))
+        assert len(lines) == 12
+        drawn = [line for line in lines if "█" in line]
+        assert len(drawn) >= 10, f"only {len(drawn)} rows carry the series"
+
+    def test_an_extreme_between_samples_is_not_discarded(self) -> None:
+        """The reason aggregation replaced decimation.
+
+        A single spike placed off the sampling stride. `points[::step]`
+        skips it entirely — 5,017 closes into 78 columns keeps 1 in 64 —
+        so the chart showed a calm series on a day the price doubled. The
+        per-column min/max cannot miss it: the spike's own column spans up
+        to it.
+        """
+        points = [10.0] * 500
+        points[251] = 99.0  # deliberately not a multiple of the old stride
+        lines = render_pane(self._pane(points))
+        assert "99" in lines[0], "the spike is not on the axis"
+        # ...and it is drawn, not merely labelled.
+        assert lines[0].rstrip().endswith("█") or "█" in lines[0]
+
+    def test_the_axis_rule_stays_in_one_column(self) -> None:
+        """A label wider than its field used to bend the axis.
+
+        `.6g` on 171.344 is seven characters in a six-character field, so
+        the `│` moved one column right on exactly the rows carrying a
+        label. The rule must be in the same column on every row.
+        """
+        lines = render_pane(self._pane([2.60714, 171.344, 340.08, 99.9, 1000.5]))
+        columns = {line.index("│") for line in lines if "│" in line}
+        assert len(columns) == 1, f"rule drifts across columns {sorted(columns)}"
+
+    def test_the_time_axis_carries_the_series_endpoints(self) -> None:
+        pane = self._pane([float(i) for i in range(100)])
         lines = render_pane(pane)
-        assert "timeseries:PX_LAST" in lines[0]
-        assert any(ch in lines[1] for ch in "⣀⣄⣤⣦⣶⣷⣿")
+        assert lines[-1].lstrip().startswith("└")
+        assert str(pane.data[0][0]) in lines[-1]
+        assert str(pane.data[-1][0]) in lines[-1]
+
+    def test_a_descending_series_labels_oldest_first(self) -> None:
+        # Direction is read from the stamps, so a pane the resolver has
+        # already reversed still labels its axis left-to-right in time.
+        pane = ResolvedPane(
+            region=Rect(row=0, col=0, height=6, width=40),
+            pane_type=PaneType.TIMESERIES,
+            binding="PX_LAST",
+            data=(("2026-03-01", 3.0), ("2026-02-01", 2.0), ("2026-01-01", 1.0)),
+        )
+        axis = render_pane(pane)[-1]
+        assert axis.index("2026-01-01") < axis.index("2026-03-01")
+
+    def test_one_point_is_not_plotted_as_a_line(self) -> None:
+        lines = render_pane(self._pane([42.0]))
+        assert "not plotted" in lines[0]
+        assert "█" not in "".join(lines)
+
+    def test_a_flat_series_draws_one_row_not_a_block(self) -> None:
+        lines = render_pane(self._pane([7.0] * 50))
+        assert sum(1 for line in lines if "█" in line) == 1
+
+    def test_a_one_row_pane_falls_back_to_the_sparkline(self) -> None:
+        # The sparkline still has a job: at height 1 its decimation is the
+        # honest best available, and the chart needs two rows minimum.
+        lines = render_pane(self._pane([float(i) for i in range(50)], height=1, width=20))
+        assert len(lines) == 1
+        assert any(ch in lines[0] for ch in "⣀⣄⣤⣦⣶⣷⣿")
 
     def test_pane_fills_its_declared_region_exactly(self) -> None:
         pane = ResolvedPane(

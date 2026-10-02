@@ -183,8 +183,13 @@ Then, in rough order of what is unblocked:
 - **`TVAL` Prong 2** — issuer curves and the screen both ship. What remains is the
   rating/seniority data the similarity metric declares missing, plus §15.4/§15.5.
 - **Canvas + FDC3** — UI work, no data dependency.
-- **`PORT` / TFM3** — model and screen both ship. What remains is per-name equity coverage
-    (still absent), and the factor breadth §16.2 describes.
+- **`PORT` / TFM3** — model and screen both ship. ~~What remains is per-name equity coverage
+    (still absent)~~ — **wrong since the Twelve Data adapter landed, and corrected 2026-10-02.**
+    The store holds **45 symbols at 5,039 daily bars each, 2006-09-21 to date, full OHLCV**.
+    `GP` and `HP` render them. What remains is *breadth* — 45 names, not the universe — and the
+    factor breadth §16.2 describes. The stale claim was quoted back to Jack on 2026-10-02 as
+    "equity prices are the real gap" without anyone checking the store, which is the hazard of
+    a dated note that reads like a current one.
 - **`CDSW` to 1.0** — needs ISDA's published test cases.
 - **Ticker plant to 1.0** — more venues (only Coinbase crypto is reachable free), security master enrichment, Redpanda and NATS transports.
 
