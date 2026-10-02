@@ -14,6 +14,14 @@ Do not restate the spec or `CLAUDE.md` here. This file holds only: where we are,
 > write timeouts). After the move the full suite runs in 10s. **Do not move it back under
 > `~/Documents`, `~/Desktop`, or any iCloud-synced path.** GitHub is the backup now.
 
+> **Store location: `/Volumes/Treble/treble`** (external 2TB APFS), moved there 2026-10-02.
+> `data/` in the repo now holds `RELOCATED.json` and the workstation follows it — there is
+> nothing to export and no variable to set. **If the disk is unmounted, every command fails
+> with "the store was moved to … and nothing is there"**, which is the intended message, not a
+> fault. Headroom went from 245 days to **104,488** (746.6 MB used, 6.5 GB/yr, 1,861.8 GB free).
+> The payloads are the only part that cannot be rebuilt from anything else and they now exist
+> in **one place** — a backup of `/Volumes/Treble/treble/payloads` is worth having.
+
 **Phase:** 2 — real-time, portfolio, risk (Phase 1 complete and green on a clean checkout)
 **Completion: 69.16%**
 

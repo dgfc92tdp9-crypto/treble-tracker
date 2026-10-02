@@ -130,9 +130,14 @@ class TestSubjectEncoding:
 
 
 @pytest.fixture(params=["in-process", "nats", "kafka"])
-async def transport(
-    request: pytest.FixtureRequest, nats_url: str, kafka_bootstrap: str
-) -> AsyncIterator[TickTransport]:
+async def transport(request: pytest.FixtureRequest) -> AsyncIterator[TickTransport]:
+    # Brokers are requested *lazily*, per parameter, rather than taken as
+    # arguments. Declaring `nats_url` and `kafka_bootstrap` in the signature
+    # built both brokers for all three parameters, so the day Java stopped
+    # working on this machine `in-process` — which has no external
+    # dependency of any kind — failed too, and 18 errors pointed at a
+    # fixture two thirds of them never needed. The failure should name the
+    # transport that is actually broken.
     if request.param == "in-process":
         made: TickTransport = InProcessTransport()
     elif request.param == "kafka":
@@ -140,8 +145,10 @@ async def transport(
         # a shared topic would leave `subscribe(None)` reading every earlier
         # test's ticks, and the wildcard test asserts an exact set.
         safe = request.node.name.replace("[", ".").replace("]", "")
-        made = await KafkaTickTransport.connect(kafka_bootstrap, topic=f"conf.{safe}")
+        bootstrap: str = request.getfixturevalue("kafka_bootstrap")
+        made = await KafkaTickTransport.connect(bootstrap, topic=f"conf.{safe}")
     else:
+        nats_url: str = request.getfixturevalue("nats_url")
         # One stream, not one per test: JetStream refuses two streams whose
         # subjects overlap, and every transport here publishes under
         # `ticks.>` by design. Isolation comes from DeliverPolicy.NEW, which
