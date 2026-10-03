@@ -22,7 +22,20 @@ import pytest
 
 from treble.ingest.secrets import PLACEHOLDER, redact, scrub
 
-SECRET = "b340d21516c34005a88cc3b1f51dcadd"  # noqa: S105 - shape only; rotated
+#: A fabricated 32-hex string, matching the shape of a Twelve Data key.
+#:
+#: **It was the real key until 2026-10-03, and that was my mistake.** The
+#: leak these tests guard against had just happened, the actual value was in
+#: front of me, and I used it as the fixture with a comment reading "shape
+#: only; rotated" -- which was not true when it was written. A live
+#: credential went into a public repository annotated as already handled,
+#: by the commit whose subject was that a key had leaked.
+#:
+#: The lesson is the session's own, applied to me: a reassuring note is not
+#: the thing it describes. A fixture never needs a real secret -- the tests
+#: assert that a 32-hex string is removed from a message, and any 32-hex
+#: string demonstrates that.
+SECRET = "0123456789abcdef0123456789abcdef"  # noqa: S105 - fabricated fixture
 
 
 class TestTheLeakThatHappened:
