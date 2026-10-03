@@ -132,30 +132,24 @@ universes:
     # symbol named "True". Pydantic's string type caught it here; a looser
     # model would have sent it to the vendor and filed the 404 as a dead
     # ticker. Quote them all rather than remember which six are traps.
-    # **Four symbols were removed on 2026-10-03 because the vendor returns
-    # 404 for them, repeatably.** Left in the list they would be retried on
-    # every run forever -- four requests from an 800/day budget, and
-    # `populate` exits non-zero while any step fails, so the command could
-    # never report success. Recorded here rather than deleted silently,
-    # because "the vendor does not have it" is a fact about coverage worth
-    # keeping:
+    # Symbols deliberately excluded, with the reason as **data** rather than
+    # a comment -- `treble coverage` reads this and reports in both
+    # directions, so a name that returns to the vendor's catalogue is
+    # surfaced instead of excluded forever. Left in `equity_tickers` these
+    # would be retried on every run: four wasted requests from an 800/day
+    # budget, and `populate` exits non-zero while any step fails, so
+    # `--only twelvedata` could never have reported success.
     #
-    #   DFS  Discover Financial -- acquired by Capital One, delisted. My
-    #        error: a hand-maintained list of large issuers went stale.
-    #   HES  Hess -- acquired by Chevron, delisted. Same error.
-    #   EA   Electronic Arts -- taken private in the 2025 buyout, delisted.
-    #        It 429'd on the first run and 404'd on the retry, which is how
-    #        a rate limit can hide a permanent answer: the vendor throttles
-    #        before it looks the symbol up. The first commit said all 17
-    #        outstanding symbols were rate limits; five were not.
-    #   AVB  AvalonBay, and
-    #   EQR  Equity Residential -- both live S&P 500 REITs, and both 404.
-    #        Not a stale list: a gap in what this tier serves. If a
-    #        residential REIT is needed for sector breadth, another vendor
-    #        or another symbol convention has to supply it.
-    #
-    # The lesson is that a hand-written universe needs validating against
-    # vendor coverage, which nothing yet does.
+    # A 429 and a 404 are indistinguishable here until the limit clears --
+    # the vendor throttles before it resolves a symbol -- so all five looked
+    # like rate limits on the first run. EA is the demonstration: 429, then
+    # 404 on retry.
+    equity_tickers_unavailable:
+      DFS: "acquired by Capital One, delisted; a hand-maintained list went stale"
+      HES: "acquired by Chevron, delisted; same"
+      EA: "taken private in the 2025 buyout, delisted; 429 first, 404 on retry"
+      AVB: "live S&P 500 REIT, 404 -- a gap in what this tier serves, not a stale list"
+      EQR: "live S&P 500 REIT, 404 -- same"
     equity_tickers:
       # Mega-cap technology and communications
       - "AAPL"

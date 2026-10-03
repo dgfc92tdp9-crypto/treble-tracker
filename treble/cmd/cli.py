@@ -36,6 +36,8 @@ from treble.core.universe import load_universe_config
 from treble.ems.simulator import Simulator
 from treble.ems.transport import HOST, SimulatorServer
 from treble.ingest.base import SourceAdapter
+from treble.ingest.coverage import catalogue as vendor_catalogue
+from treble.ingest.coverage import compare as compare_coverage
 from treble.ingest.health import Freshness, overdue, source_health
 from treble.ingest.populate import Populator
 from treble.ingest.replay import adapter_classes, rebuild, replay_source
@@ -735,6 +737,42 @@ def compact(
             f"[yellow]Left hot — namespace not a safe file name: "
             f"{', '.join(report.skipped)}[/yellow]"
         )
+
+
+@app.command()
+def coverage(
+    universe: str = typer.Option("full", help="Universe name from the config file."),
+    config: Path = typer.Option(DEFAULT_CONFIG, help="Universe configuration file."),
+) -> None:
+    """Check the configured equity symbols against what the vendor serves.
+
+    **One request, not one per symbol.** Asking for each symbol's history
+    costs the same as the populate run this is meant to precede, on a tier
+    that allows ~800 a day; the catalogue endpoint answers for all of them
+    for a single credit.
+
+    Run it before a populate, because a stale universe does not fail
+    honestly. The vendor throttles *before* it resolves a symbol, so a
+    delisted name returns 429 and not 404 until the rate limit clears — on
+    2026-10-03 that made four permanently-dead symbols look like transient
+    rate limits, and the commit message written in between said so.
+
+    Reports **both** directions. A symbol in
+    `equity_tickers_unavailable` that the vendor has started serving is
+    otherwise excluded forever by a note nobody rereads.
+    """
+    load_env()
+    spec = load_universe_config(config).get(universe)
+    if not spec.equity_tickers:
+        console.print(f"{universe}: no equity_tickers configured — nothing to check")
+        return
+    report = compare_coverage(spec, vendor_catalogue())
+    for line in report.lines():
+        console.print(line)
+    if not report.ok:
+        # Non-zero, because the point is to be run before a populate and to
+        # stop one that would spend its budget on symbols that cannot work.
+        raise typer.Exit(code=1)
 
 
 @app.command()

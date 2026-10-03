@@ -69,6 +69,21 @@ class UniverseSpec(BaseModel):
     #: different things. A named list is reproducible and auditable, and the
     #: cost is that someone has to maintain it.
     equity_tickers: tuple[str, ...] = ()
+    #: Symbols deliberately excluded, mapped to why.
+    #:
+    #: These were comments in the YAML until 2026-10-03, which meant the
+    #: knowledge existed and no code could read it: a symbol removed because
+    #: the vendor 404s it looked identical to one nobody had thought of. Five
+    #: were removed that day — three delisted (DFS, HES, EA, all acquired or
+    #: taken private) and two live S&P 500 REITs the free tier does not serve
+    #: (AVB, EQR) — and the only record was prose.
+    #:
+    #: As data it does two jobs a comment cannot. `treble coverage` checks
+    #: both directions, so a symbol that *returns* to the vendor's catalogue
+    #: is reported rather than excluded forever. And the offline gate check
+    #: can tell "configured and missing from the store" — a silent hole —
+    #: from "configured, missing, and known to be unavailable".
+    equity_tickers_unavailable: dict[str, str] = Field(default_factory=dict)
     #: ECB SDMX series keys (D.USD.EUR.SP00.A) and Coinbase products
     #: (BTC-USD). Both are keyless primary sources: the ECB's own daily
     #: fixing, and an exchange's own prints.
@@ -161,6 +176,7 @@ def load_universe_config(path: Path) -> UniverseConfig:
             gleif_leis=tuple(body.get("gleif_leis") or ()),
             openfigi_cusips=tuple(body.get("openfigi_cusips") or ()),
             equity_tickers=tuple(body.get("equity_tickers") or ()),
+            equity_tickers_unavailable=dict(body.get("equity_tickers_unavailable") or {}),
             ecb_series=tuple(body.get("ecb_series") or ()),
             coinbase_products=tuple(body.get("coinbase_products") or ()),
             dtcc_report_dates=tuple(body.get("dtcc_report_dates") or ()),

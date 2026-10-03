@@ -35,5 +35,8 @@ stage "reachability"      "$VENV/python" scripts/check_unreachable_modules.py
 stage "screen periods"    "$VENV/python" scripts/check_screen_periods.py
 stage "parser digests"    "$VENV/python" scripts/check_parser_digests.py
 stage "storage budget"    "$VENV/python" scripts/check_storage_budget.py
+# The universe rather than the code: a symbol configured, holding nothing,
+# and nobody having said why. Five sat like that for a day.
+stage "universe coverage" "$VENV/python" scripts/check_universe_coverage.py
 
 printf '\nGATE GREEN — safe to commit\n'

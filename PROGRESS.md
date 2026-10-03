@@ -1934,9 +1934,38 @@ about coverage rather than a tidy-up. **221 symbols configured, 221 held,
 221 bars validated against `low <= open, close <= high` with 0 violations,
 mean history 4,840 days.**
 
-Nothing yet validates a hand-written universe against vendor coverage, which
-is how a list containing two companies acquired in 2024-25 got written in the
-first place.
+### The coverage check, built 2026-10-03
+
+Two checks, because the question has two halves and only one needs a network.
+
+**`treble coverage`** asks the vendor what it serves and compares, in **one
+request**: the catalogue endpoint answers for every symbol for a single
+credit, where asking per symbol would cost the same as the populate run it is
+meant to precede, on a tier allowing ~800 a day. First run: **20,391 US
+instruments, 221 of 221 served, no stale exclusion** — which independently
+confirms the 404 diagnosis, since AVB and EQR are absent from the catalogue
+too, so two endpoints agree.
+
+It reports **both directions**. A symbol in `equity_tickers_unavailable` the
+vendor has *started* serving is otherwise excluded forever by a note nobody
+rereads, and that is the half a comment could never check.
+
+**`scripts/check_universe_coverage.py`** is the gate, and asks something
+different with no network and no credential: of the symbols this universe
+claims, which produced no facts? A symbol can be in the catalogue and still
+hold nothing here — interrupted populate, rate limit, never run — and that
+hole shows up only as dashes on a screen. Skip path is loud, following
+`check_storage_budget.py`: a fresh checkout has no store, so skipping is what
+happens almost everywhere.
+
+Both failure paths were driven before the check was believed: a configured
+symbol with no facts, and a symbol in both lists. Each exits 1 naming the
+symbol and the fix.
+
+**`equity_tickers_unavailable` had to become data for any of this to work.**
+While it was a YAML comment, a symbol removed because the vendor 404s it was
+indistinguishable from one somebody forgot — so neither check could be
+written, and the knowledge sat in prose next to the thing it described.
 
 **Explicit, and deliberately not a `discover` sentinel.** `edgar_ciks` may be
 DISCOVER because EDGAR publishes a stable index to resolve against. Equities
