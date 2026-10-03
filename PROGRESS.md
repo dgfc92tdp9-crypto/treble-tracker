@@ -1918,6 +1918,26 @@ at 8 requests/minute is resumable rather than all-or-nothing.
 `backfill_port.py` reads the config instead of carrying its own copy, so the
 script and `populate` cannot disagree about what the universe is.
 
+**A rate limit hid four permanent answers.** The first 226-symbol run left 17
+symbols outstanding and the commit message called them all 429 failures.
+Five were not: DFS, HES and EA are delisted (all three acquired or taken
+private), and AVB and EQR are live S&P 500 REITs this tier simply does not
+serve. The vendor throttles *before* it resolves a symbol, so a 429 and a
+404 are indistinguishable until the limit clears — and a retried 429 that
+returns 404 is the only way to tell.
+
+Left in the config they would be retried forever, four requests from an
+800/day budget on every run, and `populate` exits non-zero while any step
+fails, so the command could never report success. Removed, with the reason
+for each kept in the YAML, because "the vendor does not have it" is a fact
+about coverage rather than a tidy-up. **221 symbols configured, 221 held,
+221 bars validated against `low <= open, close <= high` with 0 violations,
+mean history 4,840 days.**
+
+Nothing yet validates a hand-written universe against vendor coverage, which
+is how a list containing two companies acquired in 2024-25 got written in the
+first place.
+
 **Explicit, and deliberately not a `discover` sentinel.** `edgar_ciks` may be
 DISCOVER because EDGAR publishes a stable index to resolve against. Equities
 have no equivalent: index membership is licensed by the vendors who compile
