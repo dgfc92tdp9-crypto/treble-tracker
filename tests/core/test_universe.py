@@ -182,3 +182,72 @@ class TestLoaderRejectsUnreadKeys:
         path = self._write(tmp_path, '    edgar_bulk_quarters: ["2026q1", "2025q4"]\n')
         spec = load_universe_config(path).universes["x"]
         assert spec.edgar_bulk_quarters == ("2026q1", "2025q4")
+
+
+class TestEquityTickersAreConfiguration:
+    """The equity universe, moved out of Python on 2026-10-03.
+
+    It had lived in `scripts/backfill_port.py` as a module constant, which
+    made `twelvedata` reachable from no universe and made the one subset of
+    the security master that could only be changed by editing code — in
+    contradiction of `config/universe.yaml`'s own opening line, that subsets
+    are "a configuration, never a code change".
+    """
+
+    def test_the_real_config_declares_equity_tickers(self) -> None:
+        config = load_universe_config(CONFIG)
+        assert config.universes["dev"].equity_tickers
+        assert len(config.universes["full"].equity_tickers) >= 200
+
+    def test_every_ticker_is_a_string(self) -> None:
+        """YAML 1.1 resolves six tickers to booleans.
+
+        `ON` is ON Semiconductor and bare `ON` loads as `True`; so do OFF,
+        YES, NO, TRUE and FALSE. Caught when `UniverseSpec` refused a bool,
+        and the symbol would otherwise have been fetched as the string
+        "True" and filed as a dead ticker. Every entry is quoted in the
+        config; this is what notices if one stops being.
+        """
+        config = load_universe_config(CONFIG)
+        for name, spec in config.universes.items():
+            for ticker in spec.equity_tickers:
+                assert isinstance(ticker, str), f"{name}: {ticker!r} is {type(ticker)}"
+                assert ticker == ticker.strip()
+                assert ticker, f"{name}: empty ticker"
+
+    def test_the_boolean_trap_is_still_in_the_config(self) -> None:
+        # Not a style assertion: it keeps a real instance of the hazard in
+        # the file, so `test_every_ticker_is_a_string` is exercised against
+        # the case that actually bit rather than against a hypothetical.
+        assert "ON" in load_universe_config(CONFIG).universes["full"].equity_tickers
+
+    def test_no_duplicates(self) -> None:
+        # A repeated symbol costs a request from an 8-per-minute budget and
+        # writes nothing, since the payload is content-addressed.
+        for name, spec in load_universe_config(CONFIG).universes.items():
+            assert len(spec.equity_tickers) == len(set(spec.equity_tickers)), name
+
+    def test_each_symbol_is_its_own_step(self) -> None:
+        """One step per symbol, so a half-hour run is resumable.
+
+        A single step covering the whole list would restart all 226 to
+        recover one, which is the state `treasury-auctions` was found in.
+        """
+        spec = load_universe_config(CONFIG).universes["dev"]
+        steps = plan_steps(spec)
+        equities = [s for s in steps if s.source_id == "twelvedata"]
+        assert len(equities) == len(spec.equity_tickers)
+        assert {s.key for s in equities} == set(spec.equity_tickers)
+
+    def test_the_request_uri_carries_no_credential(self) -> None:
+        from datetime import date
+
+        from treble.ingest.populate import uri_for_step
+
+        uri = uri_for_step(
+            PopulationStep(source_id="twelvedata", key="ON"),
+            fred_start=date(2020, 1, 1),
+            fred_end=date(2026, 1, 1),
+        )
+        assert "symbol=ON" in uri
+        assert "apikey" not in uri.lower()

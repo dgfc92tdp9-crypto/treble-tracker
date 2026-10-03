@@ -51,6 +51,24 @@ class UniverseSpec(BaseModel):
     #: exactly what these two were until now.
     gleif_leis: tuple[str, ...] = ()
     openfigi_cusips: tuple[str, ...] = ()
+    #: Equity symbols to fetch daily OHLCV history for (Twelve Data).
+    #:
+    #: Added 2026-10-03 for the reason stated above `gleif_leis`: until
+    #: today this list lived in `scripts/backfill_port.py` as a module
+    #: constant, so `twelvedata` was reachable from no universe and the one
+    #: subset of the security master that could only be changed by editing
+    #: Python — in a file whose own header says subsets are "a
+    #: configuration, never a code change".
+    #:
+    #: **Explicit, and deliberately not a `discover` sentinel.** `edgar_ciks`
+    #: may be DISCOVER because EDGAR publishes a stable index to resolve it
+    #: against. There is no equivalent for equities: index membership is
+    #: licensed by the vendors who compile it — the same wall `TIDX` hit —
+    #: and ranking by what this store happens to hold deepest would make the
+    #: universe depend on its own contents, so two runs would populate
+    #: different things. A named list is reproducible and auditable, and the
+    #: cost is that someone has to maintain it.
+    equity_tickers: tuple[str, ...] = ()
     #: ECB SDMX series keys (D.USD.EUR.SP00.A) and Coinbase products
     #: (BTC-USD). Both are keyless primary sources: the ECB's own daily
     #: fixing, and an exchange's own prints.
@@ -142,6 +160,7 @@ def load_universe_config(path: Path) -> UniverseConfig:
             edgar_bulk_quarters=tuple(body.get("edgar_bulk_quarters") or ()),
             gleif_leis=tuple(body.get("gleif_leis") or ()),
             openfigi_cusips=tuple(body.get("openfigi_cusips") or ()),
+            equity_tickers=tuple(body.get("equity_tickers") or ()),
             ecb_series=tuple(body.get("ecb_series") or ()),
             coinbase_products=tuple(body.get("coinbase_products") or ()),
             dtcc_report_dates=tuple(body.get("dtcc_report_dates") or ()),
@@ -206,6 +225,13 @@ def plan_steps(
         steps.append(PopulationStep(source_id="ecb-fx", key=key))
     for product in spec.coinbase_products:
         steps.append(PopulationStep(source_id="coinbase", key=product))
+    for ticker in spec.equity_tickers:
+        # One step per symbol, not one step for the whole list. The vendor
+        # charges a request per symbol and allows eight a minute, so a
+        # 226-symbol run is half an hour that must survive being
+        # interrupted — and a single step covering every symbol would
+        # restart all of them to recover one.
+        steps.append(PopulationStep(source_id="twelvedata", key=ticker))
     for report_date in spec.dtcc_report_dates:
         steps.append(PopulationStep(source_id="dtcc-sdr", key=report_date))
     return steps

@@ -1860,6 +1860,102 @@ classifier outage that day. Consistent across independent results, but a
 secondary reading is not a settled one. Re-read the primaries before code is
 written against them.
 
+## A live API key printed to disk, and the docstring that promised it could not (2026-10-03)
+
+**`TWELVEDATA_API_KEY` must be rotated.** It was printed five times during a
+226-symbol populate run and written to a task log on disk. Scrubbed from that
+file, but it existed in plaintext outside `.env` and should be treated as
+exposed.
+
+Scanned, and the exposure was narrow: **nothing in the payload store, the
+ingest log, the working tree or git history** — `source_uri` genuinely is
+built without the key, so every durable record was clean. The leak was the
+console and log path only.
+
+**The mechanism that failed was an argument, not a guard.**
+`SourceAdapter._get` carried this, in its own docstring:
+
+> The exception is re-raised rather than wrapped, so the caller still sees the
+> vendor's own error, and `params` never reaches a message or a log: for
+> several adapters it carries the API key.
+
+The reasoning was that `_get` never *adds* `params` to a message. It does not
+have to — `httpx` composes the request URL itself and puts it in its own
+`HTTPStatusError` message. Six symbols hit 429, and each error carried the
+full URL including `apikey=`.
+
+So this is failure mode **E** on the one subject where an untested
+explanation is least affordable: the durable half of the promise was kept by
+construction (content-addressed payloads, a hand-built `source_uri`) and the
+transient half had nothing behind it but a sentence.
+
+`treble/ingest/secrets.py` is the guard. It matches credential-bearing query
+parameter **names** rather than secret values, because scrubbing by value
+would mean holding every credential in the process in order to remove them,
+and would silently miss any key it had not been told about. `_get` now raises
+`redact(exc) from None` — `from None` as well, since `__context__` would
+otherwise keep the unredacted original reachable.
+
+`tests/ingest/test_secrets.py` builds a **real** `httpx.HTTPStatusError` from
+a real `Request` rather than a hand-written string, and asserts the premise
+first: `test_httpx_really_does_put_the_key_in_its_message`. A test against a
+string I wrote myself would have passed against the broken code, because the
+dangerous string is the one the library writes.
+
+---
+
+## Equity coverage: the list was never configuration (2026-10-03)
+
+`config/universe.yaml` opens by saying subsets are "a configuration, never a
+code change". The equity universe was the exception: 45 symbols as a module
+constant in `scripts/backfill_port.py`, which also made `twelvedata` an
+adapter **reachable from no universe** — the exact thing the comment above
+`gleif_leis` was written about when those two were in the same state.
+
+Now `equity_tickers` on `UniverseSpec`, **226 symbols** in the `full`
+universe and 10 in `dev`, one `PopulationStep` per symbol so a half-hour run
+at 8 requests/minute is resumable rather than all-or-nothing.
+`backfill_port.py` reads the config instead of carrying its own copy, so the
+script and `populate` cannot disagree about what the universe is.
+
+**Explicit, and deliberately not a `discover` sentinel.** `edgar_ciks` may be
+DISCOVER because EDGAR publishes a stable index to resolve against. Equities
+have no equivalent: index membership is licensed by the vendors who compile
+it — the same wall `TIDX` hit — and ranking by what this store holds deepest
+would make the universe depend on its own contents, so two runs would
+populate different things. The cost of a named list is that someone
+maintains it; the benefit is that it is reproducible.
+
+### YAML turned a ticker into a boolean
+
+`ON` is ON Semiconductor. YAML 1.1 resolves `ON`, `OFF`, `YES`, `NO`, `TRUE`
+and `FALSE` to booleans, so bare `ON` loaded as `True`. `UniverseSpec`'s
+string type refused it; a looser model would have sent `"True"` to the vendor
+and filed the 404 as a dead ticker. **Every symbol in the config is quoted**,
+and `test_the_boolean_trap_is_still_in_the_config` keeps a real instance of
+the hazard in the file so the guard is exercised against the case that
+actually bit rather than a hypothetical.
+
+### `populate --only`, and the gap it closed
+
+`refresh` has had `--only` since it was written. `populate` did not, so
+adding a price source to the full universe meant 16,000 unrelated EDGAR
+steps or a hand-written script — which is why the symbol list ended up in a
+script in the first place. The flag is the reason that will not recur.
+
+### `treble reparse`
+
+A `parser_version` bump had no path into the live store: `replay` writes a
+**new** database by design, so there was something to compare against. When
+the Twelve Data parser started keeping `open`, `high` and `low` — fields
+every one of the 224 stored payloads had carried since the first fetch —
+the new data was recoverable with **no network at all**: 5,496,340 facts
+parsed, 1,550,286 new, 3,946,054 dropped as unchanged by the write-path
+coalescing. Re-fetching 45 symbols at 8/minute for data already held would
+have been six minutes of rate-limited calls for nothing.
+
+---
+
 ### A defect the breakdown exposed
 
 `scripts/completion.py` credited earlier phases their **full weight**, on

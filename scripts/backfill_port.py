@@ -9,7 +9,9 @@ on it would look broken.
 The universe is chosen for cross-sectional spread rather than size alone.
 Estimating SMB, HML, RMW and CMA exposures needs names that actually differ
 on those dimensions; forty mega-cap technology stocks would produce four
-factors with nothing to separate them and betas that mean very little.
+factors with nothing to separate them and betas that mean very little. It
+now lives in `config/universe.yaml` and is read from there, so this script
+and `treble populate` cannot come to disagree about what the universe is.
 """
 
 from __future__ import annotations
@@ -21,66 +23,23 @@ import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
-from treble.cmd.cli import DEFAULT_DATA_DIR
+from treble.cmd.cli import DEFAULT_CONFIG, DEFAULT_DATA_DIR
+from treble.core.universe import load_universe_config
 from treble.ingest.frenchdata import FrenchDataAdapter
 from treble.ingest.twelvedata import API_KEY_ENV, TwelveDataDailyAdapter
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadStore
 
-UNIVERSE: tuple[str, ...] = (
-    # Mega-cap technology
-    "AAPL",
-    "MSFT",
-    "NVDA",
-    "GOOGL",
-    "META",
-    "AVGO",
-    "ORCL",
-    "CRM",
-    # Financials -- value and rate-sensitive
-    "JPM",
-    "BAC",
-    "WFC",
-    "GS",
-    "BRK.B",
-    "AXP",
-    "USB",
-    "SCHW",
-    # Health care
-    "JNJ",
-    "UNH",
-    "PFE",
-    "MRK",
-    "ABBV",
-    "TMO",
-    "CVS",
-    # Consumer staples and discretionary
-    "PG",
-    "KO",
-    "PEP",
-    "WMT",
-    "COST",
-    "MCD",
-    "NKE",
-    "HD",
-    # Industrials and energy -- the CMA and RMW spread
-    "CAT",
-    "GE",
-    "UNP",
-    "HON",
-    "XOM",
-    "CVX",
-    "COP",
-    # Utilities, telecoms, REITs -- high yield, low beta
-    "NEE",
-    "DUK",
-    "SO",
-    "VZ",
-    "T",
-    "AMT",
-    "PLD",
-)
+#: Read from `config/universe.yaml` rather than written here.
+#:
+#: This was a 45-symbol tuple in this file, which made `twelvedata` an
+#: adapter reachable from no universe and made the equity list the one
+#: subset of the security master that needed a code change to alter --
+#: against the stated rule in the config's own header. Moved 2026-10-03;
+#: `treble populate` now plans one step per symbol, so this script is no
+#: longer the only way to add a name.
+UNIVERSE: tuple[str, ...] = load_universe_config(DEFAULT_CONFIG).universes["full"].equity_tickers
 
 
 def _load_env() -> None:

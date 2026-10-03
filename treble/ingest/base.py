@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict
 
 from treble.core.facts import Fact
 from treble.core.provenance import Provenance
+from treble.ingest.secrets import redact
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadHash, PayloadStore
 
@@ -171,9 +172,23 @@ class SourceAdapter(ABC):
         tier — and repeating it three times turns a clear error into a
         slow one while using up the quota that would have fixed it.
 
-        The exception is re-raised rather than wrapped, so the caller still
-        sees the vendor's own error, and ``params`` never reaches a message
-        or a log: for several adapters it carries the API key.
+        **Secrets are stripped from the error, and that sentence replaces a
+        wrong one.** This docstring used to claim that re-raising unwrapped
+        meant "``params`` never reaches a message or a log: for several
+        adapters it carries the API key". The reasoning was that this code
+        never *adds* params to a message. It does not have to: `httpx`
+        builds the request URL itself and puts it in its own
+        ``HTTPStatusError`` message, key and all.
+
+        On 2026-10-03 a 226-symbol populate run hit 429 on six symbols and
+        printed the live Twelve Data key five times, into the console and
+        into a task log on disk. Nothing reached the payload store or the
+        ingest log — `source_uri` really is built without the key — so the
+        I5 half of the promise held and the console half never did.
+
+        `redact` now rewrites the message of anything raised from here.
+        Failure mode E, on the one subject where an untested explanation is
+        least affordable.
         """
         last: Exception | None = None
         for attempt in range(attempts):
@@ -183,7 +198,10 @@ class SourceAdapter(ABC):
                 response.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code not in RETRIABLE_STATUS:
-                    raise
+                    # `from None` as well as redaction: the original
+                    # exception stays reachable through __context__
+                    # otherwise, and its message is the thing being removed.
+                    raise redact(exc) from None
                 last = exc
             except httpx.TransportError as exc:
                 # Connection reset, truncated body, read timeout: the
@@ -195,7 +213,9 @@ class SourceAdapter(ABC):
             if attempt + 1 < attempts:
                 time.sleep(RETRY_BACKOFF_SECONDS * (2**attempt))
         assert last is not None  # noqa: S101 - the loop cannot exit without one
-        raise last
+        raise redact(last) from None
+
+    # ------------------------------------------------------------------
 
     @abstractmethod
     def fetch(self) -> Iterator[RawPayload]:

@@ -51,6 +51,8 @@ from treble.ingest.nport import ARCHIVE_URL, NportAdapter
 from treble.ingest.openfigi import MAPPING_URL as OPENFIGI_URL
 from treble.ingest.openfigi import OpenFigiAdapter
 from treble.ingest.treasury import AUCTIONS_URL, TreasuryAuctionsAdapter
+from treble.ingest.twelvedata import API_URL as TWELVEDATA_URL
+from treble.ingest.twelvedata import MAX_OUTPUTSIZE, TwelveDataDailyAdapter
 from treble.store.duck import DuckStore
 from treble.store.ingest_log import IngestLog
 from treble.store.payloads import PayloadStore
@@ -95,6 +97,10 @@ def uri_for_step(step: PopulationStep, *, fred_start: date, fred_end: date) -> s
             return ECB_SERIES_URL.format(key=step.key)
         case "coinbase":
             return f"{COINBASE_URL.format(product=step.key)}?granularity=86400"
+        case "twelvedata":
+            # Built without the key, matching the adapter: a credential in a
+            # stored URI survives every replay.
+            return f"{TWELVEDATA_URL}?symbol={step.key}&interval=1day&outputsize={MAX_OUTPUTSIZE}"
         case "dtcc-sdr":
             return file_url(date.fromisoformat(step.key))
     raise ValueError(f"no URI mapping for source {step.source_id!r}")
@@ -163,6 +169,8 @@ class Populator:
                 return EcbExchangeRatesAdapter(self._payloads, self._log, series=(step.key,))
             case "coinbase":
                 return CoinbaseCandlesAdapter(self._payloads, self._log, products=(step.key,))
+            case "twelvedata":
+                return TwelveDataDailyAdapter(self._payloads, self._log, symbols=(step.key,))
             case "dtcc-sdr":
                 return DtccSdrRatesAdapter(
                     self._payloads, self._log, report_dates=(date.fromisoformat(step.key),)
@@ -232,9 +240,23 @@ class Populator:
         return tuple(sorted(set(iter_discovered_ciks(payload))))
 
     def outstanding(
-        self, spec: UniverseSpec, *, discovered_ciks: tuple[int, ...] = ()
+        self,
+        spec: UniverseSpec,
+        *,
+        discovered_ciks: tuple[int, ...] = (),
+        only: tuple[str, ...] = (),
     ) -> list[PopulationStep]:
+        """Steps not yet completed, optionally narrowed to some sources.
+
+        ``only`` exists because the full universe plans ~16,000 EDGAR steps
+        alongside 226 equity ones, so adding a price source meant either
+        hours of unrelated work or a hand-written script. `refresh` has had
+        the same flag since it was written; this is the gap between them
+        closed.
+        """
         steps = plan_steps(spec, discovered_ciks=discovered_ciks)
+        if only:
+            steps = [s for s in steps if s.source_id in only]
         uri_for = {
             str(s): uri_for_step(s, fred_start=self._fred_start, fred_end=self._fred_end)
             for s in steps
@@ -247,6 +269,7 @@ class Populator:
         *,
         discovered_ciks: tuple[int, ...] = (),
         limit: int | None = None,
+        only: tuple[str, ...] = (),
         on_step: Callable[[PopulationStep, int, int], None] | None = None,
     ) -> PopulationResult:
         """Execute outstanding steps, writing facts as each completes.
@@ -255,7 +278,9 @@ class Populator:
         interrupted after 400 of 8,000 filers keeps those 400.
         """
         planned = plan_steps(spec, discovered_ciks=discovered_ciks)
-        todo = self.outstanding(spec, discovered_ciks=discovered_ciks)
+        if only:
+            planned = [s for s in planned if s.source_id in only]
+        todo = self.outstanding(spec, discovered_ciks=discovered_ciks, only=only)
         already = len(planned) - len(todo)
         if limit is not None:
             todo = todo[:limit]

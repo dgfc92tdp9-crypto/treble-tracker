@@ -149,6 +149,7 @@ def populate(
     config: Path = typer.Option(DEFAULT_CONFIG, help="Universe configuration file."),
     contact: str | None = typer.Option(None, help="Contact email for the EDGAR User-Agent."),
     limit: int | None = typer.Option(None, help="Stop after this many steps (for a trial run)."),
+    only: list[str] = typer.Option([], help="Populate only these source ids."),
     history_days: int = typer.Option(365, help="How far back to pull macro series."),
     dry_run: bool = typer.Option(False, help="Report outstanding work without fetching."),
 ) -> None:
@@ -169,7 +170,7 @@ def populate(
         discovered = populator.discover_ciks()
         console.print(f"[dim]discovered {len(discovered)} filers[/dim]")
 
-    todo = populator.outstanding(spec, discovered_ciks=discovered)
+    todo = populator.outstanding(spec, discovered_ciks=discovered, only=tuple(only))
     console.print(f"[bold]{universe}[/bold]: {spec.description}")
     console.print(f"outstanding steps: {len(todo)}")
     if dry_run:
@@ -185,7 +186,9 @@ def populate(
     def progress(step, index: int, total: int) -> None:  # type: ignore[no-untyped-def]
         console.print(f"[dim]{index}/{total}[/dim] {step}")
 
-    result = populator.run(spec, discovered_ciks=discovered, limit=limit, on_step=progress)
+    result = populator.run(
+        spec, discovered_ciks=discovered, limit=limit, only=tuple(only), on_step=progress
+    )
     console.print(
         f"[green]executed {result.executed}[/green], "
         f"already done {result.already_done}, "
