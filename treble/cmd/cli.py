@@ -154,11 +154,28 @@ def populate(
     only: list[str] = typer.Option([], help="Populate only these source ids."),
     history_days: int = typer.Option(365, help="How far back to pull macro series."),
     dry_run: bool = typer.Option(False, help="Report outstanding work without fetching."),
+    skip_coverage: bool = typer.Option(
+        False, help="Do not check vendor coverage first (offline, or no key)."
+    ),
 ) -> None:
     """Populate the security master for a configured universe.
 
     Resumable: re-running fetches only what is missing, so an interrupted
     run loses nothing.
+
+    **Vendor coverage is checked first, when there is equity work to do.**
+    Not because it is tidy, but because "run `treble coverage` before a
+    populate" was advice in a docstring, and advice in a docstring is how
+    the equity list came to contain two companies acquired in 2024-25. It
+    costs one request, it is skipped when no equity step is outstanding, and
+    symbols the vendor does not serve are **dropped from this run and named**
+    rather than blocking it: the whole point is to not spend an 8-per-minute
+    budget on symbols that cannot work, and a delisted name should not stop
+    220 live ones.
+
+    `--skip-coverage` exists for an offline run or a missing key, and says so
+    when it is used. A precondition that cannot be bypassed deliberately gets
+    bypassed accidentally.
     """
     spec = load_universe_config(config).get(universe)
     populator = _populator(data_dir, _contact_email(contact), history_days)
@@ -173,6 +190,7 @@ def populate(
         console.print(f"[dim]discovered {len(discovered)} filers[/dim]")
 
     todo = populator.outstanding(spec, discovered_ciks=discovered, only=tuple(only))
+
     console.print(f"[bold]{universe}[/bold]: {spec.description}")
     console.print(f"outstanding steps: {len(todo)}")
     if dry_run:
@@ -184,6 +202,49 @@ def populate(
     if not todo:
         console.print("[green]Already populated — nothing to do.[/green]")
         return
+
+    # After the dry-run return, because `--dry-run` promises to report
+    # "without fetching" and the catalogue is a fetch. A dry run reports
+    # *planned* work; coverage filtering is a decision made at run time.
+    #
+    # Only when equity work is actually outstanding: the catalogue costs a
+    # request, and a 16,000-step EDGAR run should not spend one to learn
+    # nothing.
+    if spec.equity_tickers and any(s.source_id == "twelvedata" for s in todo):
+        if skip_coverage:
+            console.print("[yellow]vendor coverage not checked (--skip-coverage)[/yellow]")
+        else:
+            try:
+                report = compare_coverage(spec, vendor_catalogue())
+            except Exception as exc:
+                # Carried past rather than fatal. A catalogue that cannot be
+                # reached is a reason to proceed with a warning, not a reason
+                # to refuse work the operator asked for — but silence here
+                # would make the check indistinguishable from having run.
+                console.print(f"[yellow]vendor coverage unavailable: {exc}[/yellow]")
+            else:
+                for line in report.lines():
+                    console.print(f"[dim]{line}[/dim]")
+                if report.missing:
+                    unserved = set(report.missing)
+                    spec = spec.model_copy(
+                        update={
+                            "equity_tickers": tuple(
+                                s for s in spec.equity_tickers if s not in unserved
+                            )
+                        }
+                    )
+                    todo = [
+                        s for s in todo if not (s.source_id == "twelvedata" and s.key in unserved)
+                    ]
+                    console.print(
+                        f"[yellow]skipping {len(unserved)} symbol(s) the vendor does not "
+                        f"serve: {', '.join(sorted(unserved))}[/yellow]"
+                    )
+                    console.print(
+                        "[dim]record them in equity_tickers_unavailable so they stop "
+                        "being planned at all[/dim]"
+                    )
 
     def progress(step, index: int, total: int) -> None:  # type: ignore[no-untyped-def]
         console.print(f"[dim]{index}/{total}[/dim] {step}")

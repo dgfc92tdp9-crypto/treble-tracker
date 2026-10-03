@@ -12,7 +12,9 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+import treble.cmd.cli as cli_module
 from treble.cmd.cli import ContactMissingError, _contact_email, app
+from treble.ingest.populate import PopulationResult, Populator
 
 runner = CliRunner()
 CONFIG = Path(__file__).parent.parent.parent / "config" / "universe.yaml"
@@ -212,3 +214,153 @@ class TestEveryDocumentedCommandIsRegistered:
         assert result.exit_code == 0
         for name in sorted(self.EXPECTED):
             assert name in result.output, f"{name} is missing from `treble --help`"
+
+
+class TestPopulateChecksCoverageFirst:
+    """Coverage is a precondition of populate, not advice about it.
+
+    "Run `treble coverage` before a populate" was a sentence in a docstring,
+    and a sentence in a docstring is how the equity list came to contain two
+    companies acquired in 2024-25. These pin the three behaviours that make
+    it a mechanism: it runs when there is equity work, it does not when
+    there is not, and bypassing it is announced.
+    """
+
+    @staticmethod
+    def _config(tmp_path: Path, tickers: list[str]) -> Path:
+        path = tmp_path / "universe.yaml"
+        body = "\n".join(f'      - "{t}"' for t in tickers)
+        path.write_text(
+            "universes:\n  u:\n    description: d\n    edgar_ciks: []\n"
+            f"    equity_tickers:\n{body}\n"
+        )
+        return path
+
+    def test_an_unserved_symbol_is_dropped_and_named(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The vendor serves one of the two. The other must not cost a
+        # request: that is the entire saving, on an 8-per-minute tier.
+        monkeypatch.setattr(cli_module, "vendor_catalogue", lambda: frozenset({"AAPL"}))
+        seen: list[str] = []
+
+        def capture(self, spec, **kwargs):  # type: ignore[no-untyped-def]
+            seen.extend(spec.equity_tickers)
+            return PopulationResult(planned=0, already_done=0, executed=0, facts_written=0)
+
+        monkeypatch.setattr(Populator, "run", capture)
+        result = runner.invoke(
+            app,
+            [
+                "populate",
+                "--universe",
+                "u",
+                "--config",
+                str(self._config(tmp_path, ["AAPL", "DEAD"])),
+                "--data-dir",
+                str(tmp_path / "d"),
+                "--only",
+                "twelvedata",
+            ],
+        )
+        assert "DEAD" in result.output
+        assert "does not serve" in result.output
+        # ...and the dead symbol never reached the fetching layer.
+        assert seen == ["AAPL"], seen
+
+    @pytest.fixture(autouse=True)
+    def _never_fetch(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # §7: no command under test touches the network. The seam is
+        # `Populator.run`, so the coverage decision is exercised and the
+        # fetching that would follow it never happens.
+        monkeypatch.setattr(
+            Populator,
+            "run",
+            lambda self, spec, **kw: PopulationResult(
+                planned=0, already_done=0, executed=0, facts_written=0
+            ),
+        )
+
+    def test_no_equity_work_means_no_catalogue_request(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The catalogue costs a credit; a run with nothing to fetch must not.
+
+        A 16,000-step EDGAR run should not spend a request to learn nothing.
+        """
+        called = False
+
+        def spy() -> frozenset[str]:
+            nonlocal called
+            called = True
+            return frozenset()
+
+        monkeypatch.setattr(cli_module, "vendor_catalogue", spy)
+        runner.invoke(
+            app,
+            [
+                "populate",
+                "--universe",
+                "u",
+                "--config",
+                str(self._config(tmp_path, [])),
+                "--data-dir",
+                str(tmp_path / "d"),
+            ],
+        )
+        assert not called, "the catalogue was fetched with no equity work outstanding"
+
+    def test_skip_coverage_announces_itself(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A bypass that is silent is indistinguishable from a check that ran.
+        def never() -> frozenset[str]:
+            raise AssertionError("coverage was fetched despite --skip-coverage")
+
+        monkeypatch.setattr(cli_module, "vendor_catalogue", never)
+        result = runner.invoke(
+            app,
+            [
+                "populate",
+                "--universe",
+                "u",
+                "--config",
+                str(self._config(tmp_path, ["AAPL"])),
+                "--data-dir",
+                str(tmp_path / "d"),
+                "--only",
+                "twelvedata",
+                "--skip-coverage",
+            ],
+        )
+        assert "--skip-coverage" in result.output or "not checked" in result.output
+
+    def test_an_unreachable_catalogue_warns_rather_than_aborts(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Offline is a reason to warn, not to refuse requested work.
+
+        But silence would make the check indistinguishable from having run,
+        which is the failure this repository keeps recording.
+        """
+
+        def boom() -> frozenset[str]:
+            raise RuntimeError("no network")
+
+        monkeypatch.setattr(cli_module, "vendor_catalogue", boom)
+        result = runner.invoke(
+            app,
+            [
+                "populate",
+                "--universe",
+                "u",
+                "--config",
+                str(self._config(tmp_path, ["AAPL"])),
+                "--data-dir",
+                str(tmp_path / "d"),
+                "--only",
+                "twelvedata",
+            ],
+        )
+        assert "coverage unavailable" in result.output
+        assert "no network" in result.output

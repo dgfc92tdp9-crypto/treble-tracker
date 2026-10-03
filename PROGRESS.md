@@ -1962,6 +1962,29 @@ Both failure paths were driven before the check was believed: a configured
 symbol with no facts, and a symbol in both lists. Each exits 1 naming the
 symbol and the fix.
 
+**And populate runs it, rather than being told to.** "Run `treble coverage`
+before a populate" was a sentence in a docstring, which is the same kind of
+instruction as the four stale records above: true when written, unenforced,
+and no mechanism behind it. `populate` now fetches the catalogue itself when
+equity work is outstanding, drops the symbols the vendor does not serve, and
+names them.
+
+Three behaviours, each driven before being believed:
+
+* **unserved symbol outstanding** -> `served: 221 of 222`, names it, skips it,
+  `executed 0`. The dead symbol never reaches the fetching layer.
+* **no equity work outstanding** -> the catalogue is never requested. It costs
+  a credit, and a 16,000-step EDGAR run should not spend one to learn nothing.
+* **`--skip-coverage`** -> the dead symbol is attempted and 404s, which is the
+  wasted request the check exists to avoid. A bypass that cannot be taken
+  deliberately gets taken accidentally, so it exists and announces itself.
+
+An unreachable catalogue warns and proceeds: offline is a reason to warn, not
+to refuse work the operator asked for. Silence is not an option, because it
+would be indistinguishable from the check having run. The block sits after
+the `--dry-run` return, since that flag promises to report "without fetching"
+and the catalogue is a fetch.
+
 **`equity_tickers_unavailable` had to become data for any of this to work.**
 While it was a YAML comment, a symbol removed because the vendor 404s it was
 indistinguishable from one somebody forgot — so neither check could be
